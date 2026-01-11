@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>doom-like raycasted on pure canvas</title>
+<style>
+    body {
+        margin: 0;
+        background: black;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+    }
+    canvas {
+        border: 1px solid #333;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+    }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+// Configuração
+const SCREEN_W = 800;
+const SCREEN_H = 600;
+const FOV = Math.PI / 3;
+const MOVE_SPEED = 0.08;
+const ROT_SPEED = 0.03;
+const PLAYER_RADIUS = 0.3;
+const RENDER_DISTANCE = 20;
+
+canvas.width = SCREEN_W;
+canvas.height = SCREEN_H;
+
+// Desativa suavização de imagem
+ctx.imageSmoothingEnabled = false;
+
+// Mapa
+const mapData = [
+    [1,1,1,1,1,1,1,1,1,1],
+    [1,-1,-1,-2,-2,-2,-2,-1,-1,1],
+    [1,-1,2,-2,-3,-3,3,-2,-1,1],
+    [1,-2,-2,-3,-3,-3,-3,-2,-2,1],
+    [1,-2,-3,-3,-1,-1,-3,-3,-2,1],
+    [1,-2,-2,-3,3,-1,2,-2,-2,1],
+    [1,-1,-1,-2,-2,-2,-2,-1,-1,1],
+    [1,1,1,1,1,1,1,1,1,1],
+];
+
+const MAP_W = mapData[0].length;
+const MAP_H = mapData.length;
+
+// Player
+const player = {
+    x: 3.5,
+    y: 3.5,
+    angle: 0,
+    height: 0.5
+};
+
+// NPCs
+const npcs = [
+    { x: 2.5, y: 2.5 },
+    { x: 6.5, y: 5.5 },
+    { x: 5.0, y: 3.0 },
+    { x: 4.5, y: 5.0 }
+];
+
+// Texturas
+const textures = {
+    walls: {},
+    floors: {},
+    npc: null
+};
+
+let texturesLoaded = 0;
+const totalTextures = 7;
+
+// Carregar texturas
+function loadTexture(path, callback) {
+    const img = new Image();
+    img.onload = () => {
+        texturesLoaded++;
+        callback(img);
+    };
+    img.src = path;
+}
+
+loadTexture('./dcss/dungeon/wall/metal_wall_brown.png', img => textures.walls[1] = img);
+loadTexture('./dcss/dungeon/wall/stone2_gray_3_old.png', img => textures.walls[2] = img);
+loadTexture('./dcss/dungeon/wall/slime_stone_0.png', img => textures.walls[3] = img);
+loadTexture('./dcss/dungeon/wall/slime_stone_0.png', img => textures.floors[1] = img);
+loadTexture('./dcss/dungeon/wall/slime_stone_0.png', img => textures.floors[2] = img);
+loadTexture('./dcss/dungeon/wall/slime_stone_0.png', img => textures.floors[3] = img);
+loadTexture('./dcss/player/base/human_male.png', img => textures.npc = img);
+
+// Controles
+const keys = {};
+let mouseDown = false;
+let lastMouseX = 0;
+
+document.addEventListener('keydown', e => keys[e.keyCode] = true);
+document.addEventListener('keyup', e => keys[e.keyCode] = false);
+
+canvas.addEventListener('mousedown', e => {
+    mouseDown = true;
+    lastMouseX = e.clientX;
+});
+document.addEventListener('mouseup', () => mouseDown = false);
+document.addEventListener('mousemove', e => {
+    if (mouseDown) {
+        const deltaX = e.clientX - lastMouseX;
+        player.angle -= deltaX * 0.005;
+        lastMouseX = e.clientX;
+    }
+});
+
+// Colisão
+function checkCollision(x, y) {
+    const mx = Math.floor(x);
+    const my = Math.floor(y);
+    
+    if (mx < 0 || my < 0 || mx >= MAP_W || my >= MAP_H) return true;
+    
+    // Verificar célula atual
+    if (mapData[my][mx] > 0) return true;
+    
+    // Verificar células vizinhas para colisão circular
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            const cx = mx + dx;
+            const cy = my + dy;
+            
+            if (cx < 0 || cy < 0 || cx >= MAP_W || cy >= MAP_H) continue;
+            if (mapData[cy][cx] <= 0) continue;
+            
+            // Distância do centro da parede ao jogador
+            const wallCenterX = cx + 0.5;
+            const wallCenterY = cy + 0.5;
+            
+            // Ponto mais próximo do quadrado ao círculo
+            const closestX = Math.max(cx, Math.min(x, cx + 1));
+            const closestY = Math.max(cy, Math.min(y, cy + 1));
+            
+            const distX = x - closestX;
+            const distY = y - closestY;
+            const distSq = distX * distX + distY * distY;
+            
+            if (distSq < PLAYER_RADIUS * PLAYER_RADIUS) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+// Raycast
+function castRay(angle) {
+    const sinA = Math.sin(angle);
+    const cosA = Math.cos(angle);
+    
+    for (let d = 0; d < RENDER_DISTANCE; d += 0.01) {
+        const x = player.x + cosA * d;
+        const y = player.y + sinA * d;
+        
+        const mx = Math.floor(x);
+        const my = Math.floor(y);
+        
+        if (mx < 0 || my < 0 || mx >= MAP_W || my >= MAP_H) break;
+        
+        const cell = mapData[my][mx];
+        if (cell > 0) {
+            // Determinar qual lado da parede foi atingido
+            const fx = x - mx;
+            const fy = y - my;
+            
+            let wallX;
+            const vertical = Math.abs(fx - 0.5) > Math.abs(fy - 0.5);
+            
+            if (vertical) {
+                wallX = fy;
+            } else {
+                wallX = fx;
+            }
+            
+            return { dist: d, cell: cell, wallX: wallX, x: x, y: y };
+        }
+    }
+    return null;
+}
+
+// Renderizar
+function render() {
+    if (texturesLoaded < totalTextures) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+        ctx.fillStyle = '#fff';
+        ctx.font = '20px monospace';
+        ctx.fillText(`Carregando texturas... ${texturesLoaded}/${totalTextures}`, 20, SCREEN_H/2);
+        return;
+    }
+    
+    // Céu
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, SCREEN_W, SCREEN_H / 2);
+    
+    // Chão com textura
+    renderFloor();
+    
+    // Z-buffer para sprites
+    const zBuffer = new Array(SCREEN_W).fill(Infinity);
+    
+    // Paredes
+    for (let x = 0; x < SCREEN_W; x++) {
+        const rayAngle = player.angle - FOV/2 + (x / SCREEN_W) * FOV;
+        const hit = castRay(rayAngle);
+        
+        if (!hit) continue;
+        
+        const dist = hit.dist * Math.cos(rayAngle - player.angle);
+        zBuffer[x] = dist;
+        
+        const wallHeight = SCREEN_H / dist;
+        const wallTop = (SCREEN_H - wallHeight) / 2;
+        
+        const texture = textures.walls[hit.cell];
+        if (texture) {
+            const texX = Math.floor(hit.wallX * texture.width);
+            
+            // Shading por distância
+            const shade = Math.max(0.3, 1 - dist / 15);
+            
+            ctx.save();
+            ctx.globalAlpha = shade;
+            ctx.drawImage(
+                texture,
+                texX, 0, 1, texture.height,
+                x, wallTop, 1, wallHeight
+            );
+            ctx.restore();
+        }
+    }
+    
+    // NPCs (billboards)
+    renderNPCs(zBuffer);
+}
+
+// Renderizar chão
+function renderFloor() {
+    const halfH = SCREEN_H / 2;
+    
+    for (let y = halfH; y < SCREEN_H; y += 4) {
+        const p = y - halfH;
+        if (p === 0) continue;
+        
+        const rowDist = (player.height * SCREEN_H) / p;
+        
+        for (let x = 0; x < SCREEN_W; x += 4) {
+            const rayAngle = player.angle - FOV/2 + (x / SCREEN_W) * FOV;
+            
+            const floorX = player.x + rowDist * Math.cos(rayAngle);
+            const floorY = player.y + rowDist * Math.sin(rayAngle);
+            
+            const mx = Math.floor(floorX);
+            const my = Math.floor(floorY);
+            
+            if (mx < 0 || my < 0 || mx >= MAP_W || my >= MAP_H) continue;
+            
+            const cell = mapData[my][mx];
+            if (cell < 0) {
+                const texIndex = Math.abs(cell);
+                const texture = textures.floors[texIndex];
+                
+                if (texture) {
+                    const tx = Math.floor((floorX % 1) * texture.width);
+                    const ty = Math.floor((floorY % 1) * texture.height);
+                    
+                    const shade = Math.max(0.2, 1 - rowDist / 12);
+                    
+                    ctx.save();
+                    ctx.globalAlpha = shade;
+                    ctx.drawImage(
+                        texture,
+                        tx, ty, 1, 1,
+                        x, y, 4, 4
+                    );
+                    ctx.restore();
+                }
+            }
+        }
+    }
+}
+
+// Renderizar NPCs
+function renderNPCs(zBuffer) {
+    const npcData = [];
+    
+    for (const npc of npcs) {
+        const dx = npc.x - player.x;
+        const dy = npc.y - player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > RENDER_DISTANCE) continue;
+        
+        const angle = Math.atan2(dy, dx);
+        let relAngle = angle - player.angle;
+        
+        while (relAngle > Math.PI) relAngle -= Math.PI * 2;
+        while (relAngle < -Math.PI) relAngle += Math.PI * 2;
+        
+        if (Math.abs(relAngle) < FOV / 2 + 0.5) {
+            npcData.push({ npc, dist, relAngle });
+        }
+    }
+    
+    npcData.sort((a, b) => b.dist - a.dist);
+    
+    for (const data of npcData) {
+        const screenX = (0.5 + data.relAngle / FOV) * SCREEN_W;
+        const spriteH = SCREEN_H / data.dist;
+        const spriteW = spriteH;
+        
+        const startX = Math.floor(screenX - spriteW / 2);
+        const shade = Math.max(0.3, 1 - data.dist / 15);
+        
+        ctx.save();
+        ctx.globalAlpha = shade;
+        
+        for (let x = startX; x < startX + spriteW; x++) {
+            if (x < 0 || x >= SCREEN_W) continue;
+            if (data.dist >= zBuffer[x]) continue;
+            
+            const u = (x - startX) / spriteW;
+            const texX = Math.floor(u * textures.npc.width);
+            
+            ctx.drawImage(
+                textures.npc,
+                texX, 0, 1, textures.npc.height,
+                x, SCREEN_H/2 - spriteH/2, 1, spriteH
+            );
+        }
+        
+        ctx.restore();
+    }
+}
+
+// Update
+function update() {
+    // Rotação
+    if (keys[37]) player.angle += ROT_SPEED;
+    if (keys[39]) player.angle -= ROT_SPEED;
+    
+    // Movimento
+    const forward = { x: Math.cos(player.angle), y: Math.sin(player.angle) };
+    const right = { x: Math.cos(player.angle - Math.PI/2), y: Math.sin(player.angle - Math.PI/2) };
+    
+    let moveX = 0, moveY = 0;
+    
+    if (keys[87]) { moveX += forward.x * MOVE_SPEED; moveY += forward.y * MOVE_SPEED; }
+    if (keys[83]) { moveX -= forward.x * MOVE_SPEED; moveY -= forward.y * MOVE_SPEED; }
+    if (keys[65]) { moveX += right.x * MOVE_SPEED; moveY += right.y * MOVE_SPEED; }
+    if (keys[68]) { moveX -= right.x * MOVE_SPEED; moveY -= right.y * MOVE_SPEED; }
+    
+    const newX = player.x + moveX;
+    const newY = player.y + moveY;
+    
+    if (!checkCollision(newX, player.y)) player.x = newX;
+    if (!checkCollision(player.x, newY)) player.y = newY;
+}
+
+// Loop principal
+function gameLoop() {
+    update();
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
