@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>maquina estatal</title>
+<title>maquina estatal - no game specified</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
     body {
@@ -69,35 +69,6 @@
         border: 3px solid rgba(255, 255, 255, 0.5);
         pointer-events: none;
         display: none;
-    }
-    #inventory {
-        position: fixed;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 5px;
-    }
-    .inventory-slot {
-        width: 50px;
-        height: 50px;
-        background: rgba(0,0,0,0.5);
-        border: 2px solid white;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 10px;
-        cursor: pointer;
-    }
-    .inventory-slot.selected {
-        border-color: yellow;
-        background: rgba(255,255,0,0.3);
-    }
-    .inventory-slot .count {
-        font-size: 12px;
-        font-weight: bold;
     }
 </style>
 </head>
