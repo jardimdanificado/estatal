@@ -1,4 +1,6 @@
 export default {
+    TITLE: "maquina estatal - no game specified",
+    VERSION: "0.1.7",
     MOVE_SPEED: 0.1,
     CROUCH_SPEED_MULTIPLIER: 0.5,
     LOOK_SPEED: 0.002,
