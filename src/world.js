@@ -1,5 +1,5 @@
-import CONFIG from '../data/config.js';
-import BLOCK_TYPES from '../data/blocks.js';
+import CONFIG from '../data/config/config.js';
+import BLOCK_TYPES from '../data/config/blocks.js';
 
 export default {
     entities: [],

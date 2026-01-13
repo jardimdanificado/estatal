@@ -1,5 +1,5 @@
-import CONFIG from '../data/config.js';
-import BLOCK_TYPES from '../data/blocks.js';
+import CONFIG from '../data/config/config.js';
+import BLOCK_TYPES from '../data/config/blocks.js';
 import { checkCollision, getGroundLevel } from './collision.js';
 
 // ============================================================
@@ -73,7 +73,7 @@ export function checkInteractionTarget(world) {
             
             if (distance < CONFIG.INTERACTION_RANGE && block.hasUseFunction) {
                 world.ui.interactionTarget = block;
-                interactionDiv.textContent = `Pressione E para usar ${block.type.name}`;
+                interactionDiv.textContent = `Usar ${block.type.name}`;
                 interactionDiv.style.display = 'block';
                 return;
             }
@@ -85,7 +85,7 @@ export function checkInteractionTarget(world) {
         const entity = world.entities.find(e => e.mesh === hitMesh);
         if (entity && distance < CONFIG.INTERACTION_RANGE && entity.isInteractable) {
             world.ui.interactionTarget = entity;
-            interactionDiv.textContent = `Pressione E para interagir com ${entity.name}`;
+            interactionDiv.textContent = `Falar com ${entity.name}`;
             interactionDiv.style.display = 'block';
             return;
         }

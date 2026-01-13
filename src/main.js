@@ -1,20 +1,20 @@
 // ============================================================
 // CONSTANTES E CONFIGURAÇÃO
 // ============================================================
-import CONFIG from "./data/config.js"
-import NPC_TYPES from "./data/npcs.js"
-import BLOCK_TYPES from "./data/blocks.js"
-import ITEMS from "./data/items.js"
-import texturesToLoad from "./data/textures.js"
-import world from "./src/world.js"
-import { updateEntity, checkInteractionTarget } from "./src/entity.js"
-import { handleInteraction } from './src/entity.js';
-import { createProjectile, placeBlock } from './src/bullet.js';
-import { updateProjectiles } from './src/bullet.js';
-import { updateItems, spawnBlockDrop, spawnItemDrop } from './src/item.js';
-import { useItem } from './src/item.js';
-import { spawnMessage, updateMessages } from './src/message.js';
-import audioSystem from './src/audio.js';
+import CONFIG from "../data/config/config.js"
+import NPC_TYPES from "../data/config/npcs.js"
+import BLOCK_TYPES from "../data/config/blocks.js"
+import ITEMS from "../data/config/items.js"
+import texturesToLoad from "../data/config/textures.js"
+import world from "./world.js"
+import { updateEntity, checkInteractionTarget } from "./entity.js"
+import { handleInteraction } from './entity.js';
+import { createProjectile, placeBlock } from './bullet.js';
+import { updateProjectiles } from './bullet.js';
+import { updateItems, spawnBlockDrop, spawnItemDrop } from './item.js';
+import { useItem } from './item.js';
+import { spawnMessage, updateMessages } from './message.js';
+import audioSystem from './audio.js';
 
 // ============================================================
 // INICIALIZAÇÃO
@@ -617,6 +617,9 @@ function buildSelectionList(world, player) {
     if (!player) return list;
     
     const isEditor = world.mode === 'editor';
+    if (!isEditor) {
+        list.push({ kind: 'empty' });
+    }
     Object.values(BLOCK_TYPES).forEach((blockType) => {
         const count = player.inventory ? (player.inventory[blockType.id] || 0) : 0;
         if (isEditor || count > 0) {
@@ -650,10 +653,12 @@ function getSelectionIndex(list, player) {
                 ? entry.blockType.id === player.selectedItem.id
                 : entry.kind === 'item'
                     ? entry.itemDef.id === player.selectedItem.id
-                    : entry.action === player.selectedItem.action &&
-                        (entry.action !== 'spawn' || (
-                            (entry.npcType && entry.npcType.id === player.selectedItem.npcTypeId)
-                        )))
+                    : entry.kind === 'entity'
+                        ? entry.action === player.selectedItem.action &&
+                            (entry.action !== 'spawn' || (
+                                (entry.npcType && entry.npcType.id === player.selectedItem.npcTypeId)
+                            ))
+                        : entry.kind === 'empty')
         ));
         if (idx >= 0) return idx;
     }
@@ -677,6 +682,8 @@ function applySelection(world, entry) {
             player.itemInventory[entry.itemDef.id] = Math.max(1, player.itemInventory[entry.itemDef.id] || 0);
         }
         player.selectedItem = { kind: 'item', id: entry.itemDef.id };
+    } else if (entry.kind === 'empty') {
+        player.selectedItem = { kind: 'empty' };
     } else if (entry.kind === 'entity') {
         player.selectedItem = {
             kind: 'entity',
@@ -720,6 +727,8 @@ function updateCurrentItemLabel(world) {
         const count = itemDef && player.itemInventory ? (player.itemInventory[itemDef.id] || 0) : 0;
         const amount = world.mode === 'editor' ? '∞' : count;
         label.textContent = `Item: ${itemDef ? itemDef.name : '-'} x${amount}`;
+    } else if (player.selectedItem.kind === 'empty') {
+        label.textContent = 'Item: Vazio';
     } else if (player.selectedItem.kind === 'entity') {
         if (player.selectedItem.action === 'despawn') {
             label.textContent = 'Item: Despawn';
@@ -762,6 +771,9 @@ function updateHud(world) {
             const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
             itemName = itemDef ? itemDef.name : '-';
             itemCount = itemDef && player.itemInventory ? (player.itemInventory[itemDef.id] || 0) : 0;
+        } else if (player.selectedItem.kind === 'empty') {
+            itemName = 'Vazio';
+            itemCount = '-';
         } else if (player.selectedItem.kind === 'entity') {
             itemName = 'Spawner';
             itemCount = '-';
@@ -770,6 +782,38 @@ function updateHud(world) {
     
     const coins = player.itemInventory ? (player.itemInventory.coin || 0) : 0;
     hud.textContent = `HP: ${hp}/${hpMax}\nItem: ${itemName} x${itemCount}\nCoins: ${coins}`;
+}
+
+function handleUseAction(world) {
+    const player = world.getPlayerEntity();
+    if (!player) return;
+    if (player.selectedItem && player.selectedItem.kind === 'item') {
+        const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
+        if (itemDef) {
+            const count = player.itemInventory ? (player.itemInventory[itemDef.id] || 0) : 0;
+            if (world.mode === 'editor' || count > 0) {
+                useItem(world, player, itemDef, 1);
+                if (itemDef.isConsumable && world.mode !== 'editor') {
+                    player.itemInventory[itemDef.id] = Math.max(0, count - 1);
+                }
+                updateCurrentItemLabel(world);
+                return true;
+            }
+        }
+        return false;
+    }
+    if (world.ui.interactionTarget) {
+        const target = world.ui.interactionTarget;
+        if (target.type === 'npc') {
+            handleInteraction(world, target);
+            return true;
+        }
+        if (target.hasUseFunction) {
+            handleInteraction(world, target);
+            return true;
+        }
+    }
+    return false;
 }
 
 // Modifique o onKeyDown para usar o marcador visual:
@@ -782,10 +826,6 @@ function onKeyDown(world, e) {
         player.onGround = false;
     }
     
-    if (e.code === 'KeyE' && world.ui.interactionTarget) {
-        handleInteraction(world, world.ui.interactionTarget);
-    }
-
     if (e.code === 'KeyO') {
         exportMap(world);
     }
@@ -793,19 +833,7 @@ function onKeyDown(world, e) {
         requestMapImport(world);
     }
 
-    if (e.code === 'KeyR' && player && player.selectedItem && player.selectedItem.kind === 'item') {
-        const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
-        if (itemDef) {
-            const count = player.itemInventory ? (player.itemInventory[itemDef.id] || 0) : 0;
-            if (world.mode === 'editor' || count > 0) {
-                useItem(world, player, itemDef, 1);
-                if (itemDef.isConsumable && world.mode !== 'editor') {
-                    player.itemInventory[itemDef.id] = Math.max(0, count - 1);
-                }
-                updateCurrentItemLabel(world);
-            }
-        }
-    }
+    
     
     if (world.mode === 'editor') {
         if (e.code === 'KeyN') {
@@ -910,7 +938,9 @@ function secondaryAction(world) {
             placeBlock(world);
         }
     } else {
-        placeBlock(world);
+        if (!handleUseAction(world)) {
+            placeBlock(world);
+        }
     }
 }
 
@@ -941,6 +971,7 @@ function setupMobileControls(world) {
     leftPad.style.gridTemplateRows = '60px 60px 60px';
     leftPad.style.gap = '8px';
     leftPad.style.pointerEvents = 'auto';
+    leftPad.style.zIndex = '2';
     container.appendChild(leftPad);
     
     const rightPad = document.createElement('div');
@@ -952,6 +983,7 @@ function setupMobileControls(world) {
     rightPad.style.gridTemplateRows = '60px 60px 60px';
     rightPad.style.gap = '8px';
     rightPad.style.pointerEvents = 'auto';
+    rightPad.style.zIndex = '2';
     container.appendChild(rightPad);
     
     const lookPad = document.createElement('div');
@@ -959,6 +991,7 @@ function setupMobileControls(world) {
     lookPad.style.inset = '0';
     lookPad.style.pointerEvents = 'auto';
     lookPad.style.background = 'transparent';
+    lookPad.style.zIndex = '1';
     container.appendChild(lookPad);
     
     const makeButton = (label, onDown, onUp) => {
@@ -990,6 +1023,37 @@ function setupMobileControls(world) {
     const releaseKey = (code) => {
         world._internal.keys[code] = false;
     };
+    const jumpAction = () => {
+        const player = world.getPlayerEntity();
+        if (!player) return;
+        if (world.mode === 'editor') {
+            pressKey('Space');
+            return;
+        }
+        if (player.onGround) {
+            player.velocityY = CONFIG.JUMP_FORCE;
+            player.onGround = false;
+        }
+    };
+    const jumpRelease = () => {
+        if (world.mode === 'editor') {
+            releaseKey('Space');
+        }
+    };
+    const downAction = () => {
+        if (world.mode === 'editor') {
+            pressKey('ControlLeft');
+        } else {
+            pressKey('KeyC');
+        }
+    };
+    const downRelease = () => {
+        if (world.mode === 'editor') {
+            releaseKey('ControlLeft');
+        } else {
+            releaseKey('KeyC');
+        }
+    };
     
     leftPad.appendChild(document.createElement('div'));
     leftPad.appendChild(makeButton('W', () => pressKey('KeyW'), () => releaseKey('KeyW')));
@@ -998,30 +1062,11 @@ function setupMobileControls(world) {
     leftPad.appendChild(makeButton('S', () => pressKey('KeyS'), () => releaseKey('KeyS')));
     leftPad.appendChild(makeButton('D', () => pressKey('KeyD'), () => releaseKey('KeyD')));
     leftPad.appendChild(document.createElement('div'));
-    leftPad.appendChild(makeButton('Jump', () => pressKey('Space'), () => releaseKey('Space')));
-    leftPad.appendChild(makeButton('Down', () => pressKey('ControlLeft'), () => releaseKey('ControlLeft')));
+    leftPad.appendChild(makeButton('Jump', jumpAction, jumpRelease));
+    leftPad.appendChild(makeButton('Down', downAction, downRelease));
     
     rightPad.appendChild(makeButton('Shoot', () => primaryAction(world)));
-    rightPad.appendChild(makeButton('Place', () => secondaryAction(world)));
-    rightPad.appendChild(makeButton('Use', () => {
-        const player = world.getPlayerEntity();
-        if (!player) return;
-        if (player.selectedItem && player.selectedItem.kind === 'item') {
-            const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
-            if (itemDef) {
-                useItem(world, player, itemDef, 1);
-                if (itemDef.isConsumable && world.mode !== 'editor') {
-                    const count = player.itemInventory ? (player.itemInventory[itemDef.id] || 0) : 0;
-                    player.itemInventory[itemDef.id] = Math.max(0, count - 1);
-                }
-            }
-        }
-    }));
-    rightPad.appendChild(makeButton('Interact', () => {
-        if (world.ui.interactionTarget) {
-            handleInteraction(world, world.ui.interactionTarget);
-        }
-    }));
+    rightPad.appendChild(makeButton('Action', () => secondaryAction(world)));
     rightPad.appendChild(makeButton('Drop', () => dropSelectedBlock(world)));
     rightPad.appendChild(makeButton('Noclip', () => {
         if (world.mode !== 'editor') return;

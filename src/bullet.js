@@ -1,6 +1,6 @@
-import CONFIG from '../data/config.js';
-import BLOCK_TYPES from '../data/blocks.js';
-import ITEMS from '../data/items.js';
+import CONFIG from '../data/config/config.js';
+import BLOCK_TYPES from '../data/config/blocks.js';
+import ITEMS from '../data/config/items.js';
 import { spawnBlockDrop, spawnItemDrop } from './item.js';
 
 function createBlockMaterials(world, blockType) {
