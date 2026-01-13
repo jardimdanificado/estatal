@@ -50,6 +50,7 @@ async function init() {
     document.body.dataset.mode = world.mode;
     ensureItemLabel();
     ensureHud();
+    setupMobileControls(world);
     
     await initAudio();
     
@@ -867,41 +868,192 @@ function onMouseMove(world, event) {
 
 function onMouseDown(world, event) {
     if (document.pointerLockElement !== document.body) return;
-    
+    if (event.button === 0) {
+        primaryAction(world);
+    } else if (event.button === 2) {
+        secondaryAction(world);
+    }
+}
+
+function primaryAction(world) {
     if (world.mode === 'editor') {
         const player = world.getPlayerEntity();
         const selection = player ? player.selectedItem : null;
-        if (event.button === 0) {
-            if (selection && selection.kind === 'entity' && selection.action === 'despawn') {
-                if (!removeTargetItem(world)) {
-                    if (!removeTargetEntity(world)) {
-                        removeTargetBlock(world);
-                    }
+        if (selection && selection.kind === 'entity' && selection.action === 'despawn') {
+            if (!removeTargetItem(world)) {
+                if (!removeTargetEntity(world)) {
+                    removeTargetBlock(world);
                 }
-            } else {
-                removeTargetBlock(world);
             }
-        } else if (event.button === 2) {
-            if (!selection) return;
-            const targetPos = world.ui.targetBlockPosition || { x: player.x, y: player.y, z: player.z };
-            if (selection.kind === 'entity' && selection.action === 'spawn') {
-                const npcType = getNpcTypeById(selection.npcTypeId);
-                if (npcType) {
-                    createNpcEntity(world, npcType, { x: targetPos.x, y: targetPos.y + 0.5, z: targetPos.z });
-                }
-            } else if (selection.kind === 'item') {
-                spawnItemDrop(world, selection.id, 1, { x: targetPos.x, y: targetPos.y + 0.5, z: targetPos.z });
-            } else {
-                placeBlock(world);
-            }
+        } else {
+            removeTargetBlock(world);
         }
     } else {
-        if (event.button === 0) {
-            createProjectile(world);
-        } else if (event.button === 2) {
+        createProjectile(world);
+    }
+}
+
+function secondaryAction(world) {
+    if (world.mode === 'editor') {
+        const player = world.getPlayerEntity();
+        const selection = player ? player.selectedItem : null;
+        if (!selection) return;
+        const targetPos = world.ui.targetBlockPosition || { x: player.x, y: player.y, z: player.z };
+        if (selection.kind === 'entity' && selection.action === 'spawn') {
+            const npcType = getNpcTypeById(selection.npcTypeId);
+            if (npcType) {
+                createNpcEntity(world, npcType, { x: targetPos.x, y: targetPos.y + 0.5, z: targetPos.z });
+            }
+        } else if (selection.kind === 'item') {
+            spawnItemDrop(world, selection.id, 1, { x: targetPos.x, y: targetPos.y + 0.5, z: targetPos.z });
+        } else {
             placeBlock(world);
         }
+    } else {
+        placeBlock(world);
     }
+}
+
+function isMobile() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+function setupMobileControls(world) {
+    if (!isMobile()) return;
+    if (document.getElementById('mobile-controls')) return;
+    
+    document.documentElement.style.touchAction = 'none';
+    
+    const container = document.createElement('div');
+    container.id = 'mobile-controls';
+    container.style.position = 'fixed';
+    container.style.inset = '0';
+    container.style.pointerEvents = 'none';
+    container.style.zIndex = '20';
+    document.body.appendChild(container);
+    
+    const leftPad = document.createElement('div');
+    leftPad.style.position = 'fixed';
+    leftPad.style.left = '16px';
+    leftPad.style.bottom = '16px';
+    leftPad.style.display = 'grid';
+    leftPad.style.gridTemplateColumns = '60px 60px 60px';
+    leftPad.style.gridTemplateRows = '60px 60px 60px';
+    leftPad.style.gap = '8px';
+    leftPad.style.pointerEvents = 'auto';
+    container.appendChild(leftPad);
+    
+    const rightPad = document.createElement('div');
+    rightPad.style.position = 'fixed';
+    rightPad.style.right = '16px';
+    rightPad.style.bottom = '16px';
+    rightPad.style.display = 'grid';
+    rightPad.style.gridTemplateColumns = '70px 70px';
+    rightPad.style.gridTemplateRows = '60px 60px 60px';
+    rightPad.style.gap = '8px';
+    rightPad.style.pointerEvents = 'auto';
+    container.appendChild(rightPad);
+    
+    const lookPad = document.createElement('div');
+    lookPad.style.position = 'fixed';
+    lookPad.style.inset = '0';
+    lookPad.style.pointerEvents = 'auto';
+    lookPad.style.background = 'transparent';
+    container.appendChild(lookPad);
+    
+    const makeButton = (label, onDown, onUp) => {
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.style.width = '60px';
+        btn.style.height = '60px';
+        btn.style.borderRadius = '10px';
+        btn.style.border = '1px solid rgba(255,255,255,0.4)';
+        btn.style.background = 'rgba(0,0,0,0.4)';
+        btn.style.color = 'white';
+        btn.style.fontFamily = 'inherit';
+        btn.style.fontSize = '12px';
+        btn.style.touchAction = 'none';
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            onDown();
+        });
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (onUp) onUp();
+        });
+        return btn;
+    };
+    
+    const pressKey = (code) => {
+        world._internal.keys[code] = true;
+    };
+    const releaseKey = (code) => {
+        world._internal.keys[code] = false;
+    };
+    
+    leftPad.appendChild(document.createElement('div'));
+    leftPad.appendChild(makeButton('W', () => pressKey('KeyW'), () => releaseKey('KeyW')));
+    leftPad.appendChild(document.createElement('div'));
+    leftPad.appendChild(makeButton('A', () => pressKey('KeyA'), () => releaseKey('KeyA')));
+    leftPad.appendChild(makeButton('S', () => pressKey('KeyS'), () => releaseKey('KeyS')));
+    leftPad.appendChild(makeButton('D', () => pressKey('KeyD'), () => releaseKey('KeyD')));
+    leftPad.appendChild(document.createElement('div'));
+    leftPad.appendChild(makeButton('Jump', () => pressKey('Space'), () => releaseKey('Space')));
+    leftPad.appendChild(makeButton('Down', () => pressKey('ControlLeft'), () => releaseKey('ControlLeft')));
+    
+    rightPad.appendChild(makeButton('Shoot', () => primaryAction(world)));
+    rightPad.appendChild(makeButton('Place', () => secondaryAction(world)));
+    rightPad.appendChild(makeButton('Use', () => {
+        const player = world.getPlayerEntity();
+        if (!player) return;
+        if (player.selectedItem && player.selectedItem.kind === 'item') {
+            const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
+            if (itemDef) {
+                useItem(world, player, itemDef, 1);
+                if (itemDef.isConsumable && world.mode !== 'editor') {
+                    const count = player.itemInventory ? (player.itemInventory[itemDef.id] || 0) : 0;
+                    player.itemInventory[itemDef.id] = Math.max(0, count - 1);
+                }
+            }
+        }
+    }));
+    rightPad.appendChild(makeButton('Interact', () => {
+        if (world.ui.interactionTarget) {
+            handleInteraction(world, world.ui.interactionTarget);
+        }
+    }));
+    rightPad.appendChild(makeButton('Drop', () => dropSelectedBlock(world)));
+    rightPad.appendChild(makeButton('Noclip', () => {
+        if (world.mode !== 'editor') return;
+        const player = world.getPlayerEntity();
+        if (!player) return;
+        player.noClip = !player.noClip;
+    }));
+    
+    let lookActive = false;
+    let lastX = 0;
+    let lastY = 0;
+    lookPad.addEventListener('touchstart', (e) => {
+        if (e.target !== lookPad) return;
+        lookActive = true;
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+    }, { passive: true });
+    lookPad.addEventListener('touchend', () => {
+        lookActive = false;
+    });
+    lookPad.addEventListener('touchmove', (e) => {
+        if (!lookActive) return;
+        const player = world.getPlayerEntity();
+        if (!player) return;
+        const dx = e.touches[0].clientX - lastX;
+        const dy = e.touches[0].clientY - lastY;
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+        player.yaw -= dx * CONFIG.LOOK_SPEED;
+        player.pitch -= dy * CONFIG.LOOK_SPEED;
+        player.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, player.pitch));
+    }, { passive: true });
 }
 
 function onWindowResize(world) {

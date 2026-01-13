@@ -100,10 +100,15 @@ export function updateItems(world) {
         
         item.velocityY -= CONFIG.GRAVITY * 0.7;
         if (item.velocity) {
-            item.mesh.position.add(item.velocity);
-            item.velocity.multiplyScalar(0.95);
-            if (item.velocity.length() < 0.01) {
+            const nextPos = item.mesh.position.clone().add(item.velocity);
+            if (isItemColliding(world, nextPos)) {
                 item.velocity = null;
+            } else {
+                item.mesh.position.copy(nextPos);
+                item.velocity.multiplyScalar(0.95);
+                if (item.velocity.length() < 0.01) {
+                    item.velocity = null;
+                }
             }
         }
         if (item.velocity) {
@@ -186,6 +191,19 @@ export function useItem(world, entity, itemDef, amount = 1) {
     if (itemDef.use) {
         itemDef.use(world, entity, amount);
         return true;
+    }
+    return false;
+}
+
+function isItemColliding(world, position) {
+    const half = CONFIG.BLOCK_SIZE / 2;
+    for (const block of world.blocks) {
+        if (!block.solid) continue;
+        if (Math.abs(position.x - block.x) < half &&
+            Math.abs(position.y - block.y) < half &&
+            Math.abs(position.z - block.z) < half) {
+            return true;
+        }
     }
     return false;
 }
