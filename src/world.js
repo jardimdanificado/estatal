@@ -161,6 +161,7 @@ export default {
             onUpdate: entityData.onUpdate || null,
             
             npcData: entityData.npcData || null,
+            audioInstance: entityData.audioInstance || null,
             
             // Sistema de pathfinding
             target: entityData.target || null,

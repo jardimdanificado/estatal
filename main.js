@@ -209,8 +209,26 @@ function createEntities(world) {
             target: { x: spawn.x + 3, y: 2, z: spawn.z + 3 },
             onInteract: (world, entity) => {
                 const dialogue = entity.npcData.dialogue;
+                if (entity.audioInstance) {
+                    audioSystem.stopEvent(entity.audioInstance, true);
+                    entity.audioInstance = null;
+                }
+
+                audioSystem.playEvent('event:/teste', {}, { autoStart: true }).then((instance) => {
+                    if (!instance) return;
+                    audioSystem.attachEvent(instance, {
+                        relative: entity,
+                        offset: { x: 0, y: 1.6, z: 0 }
+                    });
+                    entity.audioInstance = instance;
+                });
+
                 alert(`${entity.name}: ${dialogue}`);
-                //audioSystem.playOneShot('event:/teste', { x: entity.x, y: entity.y, z: entity.z });
+
+                if (entity.audioInstance) {
+                    audioSystem.stopEvent(entity.audioInstance, true);
+                    entity.audioInstance = null;
+                }
             }
         });
     });

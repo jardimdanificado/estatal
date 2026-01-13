@@ -6,6 +6,7 @@ class FMODAudioSystem {
         this.system = null;
         this.banks = {};
         this.events = {};
+        this.attachments = new Map();
         this.initialized = false;
     }
 
@@ -85,7 +86,7 @@ class FMODAudioSystem {
         }
     }
 
-    async playEvent(eventPath, params = {}, { autoStart = true } = {}) {
+    async playEvent(eventPath, params = {}, { autoStart = true, position = null } = {}) {
         if (!this.initialized) {
             console.error('FMOD not initialized');
             return null;
@@ -114,6 +115,10 @@ class FMODAudioSystem {
                 eventInstance.setParameterByName(paramName, value, false);
             }
 
+            if (position) {
+                this.setEventPosition(eventInstance, position);
+            }
+
             const eventId = `${eventPath}_${Date.now()}`;
             this.events[eventId] = eventInstance;
 
@@ -134,15 +139,7 @@ class FMODAudioSystem {
         const instance = await this.playEvent(eventPath, {}, { autoStart: false });
 
         if (instance && position) {
-            const attributes = {
-                position: { x: position.x, y: position.y, z: position.z },
-                velocity: { x: 0, y: 0, z: 0 },
-                forward: { x: 0, y: 0, z: 1 },
-                up: { x: 0, y: 1, z: 0 }
-            };
-
-            const r3d = instance.set3DAttributes(attributes);
-            if (r3d !== FMOD.OK) console.warn("set3DAttributes:", r3d);
+            this.setEventPosition(instance, position);
         }
 
         if (!instance) return null;
@@ -156,8 +153,10 @@ class FMODAudioSystem {
 
     async stopEvent(eventInstance, allowFadeout = true) {
         if (eventInstance) {
+            this.detachEvent(eventInstance);
             const mode = allowFadeout ? FMOD.STUDIO_STOP_ALLOWFADEOUT : FMOD.STUDIO_STOP_IMMEDIATE;
             eventInstance.stop(mode);
+            eventInstance.release();
         }
     }
 
@@ -175,10 +174,54 @@ class FMODAudioSystem {
         if (r !== FMOD.OK) console.warn("setListenerAttributes:", r);
     }
 
+    setEventPosition(eventInstance, position) {
+        if (!eventInstance || !position) return;
+
+        const attributes = {
+            position: { x: position.x, y: position.y, z: position.z },
+            velocity: { x: 0, y: 0, z: 0 },
+            forward: { x: 0, y: 0, z: 1 },
+            up: { x: 0, y: 1, z: 0 }
+        };
+
+        const r3d = eventInstance.set3DAttributes(attributes);
+        if (r3d !== FMOD.OK) console.warn("set3DAttributes:", r3d);
+    }
+
+    attachEvent(eventInstance, { relative, offset = null } = {}) {
+        if (!eventInstance || !relative) return false;
+        const attachment = {
+            relative,
+            offset: offset ? { x: offset.x, y: offset.y, z: offset.z } : { x: 0, y: 0, z: 0 }
+        };
+        this.attachments.set(eventInstance, attachment);
+        return true;
+    }
+
+    detachEvent(eventInstance) {
+        this.attachments.delete(eventInstance);
+    }
+
+    updateAttachments() {
+        for (const [eventInstance, attachment] of this.attachments.entries()) {
+            const base = typeof attachment.relative === 'function'
+                ? attachment.relative()
+                : attachment.relative;
+
+            if (!base) continue;
+
+            this.setEventPosition(eventInstance, {
+                x: base.x + attachment.offset.x,
+                y: base.y + attachment.offset.y,
+                z: base.z + attachment.offset.z
+            });
+        }
+    }
 
 
     update() {
         if (this.initialized && this.system) {
+            this.updateAttachments();
             this.system.update();
         }
     }
@@ -188,6 +231,7 @@ class FMODAudioSystem {
             await this.stopEvent(this.events[eventId], false);
         }
         this.events = {};
+        this.attachments.clear();
 
         for (const bankPath in this.banks) {
             this.banks[bankPath].unload();
