@@ -1,6 +1,6 @@
 export default {
     TITLE: "unamed game",
-    VERSION: "0.2.2",
+    VERSION: "0.2.3",
     MOVE_SPEED: 0.1,
     CROUCH_SPEED_MULTIPLIER: 0.5,
     LOOK_SPEED: 0.002,
