@@ -266,7 +266,8 @@ export function updateEntity(world, entity) {
     const isPlayerControlled = (world.getPlayerEntity() === entity);
     
     // GRAVIDADE para TODAS as entidades (controláveis e hostis)
-    entity.velocityY -= CONFIG.GRAVITY;
+    if(!entity.isEditor)
+        entity.velocityY -= CONFIG.GRAVITY;
     
     if (isPlayerControlled) {
         updatePlayerControlled(world, entity);
@@ -278,7 +279,8 @@ export function updateEntity(world, entity) {
     }
     
     // Física Y para TODAS as entidades
-    applyPhysics(world, entity);
+    if(!entity.isEditor)
+        applyPhysics(world, entity);
     
     // Gerencia visibilidade do mesh
     updateEntityMesh(world, entity, isPlayerControlled);
@@ -318,7 +320,7 @@ export function updatePlayerControlled(world, entity) {
     const keys = world._internal.keys;
     
     // Crouch - só pode levantar se tiver espaço
-    const wantsCrouch = keys['ControlLeft'] || keys['ControlRight'];
+    const wantsCrouch = keys['KeyC'];
     
     if (wantsCrouch) {
         entity.isCrouching = true;

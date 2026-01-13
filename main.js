@@ -9,11 +9,13 @@ import world from "./src/world.js"
 import { updateEntity, updateHostileAI, checkInteractionTarget } from "./src/entity.js"
 import { handleInteraction } from './src/entity.js';
 import { createProjectile, placeBlock } from './src/bullet.js';
+import { updateProjectiles } from './src/bullet.js';
+import audioSystem from './src/audio.js';
 
 // ============================================================
 // INICIALIZAÇÃO
 // ============================================================
-function init() {
+async function init() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
     scene.fog = new THREE.Fog(0x87CEEB, 1, 50);
@@ -41,6 +43,8 @@ function init() {
     world._internal.camera = camera;
     world._internal.renderer = renderer;
     
+    await initAudio();
+    
     loadTextures(world);
     
     window.addEventListener('resize', () => onWindowResize(world));
@@ -59,6 +63,26 @@ function init() {
 }
 
 // ============================================================
+// INICIALIZAÇÃO DE ÁUDIO
+// ============================================================
+async function initAudio() {
+    try {
+        await audioSystem.init();
+        
+        // Carrega o banco Master
+        await audioSystem.loadBank('./data/audio/Master.bank', true);
+        
+        // Carrega o banco de strings (necessário para resolver nomes de eventos)
+        await audioSystem.loadBank('./data/audio/Master.strings.bank', false);
+        
+        console.log('✅ Audio FMOD ready');
+    } catch (error) {
+        console.warn('⚠️ FMOD não disponível - jogo rodando sem áudio');
+        console.warn('Para habilitar áudio: baixe FMOD em https://www.fmod.com/download');
+    }
+}
+
+// ============================================================
 // CARREGAMENTO DE TEXTURAS
 // ============================================================
 function loadTextures(world) {
@@ -72,7 +96,6 @@ function loadTextures(world) {
             world._internal.texturesLoaded = true;
             createWorld(world);
             createEntities(world);
-            //updateInventoryDisplay(world);
         }
     }
     
@@ -146,6 +169,7 @@ function createEntities(world) {
         z: 5.5,
         isControllable: true,
         isInteractable: false,
+        isEditor: true,
         inventory: {
             [BLOCK_TYPES.STONE.id]: 20,
             [BLOCK_TYPES.GRASS.id]: 30,
@@ -186,34 +210,8 @@ function createEntities(world) {
             onInteract: (world, entity) => {
                 const dialogue = entity.npcData.dialogue;
                 alert(`${entity.name}: ${dialogue}`);
+                //audioSystem.playOneShot('event:/teste', { x: entity.x, y: entity.y, z: entity.z });
             }
-        });
-    });
-    
-    // NPCs Hostis
-    const hostileSpawns = [
-        { x: 5.0, z: 2.5, name: 'Esqueleto' },
-        { x: 12.5, z: 9.5, name: 'Zumbi' }
-    ];
-    
-    hostileSpawns.forEach(spawn => {
-        world.addEntity({
-            name: spawn.name,
-            type: 'hostile',
-            x: spawn.x,
-            y: 2,
-            z: spawn.z,
-            hp: 80,
-            maxHP: 80,
-            isControllable: false,
-            isInteractable: false,
-            isHostile: true,
-            npcData: NPC_TYPES.GUARD, // Usa textura de guard
-            inventory: {
-                [BLOCK_TYPES.STONE.id]: 999
-            },
-            selectedBlockType: BLOCK_TYPES.STONE,
-            onUpdate: (world, entity) => updateHostileAI(world, entity)
         });
     });
 }
@@ -221,7 +219,6 @@ function createEntities(world) {
 // ============================================================
 // INPUT
 // ============================================================
-
 export function selectBlockType(world, blockType) {
     const player = world.getPlayerEntity();
     if (player && player.inventory) {
@@ -229,6 +226,37 @@ export function selectBlockType(world, blockType) {
     }
 }
 
+// Variáveis globais (adicione no topo do main.js)
+let fixedSoundPosition = null;
+let soundMarker = null;
+
+// Função para criar/atualizar marcador visual
+function updateSoundMarker(world, position) {
+    const scene = world._internal.scene;
+    
+    // Remove marcador antigo
+    if (soundMarker) {
+        scene.remove(soundMarker);
+    }
+    
+    if (position) {
+        // Cria novo marcador (esfera vermelha pulsante)
+        const geometry = new THREE.SphereGeometry(0.3, 8, 8);
+        const material = new THREE.MeshBasicMaterial({ 
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.7
+        });
+        soundMarker = new THREE.Mesh(geometry, material);
+        soundMarker.position.set(position.x, position.y + 0.5, position.z);
+        scene.add(soundMarker);
+        
+        // Adiciona animação de pulso
+        soundMarker.userData.pulse = 0;
+    }
+}
+
+// Modifique o onKeyDown para usar o marcador visual:
 function onKeyDown(world, e) {
     world._internal.keys[e.code] = true;
     const player = world.getPlayerEntity();
@@ -246,7 +274,38 @@ function onKeyDown(world, e) {
         e.preventDefault();
         const nextIndex = (world.playerEntityIndex + 1) % world.entities.length;
         world.switchPlayerControl(nextIndex);
-        //updateInventoryDisplay(world);
+    }
+    
+    // MARCAR posição do som
+    if (e.code === 'KeyT') {
+        if (!fixedSoundPosition) {
+            fixedSoundPosition = { x: player.x, y: player.y, z: player.z };
+            updateSoundMarker(world, fixedSoundPosition);
+            console.log('🎯 Posição marcada:', fixedSoundPosition);
+            console.log('▶️ Pressione Y para tocar som nesta posição');
+            console.log('🚶 Ande para longe e pressione Y novamente!');
+        } else {
+            fixedSoundPosition = null;
+            updateSoundMarker(world, null);
+            console.log('❌ Marcador removido');
+        }
+    }
+    
+    // TOCAR som na posição marcada
+    if (e.code === 'KeyY') {
+        if (!fixedSoundPosition) {
+            console.log('⚠️ Pressione T primeiro para marcar!');
+        } else {
+            audioSystem.playOneShot('event:/teste', fixedSoundPosition);
+            
+            const dx = player.x - fixedSoundPosition.x;
+            const dz = player.z - fixedSoundPosition.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            
+            console.log(`🔊 Som na posição: (${fixedSoundPosition.x.toFixed(1)}, ${fixedSoundPosition.y.toFixed(1)}, ${fixedSoundPosition.z.toFixed(1)})`);
+            console.log(`📏 Distância: ${distance.toFixed(1)} blocos`);
+            console.log(`🎧 Volume esperado: ${distance < 5 ? 'ALTO 🔊' : distance < 10 ? 'MÉDIO 🔉' : 'BAIXO 🔈'}`);
+        }
     }
     
     if (e.code === 'Digit1') selectBlockType(world, BLOCK_TYPES.STONE);
@@ -271,6 +330,8 @@ function onMouseMove(world, event) {
 function onMouseDown(world, event) {
     if (document.pointerLockElement !== document.body) return;
     
+    const player = world.getPlayerEntity();
+    
     if (event.button === 0) {
         createProjectile(world);
     } else if (event.button === 2) {
@@ -285,22 +346,58 @@ function onWindowResize(world) {
 }
 
 // ============================================================
-// SISTEMA DE PROJÉTEIS
-// ============================================================
-import { updateProjectiles } from './src/bullet.js';
-
-// ============================================================
 // LOOP DE ANIMAÇÃO
 // ============================================================
+// Substitua a função animate() no seu main.js por esta versão:
+
+// Modifique a função animate para animar o marcador:
+// Substitua a função animate() completa no seu main.js:
+
 function animate(world) {
     requestAnimationFrame(() => animate(world));
     
     if (world._internal.texturesLoaded) {
+        // Atualiza entidades
         world.entities.forEach(entity => updateEntity(world, entity));
         updateProjectiles(world);
         checkInteractionTarget(world);
+        
+        // Anima marcador de som
+        if (soundMarker) {
+            soundMarker.userData.pulse += 0.1;
+            const scale = 1 + Math.sin(soundMarker.userData.pulse) * 0.3;
+            soundMarker.scale.set(scale, scale, scale);
+        }
+        
+        // Atualiza câmera e listener de áudio
+        const player = world.getPlayerEntity();
+        if (player) {
+            const camera = world._internal.camera;
+            
+            // Atualiza posição da câmera
+            camera.position.set(player.x, player.y + 1.6, player.z);
+            camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+            camera.updateMatrixWorld(); // IMPORTANTE: atualiza a matriz antes de pegar vetores
+            
+            // Pega vetores de direção atualizados
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+            
+            // ============================================================
+            // ATUALIZA LISTENER DO FMOD (automático a cada frame)
+            // ============================================================
+            audioSystem.setListenerPosition(
+                { x: player.x, y: player.y + 1.6, z: player.z }, // Mesma altura da câmera
+                { x: forward.x, y: forward.y, z: forward.z },
+                { x: up.x, y: up.y, z: up.z }
+            );
+        }
     }
     
+    // Atualiza sistema de áudio do FMOD
+    audioSystem.update();
+    
+    // Renderiza a cena
     world._internal.renderer.render(world._internal.scene, world._internal.camera);
 }
 
