@@ -10,14 +10,14 @@ const VISION_ICONS = {
     hostile: { seen: 'sensed_hostile', unseen: 'sensed_hostile_unseen' }
 };
 const DIRECTION_ICONS = [
-    'arrow_0',
-    'arrow_1',
-    'arrow_2',
-    'arrow_3',
-    'arrow_4',
-    'arrow_5',
-    'arrow_6',
-    'arrow_7'
+    'poison_arrow_0',
+    'poison_arrow_1',
+    'poison_arrow_2',
+    'poison_arrow_3',
+    'poison_arrow_4',
+    'poison_arrow_5',
+    'poison_arrow_6',
+    'poison_arrow_7'
 ];
 const HP_ICONS = [
     { threshold: 0.15, key: 'mdam_almost_dead' },
