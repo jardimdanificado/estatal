@@ -962,6 +962,7 @@ function rebuildPickerOptions() {
     });
     select.selectedIndex = options.length ? 0 : -1;
     rebuildPickerPreview();
+    pickerState.currentOptions = options;
 }
 
 function rebuildPickerPreview() {
@@ -973,9 +974,9 @@ function rebuildPickerPreview() {
     const category = panel.querySelector('#editor-picker-category');
     const entry = pickerState.categories.find((cat) => cat.id === category.value);
     const selectedIndex = select.selectedIndex;
-    const hasOptions = entry && Array.isArray(entry.options);
-    const option = hasOptions && selectedIndex >= 0 && selectedIndex < entry.options.length
-        ? entry.options[selectedIndex]
+    const currentOptions = Array.isArray(pickerState.currentOptions) ? pickerState.currentOptions : [];
+    const option = selectedIndex >= 0 && selectedIndex < currentOptions.length
+        ? currentOptions[selectedIndex]
         : null;
     if (option && option.textureUrl) {
         previewImg.style.backgroundImage = `url("${option.textureUrl}")`;
@@ -1010,8 +1011,9 @@ function openUnifiedPickerPanel({ title, categories, onPick }) {
     addBtn.onclick = () => {
         const entry = pickerState.categories.find((cat) => cat.id === category.value);
         const selectedIndex = select.selectedIndex;
-        if (entry && entry.options[selectedIndex]) {
-            onPick(entry.id, entry.options[selectedIndex]);
+        const currentOptions = Array.isArray(pickerState.currentOptions) ? pickerState.currentOptions : [];
+        if (entry && currentOptions[selectedIndex]) {
+            onPick(entry.id, currentOptions[selectedIndex]);
         }
         rebuildPickerPreview();
     };
