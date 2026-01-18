@@ -18,6 +18,7 @@ import { useItem } from './item.js';
 import { spawnMessage, updateMessages } from './message.js';
 import audioSystem from './audio.js';
 import { getGroundLevel } from './collision.js';
+import { openInspectorWindow } from './inspector.js';
 
 // ============================================================
 // INICIALIZAÇÃO
@@ -563,116 +564,24 @@ function addMenuItem(menu, label, onClick) {
     menu.appendChild(item);
 }
 
-function formatEditorValue(value, depth = 0) {
-    const indent = '  ';
-    const pad = indent.repeat(depth);
-    const padInner = indent.repeat(depth + 1);
-    if (typeof value === 'function') {
-        return value.toString();
-    }
-    if (value === undefined) {
-        return 'undefined';
-    }
-    if (value === null || typeof value !== 'object') {
-        return JSON.stringify(value);
-    }
-    if (Array.isArray(value)) {
-        if (!value.length) return '[]';
-        return `[\n${value.map((item) => `${padInner}${formatEditorValue(item, depth + 1)}`).join(',\n')}\n${pad}]`;
-    }
-    const entries = Object.entries(value);
-    if (!entries.length) return '{}';
-    const props = entries.map(([key, val]) => {
-        const safeKey = /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(key) ? key : JSON.stringify(key);
-        return `${padInner}${safeKey}: ${formatEditorValue(val, depth + 1)}`;
+function openEntityInspectorWindow(entity) {
+    openInspectorWindow(entity, {
+        title: 'Entity',
+        onChange: (path, value, target) => {
+            const key = path[path.length - 1];
+            if (key === 'name' && target && target.indicatorGroup) {
+                refreshEntityIndicators(world, target);
+            }
+        }
     });
-    return `{\n${props.join(',\n')}\n${pad}}`;
 }
 
-function getEditorContext(world) {
-    return {
-        world,
-        CONFIG,
-        BLOCK_TYPES,
-        ITEMS,
-        NPC_TYPES,
-        FACTIONS,
-        THREE,
-        spawnMessage,
-        audioSystem,
-        createProjectile,
-        placeBlock,
-        spawnBlockDrop,
-        spawnItemDrop,
-        useItem,
-        getGroundLevel
-    };
+function openBlockInspectorWindow(block) {
+    openInspectorWindow(block, { title: 'Block' });
 }
 
-function parseEditorPayload(text, context) {
-    const trimmed = text.trim();
-    if (!trimmed) return null;
-    const keys = Object.keys(context);
-    const values = Object.values(context);
-    const fn = new Function(...keys, `"use strict"; return (${trimmed});`);
-    return fn(...values);
-}
-
-function editEntityFromPrompt(entity) {
-    const snapshot = {
-        name: entity.name,
-        faction: entity.faction,
-        hp: entity.hp,
-        maxHP: entity.maxHP,
-        isHostile: entity.isHostile,
-        isControllable: entity.isControllable,
-        isInteractable: entity.isInteractable,
-        selectedBlockTypeId: entity.selectedBlockType ? entity.selectedBlockType.id : null,
-        inventory: entity.inventory || {},
-        itemInventory: entity.itemInventory || {},
-        onInteract: entity.onInteract || null,
-        onUpdate: entity.onUpdate || null
-    };
-    const panel = ensureCodeEditorPanel('entity-editor-panel');
-    const textarea = panel.querySelector('#entity-editor-panel-textarea');
-    const saveBtn = panel.querySelector('#entity-editor-panel-save');
-    textarea.value = formatEditorValue(snapshot);
-    panel.style.display = 'block';
-    if (document.pointerLockElement === document.body) {
-        document.exitPointerLock();
-    }
-    saveBtn.onclick = () => {
-        const text = textarea.value;
-        if (!text) return;
-        try {
-            const data = parseEditorPayload(text, getEditorContext(world));
-            if (!data || typeof data !== 'object') return;
-        const oldName = entity.name;
-        if (typeof data.name === 'string') entity.name = data.name;
-        if (typeof data.faction === 'string') entity.faction = data.faction;
-        if (typeof data.hp === 'number') entity.hp = data.hp;
-        if (typeof data.maxHP === 'number') entity.maxHP = data.maxHP;
-        if (typeof data.isHostile === 'boolean') entity.isHostile = data.isHostile;
-        if (typeof data.isControllable === 'boolean') entity.isControllable = data.isControllable;
-        if (typeof data.isInteractable === 'boolean') entity.isInteractable = data.isInteractable;
-        if (typeof data.selectedBlockTypeId === 'number') {
-            const blockType = Object.values(BLOCK_TYPES).find((b) => b.id === data.selectedBlockTypeId);
-            if (blockType) entity.selectedBlockType = blockType;
-        }
-        if (data.inventory && typeof data.inventory === 'object') entity.inventory = data.inventory;
-        if (data.itemInventory && typeof data.itemInventory === 'object') entity.itemInventory = data.itemInventory;
-        if (typeof data.onInteract === 'function' || data.onInteract === null) {
-            entity.onInteract = data.onInteract || null;
-        }
-        if (typeof data.onUpdate === 'function' || data.onUpdate === null) {
-            entity.onUpdate = data.onUpdate || null;
-        }
-        refreshEntityIndicators(world, entity);
-        panel.style.display = 'none';
-        } catch (err) {
-            console.warn('JS invalido:', err);
-        }
-    };
+function openWorldInspectorWindow(world) {
+    openInspectorWindow(world, { title: 'World' });
 }
 
 function openEditorContextMenu(world, event) {
@@ -689,7 +598,9 @@ function openEditorContextMenu(world, event) {
                 updateCurrentItemLabel(world);
             }
         });
-        addMenuItem(menu, 'Editar objeto JS', () => editEntityFromPrompt(entity));
+        addMenuItem(menu, 'Inspector (nova aba)', () => {
+            openEntityInspectorWindow(entity);
+        });
         if (entity.type === 'npc') {
             addMenuItem(menu, 'Venha ate aqui', () => {
                 startEditorMoveCommand(world, entity);
@@ -706,10 +617,11 @@ function openEditorContextMenu(world, event) {
             addMenuItem(menu, 'Log no console', () => console.log('Entity:', entity));
         }
     } else if (target && target.kind === 'block') {
-        addMenuItem(menu, 'Editar bloco (JS)', () => editBlockFromPanel(world, target.block.type));
+        addMenuItem(menu, 'Inspector bloco (nova aba)', () => openBlockInspectorWindow(target.block));
+        addMenuItem(menu, 'Inspector world (nova aba)', () => openWorldInspectorWindow(world));
         addMenuItem(menu, 'Criar bloco a partir deste', () => cloneBlockTypeFrom(world, target.block.type));
-        addMenuItem(menu, 'Editar world (JSON)', () => editWorldFromPanel(world));
     } else {
+        addMenuItem(menu, 'Inspector world (nova aba)', () => openWorldInspectorWindow(world));
         addMenuItem(menu, 'Fechar', () => {});
     }
     const x = Number.isFinite(event.clientX) ? event.clientX : window.innerWidth / 2;
@@ -717,131 +629,6 @@ function openEditorContextMenu(world, event) {
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     menu.style.display = 'block';
-}
-
-function ensureCodeEditorPanel(id) {
-    let panel = document.getElementById(id);
-    if (panel) return panel;
-    panel = document.createElement('div');
-    panel.id = id;
-    panel.style.position = 'fixed';
-    panel.style.inset = '40px';
-    panel.style.background = 'rgba(0,0,0,0.88)';
-    panel.style.border = '1px solid rgba(255,255,255,0.2)';
-    panel.style.zIndex = '50';
-    panel.style.display = 'none';
-    panel.style.padding = '12px';
-    panel.style.color = 'white';
-    panel.style.fontFamily = '"Courier New", monospace';
-    panel.style.fontSize = '12px';
-    panel.style.boxShadow = '0 10px 24px rgba(0,0,0,0.45)';
-
-    const textarea = document.createElement('textarea');
-    textarea.id = `${id}-textarea`;
-    textarea.style.width = '100%';
-    textarea.style.height = 'calc(100% - 48px)';
-    textarea.style.background = 'rgba(10,10,10,0.9)';
-    textarea.style.color = 'white';
-    textarea.style.border = '1px solid rgba(255,255,255,0.25)';
-    textarea.style.padding = '8px';
-    textarea.style.fontFamily = '"Courier New", monospace';
-    textarea.style.fontSize = '12px';
-    textarea.style.resize = 'none';
-
-    const actions = document.createElement('div');
-    actions.style.display = 'flex';
-    actions.style.justifyContent = 'flex-end';
-    actions.style.gap = '8px';
-    actions.style.marginTop = '8px';
-
-    const makeBtn = (label) => {
-        const btn = document.createElement('button');
-        btn.textContent = label;
-        btn.style.padding = '6px 10px';
-        btn.style.fontFamily = '"Courier New", monospace';
-        btn.style.fontSize = '12px';
-        btn.style.background = 'rgba(255,255,255,0.1)';
-        btn.style.color = 'white';
-        btn.style.border = '1px solid rgba(255,255,255,0.2)';
-        btn.style.cursor = 'pointer';
-        return btn;
-    };
-
-    const cancelBtn = makeBtn('Cancelar');
-    cancelBtn.onclick = () => {
-        panel.style.display = 'none';
-    };
-    const saveBtn = makeBtn('Salvar');
-    saveBtn.id = `${id}-save`;
-    actions.appendChild(cancelBtn);
-    actions.appendChild(saveBtn);
-
-    panel.appendChild(textarea);
-    panel.appendChild(actions);
-    document.body.appendChild(panel);
-    return panel;
-}
-
-function editBlockFromPanel(world, blockType) {
-    if (!blockType) return;
-    const snapshot = {
-        id: blockType.id,
-        name: blockType.name,
-        solid: blockType.solid,
-        maxHP: blockType.maxHP,
-        breakDamage: blockType.breakDamage,
-        bulletSpeed: blockType.bulletSpeed,
-        bulletLifetime: blockType.bulletLifetime,
-        isFloor: blockType.isFloor,
-        opacity: typeof blockType.opacity === 'number' ? blockType.opacity : 1,
-        render: blockType.render || null,
-        editorOnly: !!blockType.editorOnly,
-        droppable: blockType.droppable !== false,
-        textures: blockType.textures || null,
-        onUse: blockType.onUse || null
-    };
-    const panel = ensureCodeEditorPanel('block-editor-panel');
-    const textarea = panel.querySelector('#block-editor-panel-textarea');
-    const saveBtn = panel.querySelector('#block-editor-panel-save');
-    textarea.value = formatEditorValue(snapshot);
-    panel.style.display = 'block';
-    if (document.pointerLockElement === document.body) {
-        document.exitPointerLock();
-    }
-    saveBtn.onclick = () => {
-        const text = textarea.value;
-        if (!text) return;
-        try {
-            const data = parseEditorPayload(text, getEditorContext(world));
-            if (!data || typeof data !== 'object') return;
-            if (typeof data.name === 'string') blockType.name = data.name;
-            if (typeof data.solid === 'boolean') blockType.solid = data.solid;
-            if (typeof data.maxHP === 'number') blockType.maxHP = data.maxHP;
-            if (typeof data.breakDamage === 'number') blockType.breakDamage = data.breakDamage;
-            if (typeof data.bulletSpeed === 'number') blockType.bulletSpeed = data.bulletSpeed;
-            if (typeof data.bulletLifetime === 'number') blockType.bulletLifetime = data.bulletLifetime;
-            if (typeof data.isFloor === 'boolean') blockType.isFloor = data.isFloor;
-            if (typeof data.opacity === 'number') blockType.opacity = data.opacity;
-            if (typeof data.render === 'string' || data.render === null) blockType.render = data.render || undefined;
-            if (typeof data.editorOnly === 'boolean') blockType.editorOnly = data.editorOnly;
-            if (typeof data.droppable === 'boolean') blockType.droppable = data.droppable;
-            if (data.textures && typeof data.textures === 'object') blockType.textures = data.textures;
-            if (typeof data.onUse === 'function') {
-                blockType.onUse = data.onUse;
-            } else if (data.onUse === null) {
-                delete blockType.onUse;
-            }
-            const hasUseFunction = typeof blockType.onUse === 'function';
-            for (const block of world.blocks) {
-                if (block.type === blockType) {
-                    block.hasUseFunction = hasUseFunction;
-                }
-            }
-            panel.style.display = 'none';
-        } catch (err) {
-            console.warn('JS invalido:', err);
-        }
-    };
 }
 
 function cloneBlockTypeFrom(world, source) {
@@ -857,93 +644,6 @@ function cloneBlockTypeFrom(world, source) {
     if (player && world.mode === 'editor' && player.inventory) {
         player.inventory[newId] = 999;
     }
-}
-
-function editWorldFromPanel(world) {
-    const snapshot = {
-        mode: world.mode,
-        playerEntityIndex: world.playerEntityIndex,
-        mapCenter: world._internal.mapCenter,
-        ui: { ...world.ui },
-        entities: world.entities.map((entity) => ({
-            id: entity.id,
-            name: entity.name,
-            type: entity.type,
-            faction: entity.faction,
-            x: entity.x,
-            y: entity.y,
-            z: entity.z,
-            yaw: entity.yaw,
-            pitch: entity.pitch,
-            hp: entity.hp,
-            maxHP: entity.maxHP,
-            isHostile: entity.isHostile,
-            isControllable: entity.isControllable,
-            isInteractable: entity.isInteractable,
-            npcTypeId: entity.npcTypeId || null,
-            selectedBlockTypeId: entity.selectedBlockType ? entity.selectedBlockType.id : null,
-            inventory: entity.inventory || null,
-            itemInventory: entity.itemInventory || {}
-        })),
-        blocks: world.blocks.map((block) => ({
-            x: block.x,
-            y: block.y,
-            z: block.z,
-            typeId: block.type ? block.type.id : null,
-            solid: block.solid,
-            isFloor: block.isFloor,
-            hp: block.hp,
-            maxHP: block.maxHP
-        })),
-        items: world.items.map((item) => ({
-            kind: item.kind,
-            blockTypeId: item.blockTypeId || null,
-            itemId: item.itemId || null,
-            amount: item.amount || 1,
-            x: item.mesh ? item.mesh.position.x : null,
-            y: item.mesh ? item.mesh.position.y : null,
-            z: item.mesh ? item.mesh.position.z : null
-        })),
-        projectiles: world.projectiles.map((proj) => ({
-            x: proj.mesh ? proj.mesh.position.x : null,
-            y: proj.mesh ? proj.mesh.position.y : null,
-            z: proj.mesh ? proj.mesh.position.z : null,
-            damage: proj.damage
-        })),
-        messages: world.messages.map((msg) => ({
-            text: msg.text,
-            duration: msg.duration,
-            startTime: msg.startTime
-        }))
-    };
-    const panel = ensureCodeEditorPanel('world-editor-panel');
-    const textarea = panel.querySelector('#world-editor-panel-textarea');
-    const saveBtn = panel.querySelector('#world-editor-panel-save');
-    textarea.value = JSON.stringify(snapshot, null, 2);
-    panel.style.display = 'block';
-    if (document.pointerLockElement === document.body) {
-        document.exitPointerLock();
-    }
-    saveBtn.onclick = () => {
-        const text = textarea.value;
-        if (!text) return;
-        try {
-            const data = JSON.parse(text);
-            if (data.mode === 'editor' || data.mode === 'game' || data.mode === 'shooter') {
-                setWorldMode(world, data.mode);
-            }
-            if (typeof data.playerEntityIndex === 'number') {
-                world.switchPlayerControl(Math.floor(data.playerEntityIndex));
-            }
-            if (data.mapCenter && typeof data.mapCenter === 'object') {
-                if (typeof data.mapCenter.x === 'number') world._internal.mapCenter.x = data.mapCenter.x;
-                if (typeof data.mapCenter.z === 'number') world._internal.mapCenter.z = data.mapCenter.z;
-            }
-            panel.style.display = 'none';
-        } catch (err) {
-            console.warn('JSON invalido:', err);
-        }
-    };
 }
 
 function getEntityPreviewColor(entity) {
