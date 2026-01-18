@@ -497,7 +497,6 @@ export function createProjectile(world) {
     
     const damage = player.selectedBlockType.breakDamage;
     const speed = player.selectedBlockType.bulletSpeed || 0.5;
-    const lifeTime = player.selectedBlockType.bulletLifetime || 100;
     
     const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
     const materials = createBlockMaterials(world, player.selectedBlockType);
@@ -512,7 +511,6 @@ export function createProjectile(world) {
         mesh: mesh,
         velocity: direction.multiplyScalar(speed),
         damage: damage,
-        lifeTime: lifeTime,
         shooter: player,
         blockType: player.selectedBlockType
     };

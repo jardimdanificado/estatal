@@ -908,8 +908,7 @@ function editWorldFromPanel(world) {
             x: proj.mesh ? proj.mesh.position.x : null,
             y: proj.mesh ? proj.mesh.position.y : null,
             z: proj.mesh ? proj.mesh.position.z : null,
-            damage: proj.damage,
-            lifeTime: proj.lifeTime
+            damage: proj.damage
         })),
         messages: world.messages.map((msg) => ({
             text: msg.text,
