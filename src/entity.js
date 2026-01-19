@@ -535,9 +535,11 @@ export function updateEditorControlled(world, entity) {
     entity.isCrouching = false;
     entity.onGround = false;
     
-    const forwardVec = new THREE.Vector3(0, 0, -1).applyEuler(
-        new THREE.Euler(entity.pitch, entity.yaw, 0, 'YXZ')
-    );
+    const forwardVec = new THREE.Vector3(
+        -Math.sin(entity.yaw),
+        0,
+        -Math.cos(entity.yaw)
+    ).normalize();
     const rightVec = new THREE.Vector3().crossVectors(forwardVec, new THREE.Vector3(0, 1, 0)).normalize();
     
     let moveX = 0;
@@ -546,28 +548,24 @@ export function updateEditorControlled(world, entity) {
     
     if (keys['KeyW']) {
         moveX += forwardVec.x * speed;
-        moveY += forwardVec.y * speed;
         moveZ += forwardVec.z * speed;
     }
     if (keys['KeyS']) {
         moveX -= forwardVec.x * speed;
-        moveY -= forwardVec.y * speed;
         moveZ -= forwardVec.z * speed;
     }
     if (keys['KeyA']) {
         moveX -= rightVec.x * speed;
-        moveY -= rightVec.y * speed;
         moveZ -= rightVec.z * speed;
     }
     if (keys['KeyD']) {
         moveX += rightVec.x * speed;
-        moveY += rightVec.y * speed;
         moveZ += rightVec.z * speed;
     }
     if (keys['Space']) {
         moveY += speed;
     }
-    if (keys['ControlLeft'] || keys['ControlRight']) {
+    if (keys['KeyC']) {
         moveY -= speed;
     }
 
