@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2d map editor</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #151a22;
+      --panel2: #10151d;
+      --text: #e6e9ef;
+      --muted: #9aa4b2;
+      --line: rgba(255,255,255,0.08);
+      --accent: #a78bfa;
+      --bad: #fb7185;
+      --good: #34d399;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      overflow: hidden;
+    }
+    #app { display: grid; grid-template-columns: 360px 1fr; height: 100vh; }
+    #sidebar {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border-right: 1px solid var(--line);
+      padding: 12px;
+      overflow: auto;
+    }
+    #stage { position: relative; height: 100vh; overflow: hidden; }
+
+    h1 { font-size: 16px; margin: 0 0 10px 0; }
+    h2 { font-size: 13px; margin: 14px 0 8px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(0,0,0,0.18);
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 8px 0 6px;
+    }
+
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,0.25);
+      color: var(--text);
+      outline: none;
+    }
+
+    button {
+      padding: 9px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      cursor: pointer;
+    }
+    button:hover { border-color: rgba(255,255,255,0.18); }
+    button.primary { background: rgba(167, 139, 250, 0.14); border-color: rgba(167, 139, 250, 0.35); }
+    button.good { background: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.35); }
+    button.bad { background: rgba(251, 113, 133, 0.12); border-color: rgba(251, 113, 133, 0.35); }
+
+    .btnbar { display: flex; flex-wrap: wrap; gap: 8px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .entry {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+      cursor: pointer;
+      user-select: none;
+    }
+    .entry:hover { border-color: rgba(255,255,255,0.18); }
+    .entry.active { outline: 2px solid rgba(167, 139, 250, 0.55); border-color: rgba(167, 139, 250, 0.35); }
+
+    .thumb {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.2);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+
+    .meta { display: grid; gap: 2px; }
+    .meta .name { font-size: 13px; }
+    .meta .sub { font-size: 11px; color: var(--muted); }
+
+    #canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      background: #0b0f14;
+      cursor: crosshair;
+    }
+
+    #overlay {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      padding: 8px 10px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      backdrop-filter: blur(6px);
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+      pointer-events: none;
+      white-space: pre;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 8px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,0.2);
+      white-space: pre-wrap;
+    }
+
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <h1>Editor 2D (grid por camadas)</h1>
+
+      <div class="card">
+        <h2>Mapa</h2>
+        <div class="btnbar">
+          <button class="primary" id="btn-load-default">Carregar default.json</button>
+          <button id="btn-import">Importar…</button>
+          <button class="good" id="btn-export">Exportar JSON</button>
+          <button class="bad" id="btn-clear">Limpar</button>
+        </div>
+        <div class="status" id="status">Pronto.</div>
+      </div>
+
+      <div class="card" style="margin-top: 10px;">
+        <h2>Ferramenta</h2>
+        <label>Modo</label>
+        <div class="row">
+          <select id="tool-mode">
+            <option value="block">Bloco</option>
+            <option value="floor">Chão (isFloor)</option>
+            <option value="npc">Entidade (NPC)</option>
+            <option value="item">Item (drop)</option>
+            <option value="erase">Apagar</option>
+          </select>
+          <div>
+            <label style="margin-top:0;">Camada Y</label>
+            <input id="layer-y" type="number" value="0" step="1" />
+          </div>
+        </div>
+
+        <label>Zoom</label>
+        <input id="zoom" type="number" value="26" min="8" max="96" step="1" />
+
+        <label>Busca no catálogo</label>
+        <input id="search" type="text" placeholder="filtrar por nome…" />
+
+        <div class="hint">
+          <b>Controles:</b><br/>
+          - Clique esquerdo: aplicar<br/>
+          - Botão direito: apagar<br/>
+          - Shift + clique: apagar (atalho)<br/>
+          - Rodinha: zoom<br/>
+          <br/>
+          <b>Camadas:</b> bloco em y = (camada + 0.5). Chão usa y = -0.5 com isFloor=true.
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 10px;">
+        <h2>Paleta</h2>
+        <div class="palette" id="palette"></div>
+      </div>
+
+      <div class="card" style="margin-top: 10px;">
+        <h2>Links</h2>
+        <div style="font-size:12px; color: var(--muted); line-height:1.35;">
+          <div>- <a href="./index.html">Voltar pro jogo (index.html)</a></div>
+          <div>- <a href="./editor3d.html">Editor 3D (voxels)</a></div>
+        </div>
+      </div>
+    </aside>
+
+    <main id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="overlay"></div>
+    </main>
+  </div>
+
+  <script type="module">
+        // ------------------------------------------------------------
+    // IMPORTS COM FALLBACK (pra você poder mover /data/config -> /src)
+    // ------------------------------------------------------------
+    async function importWithFallback(candidates) {
+      let lastErr = null;
+      for (const p of candidates) {
+        try { return await import(p); } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error('Falha ao importar módulos.');
+    }
+
+    const [{ default: CONFIG }, { default: BLOCK_TYPES }, { default: NPC_TYPES }, { default: ITEMS }, { default: texturesToLoad }] = await Promise.all([
+      importWithFallback(['./data/config/config.js', './src/config.js']),
+      importWithFallback(['./data/config/blocks.js', './src/blocks.js']),
+      importWithFallback(['./data/config/npcs.js', './src/npcs.js']),
+      importWithFallback(['./data/config/items.js', './src/items.js']),
+      importWithFallback(['./data/config/textures.js', './src/textures.js']),
+    ]);
+
+
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $('status');
+    const overlayEl = $('overlay');
+    const canvas = $('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+
+    const textureUrlByKey = texturesToLoad.reduce((m, e) => (m[e.key] = e.url, m), {});
+
+    function getBlockThumbKey(bt) {
+      const t = bt && bt.textures ? bt.textures : null;
+      return t ? (t.all || t.top || t.side || t.bottom || null) : null;
+    }
+
+    const blockList = Object.values(BLOCK_TYPES)
+      .slice()
+      .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+      .map(bt => ({ kind: 'block', id: bt.id, label: bt.name, bt, thumbKey: getBlockThumbKey(bt) }));
+
+    const npcList = Object.values(NPC_TYPES)
+      .slice()
+      .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+      .map(npc => ({ kind: 'npc', id: npc.id, label: npc.name, npc, thumbKey: npc.texture || 'npc' }));
+
+    const itemList = Object.values(ITEMS)
+      .slice()
+      .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+      .map(it => ({ kind: 'item', id: it.id, label: it.name, it, thumbKey: it.textureKey || null }));
+
+    const state = {
+      toolMode: 'block',
+      layerY: 0,
+      zoom: 26,
+      selected: null,
+      map: { version: 1, player: { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0 }, blocks: [], items: [], entities: [] },
+      view: { minX: 0, minZ: 0, maxX: 15, maxZ: 15 },
+    };
+
+    // Image cache (for palette + canvas rendering)
+    const imgCache = new Map();
+    function loadImg(key) {
+      const url = textureUrlByKey[key];
+      if (!url) return null;
+      if (imgCache.has(key)) return imgCache.get(key);
+      const img = new Image();
+      img.src = url;
+      imgCache.set(key, img);
+      return img;
+    }
+
+    function getActiveList() {
+      const m = state.toolMode;
+      if (m === 'npc') return npcList;
+      if (m === 'item') return itemList;
+      return blockList;
+    }
+
+    // Palette UI
+    const paletteEl = $('palette');
+    const searchEl = $('search');
+    const toolEl = $('tool-mode');
+    const layerEl = $('layer-y');
+    const zoomEl = $('zoom');
+
+    function renderPalette() {
+      paletteEl.innerHTML = '';
+      const q = (searchEl.value || '').trim().toLowerCase();
+      const list = getActiveList().filter(e => !q || (e.label||'').toLowerCase().includes(q));
+
+      if (!state.selected || state.selected.kind !== (state.toolMode === 'npc' ? 'npc' : state.toolMode === 'item' ? 'item' : 'block')) {
+        state.selected = list[0] || null;
+      }
+
+      for (const entry of list.slice(0, 2200)) {
+        const div = document.createElement('div');
+        div.className = 'entry' + (state.selected === entry ? ' active' : '');
+
+        const thumb = document.createElement('div');
+        thumb.className = 'thumb';
+        const k = entry.thumbKey;
+        if (k && textureUrlByKey[k]) {
+          const img = document.createElement('img');
+          img.src = textureUrlByKey[k];
+          img.alt = '';
+          thumb.appendChild(img);
+        } else {
+          thumb.textContent = entry.kind === 'npc' ? 'NPC' : entry.kind === 'item' ? 'IT' : 'BL';
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        const name = document.createElement('div');
+        name.className = 'name';
+        name.textContent = entry.label || '—';
+        const sub = document.createElement('div');
+        sub.className = 'sub';
+        sub.textContent = `${entry.kind.toUpperCase()} • id=${entry.id}`;
+        meta.appendChild(name);
+        meta.appendChild(sub);
+
+        div.appendChild(thumb);
+        div.appendChild(meta);
+        div.addEventListener('click', () => { state.selected = entry; renderPalette(); draw(); });
+        paletteEl.appendChild(div);
+      }
+
+      draw();
+    }
+
+    toolEl.addEventListener('change', () => { state.toolMode = toolEl.value; renderPalette(); });
+    layerEl.addEventListener('change', () => { state.layerY = Math.trunc(Number(layerEl.value||0)); layerEl.value = String(state.layerY); draw(); });
+    zoomEl.addEventListener('change', () => { state.zoom = Math.max(8, Math.min(96, Math.trunc(Number(zoomEl.value||26)))); zoomEl.value = String(state.zoom); draw(); });
+    searchEl.addEventListener('input', renderPalette);
+
+    // Map helpers
+    function recalcBounds() {
+      let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+      for (const b of state.map.blocks) {
+        minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
+        minZ = Math.min(minZ, b.z); maxZ = Math.max(maxZ, b.z);
+      }
+      // entities/items also expand view
+      for (const e of state.map.entities) {
+        if (!e) continue;
+        const cx = Math.floor((e.x ?? 0));
+        const cz = Math.floor((e.z ?? 0));
+        minX = Math.min(minX, cx); maxX = Math.max(maxX, cx);
+        minZ = Math.min(minZ, cz); maxZ = Math.max(maxZ, cz);
+      }
+      for (const it of state.map.items) {
+        if (!it) continue;
+        const cx = Math.floor((it.x ?? 0));
+        const cz = Math.floor((it.z ?? 0));
+        minX = Math.min(minX, cx); maxX = Math.max(maxX, cx);
+        minZ = Math.min(minZ, cz); maxZ = Math.max(maxZ, cz);
+      }
+
+      if (minX === Infinity) { minX = 0; minZ = 0; maxX = 15; maxZ = 15; }
+
+      // padding
+      state.view = { minX: minX - 2, minZ: minZ - 2, maxX: maxX + 2, maxZ: maxZ + 2 };
+    }
+
+    function getLayerY() {
+      if (state.toolMode === 'floor') return -0.5;
+      if (state.toolMode === 'block') return state.layerY + 0.5;
+      return 0;
+    }
+
+    function findBlockAt(x,y,z) {
+      return state.map.blocks.find(b => b.x === x && b.y === y && b.z === z) || null;
+    }
+
+    function upsertBlock(x,y,z,typeId,isFloor) {
+      const existing = findBlockAt(x,y,z);
+      if (existing) {
+        existing.typeId = typeId;
+        existing.isFloor = !!isFloor;
+        return;
+      }
+      state.map.blocks.push({ x,y,z,typeId,isFloor: !!isFloor });
+    }
+
+    function eraseAtCell(x,z) {
+      const y = getLayerY();
+      // remove a block at this layer
+      state.map.blocks = state.map.blocks.filter(b => !(b.x===x && b.z===z && b.y===y));
+
+      // if erasing on entity/item modes, also remove entity/item in cell
+      const cx = x + 0.5;
+      const cz = z + 0.5;
+      state.map.entities = state.map.entities.filter(e => !(Math.abs((e.x??0)-cx)<0.51 && Math.abs((e.z??0)-cz)<0.51));
+      state.map.items = state.map.items.filter(it => !(Math.abs((it.x??0)-cx)<0.51 && Math.abs((it.z??0)-cz)<0.51));
+    }
+
+    // Canvas sizing
+    function resizeCanvas() {
+      const rect = $('stage').getBoundingClientRect();
+      const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // Drawing
+    function draw() {
+      recalcBounds();
+      const rect = $('stage').getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0,0,w,h);
+
+      const cell = state.zoom;
+      const cols = Math.floor(w / cell);
+      const rows = Math.floor(h / cell);
+
+      const spanX = state.view.maxX - state.view.minX + 1;
+      const spanZ = state.view.maxZ - state.view.minZ + 1;
+
+      // center the map in available space
+      const ox = Math.floor((w - spanX * cell) / 2);
+      const oz = Math.floor((h - spanZ * cell) / 2);
+
+      // background grid
+      ctx.fillStyle = '#0b0f14';
+      ctx.fillRect(0,0,w,h);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= spanX; i++) {
+        const x = ox + i * cell;
+        ctx.beginPath(); ctx.moveTo(x, oz); ctx.lineTo(x, oz + spanZ * cell); ctx.stroke();
+      }
+      for (let i = 0; i <= spanZ; i++) {
+        const y = oz + i * cell;
+        ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox + spanX * cell, y); ctx.stroke();
+      }
+
+      const activeY = (state.toolMode === 'floor') ? -0.5 : (state.layerY + 0.5);
+
+      // draw blocks on current layer
+      for (const b of state.map.blocks) {
+        if (b.y !== activeY) continue;
+        const bt = Object.values(BLOCK_TYPES).find(t => t.id === b.typeId);
+        const txKey = bt ? getBlockThumbKey(bt) : null;
+        const img = txKey ? loadImg(txKey) : null;
+
+        const gx = b.x - state.view.minX;
+        const gz = b.z - state.view.minZ;
+        const px = ox + gx * cell;
+        const pz = oz + gz * cell;
+
+        if (img && img.complete && img.naturalWidth) {
+          ctx.drawImage(img, px, pz, cell, cell);
+        } else {
+          ctx.fillStyle = 'rgba(100,116,139,0.55)';
+          ctx.fillRect(px, pz, cell, cell);
+        }
+
+        // subtle border
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        ctx.strokeRect(px + 0.5, pz + 0.5, cell - 1, cell - 1);
+      }
+
+      // draw entities/items as overlays (always shown, regardless of layer)
+      for (const e of state.map.entities) {
+        if (!e || e.type !== 'npc') continue;
+        const npc = Object.values(NPC_TYPES).find(n => n.id === e.npcTypeId);
+        const txKey = npc ? (npc.texture || 'npc') : 'npc';
+        const img = loadImg(txKey);
+
+        const cx = Math.floor((e.x ?? 0));
+        const cz = Math.floor((e.z ?? 0));
+        const gx = cx - state.view.minX;
+        const gz = cz - state.view.minZ;
+        const px = ox + gx * cell;
+        const pz = oz + gz * cell;
+
+        // badge
+        ctx.fillStyle = 'rgba(167, 139, 250, 0.22)';
+        ctx.fillRect(px, pz, cell, cell);
+        if (img && img.complete && img.naturalWidth) {
+          ctx.drawImage(img, px, pz, cell, cell);
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(px, pz + cell - 16, cell, 16);
+        ctx.fillStyle = '#e6e9ef';
+        ctx.font = '11px ui-monospace, monospace';
+        ctx.fillText('NPC', px + 4, pz + cell - 4);
+      }
+
+      for (const it of state.map.items) {
+        if (!it || it.kind !== 'item') continue;
+        const def = Object.values(ITEMS).find(i => i.id === it.itemId);
+        const txKey = def ? (def.textureKey || null) : null;
+        const img = txKey ? loadImg(txKey) : null;
+
+        const cx = Math.floor((it.x ?? 0));
+        const cz = Math.floor((it.z ?? 0));
+        const gx = cx - state.view.minX;
+        const gz = cz - state.view.minZ;
+        const px = ox + gx * cell;
+        const pz = oz + gz * cell;
+
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.18)';
+        ctx.fillRect(px, pz, cell, cell);
+        if (img && img.complete && img.naturalWidth) {
+          ctx.drawImage(img, px, pz, cell, cell);
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(px, pz + cell - 16, cell, 16);
+        ctx.fillStyle = '#e6e9ef';
+        ctx.fillText('ITEM', px + 4, pz + cell - 4);
+      }
+
+      // overlay info
+      overlayEl.textContent = `Modo: ${state.toolMode}\nCamada Y: ${state.layerY} (render y=${activeY})\nZoom: ${cell}px\nBlocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens: ${state.map.items.length}`;
+    }
+
+    // Mouse mapping
+    function screenToCell(clientX, clientY) {
+      const rect = $('stage').getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      const cell = state.zoom;
+
+      const spanX = state.view.maxX - state.view.minX + 1;
+      const spanZ = state.view.maxZ - state.view.minZ + 1;
+      const ox = Math.floor((w - spanX * cell) / 2);
+      const oz = Math.floor((h - spanZ * cell) / 2);
+
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const gx = Math.floor((x - ox) / cell);
+      const gz = Math.floor((y - oz) / cell);
+
+      if (gx < 0 || gz < 0 || gx >= spanX || gz >= spanZ) return null;
+
+      return {
+        x: state.view.minX + gx,
+        z: state.view.minZ + gz,
+      };
+    }
+
+    // Apply tool
+    function applyAtCell(cellPos, isErase) {
+      if (!cellPos) return;
+      const { x, z } = cellPos;
+
+      const mode = state.toolMode;
+      if (isErase || mode === 'erase') {
+        eraseAtCell(x, z);
+        setStatus(`Apagado em (${x}, ${getLayerY()}, ${z}).`);
+        draw();
+        return;
+      }
+
+      if (!state.selected) return;
+
+      if (mode === 'block' || mode === 'floor') {
+        const bt = state.selected.bt;
+        if (!bt) return;
+        const y = (mode === 'floor') ? -0.5 : (state.layerY + 0.5);
+        upsertBlock(x, y, z, bt.id, mode === 'floor');
+        setStatus(`Bloco: ${bt.name} em (${x}, ${y}, ${z})`);
+        draw();
+        return;
+      }
+
+      if (mode === 'npc') {
+        const npc = state.selected.npc;
+        if (!npc) return;
+        const entry = {
+          type: 'npc',
+          npcTypeId: npc.id,
+          name: npc.name,
+          faction: npc.faction || null,
+          x: x + 0.5,
+          y: 0,
+          z: z + 0.5,
+          yaw: 0,
+          pitch: 0,
+          hp: npc.maxHP || 100,
+          maxHP: npc.maxHP || 100,
+          isHostile: !!npc.isHostile,
+        };
+        // replace any npc in the cell
+        state.map.entities = state.map.entities.filter(e => !(Math.abs((e.x??0)-(x+0.5))<0.51 && Math.abs((e.z??0)-(z+0.5))<0.51));
+        state.map.entities.push(entry);
+        setStatus(`NPC: ${npc.name} em (${x + 0.5}, 0, ${z + 0.5})`);
+        draw();
+        return;
+      }
+
+      if (mode === 'item') {
+        const it = state.selected.it;
+        if (!it) return;
+        const entry = { kind: 'item', itemId: it.id, amount: 1, x: x + 0.5, y: 0.2, z: z + 0.5 };
+        // replace any item in the cell
+        state.map.items = state.map.items.filter(i => !(Math.abs((i.x??0)-(x+0.5))<0.51 && Math.abs((i.z??0)-(z+0.5))<0.51));
+        state.map.items.push(entry);
+        setStatus(`Item: ${it.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
+        draw();
+        return;
+      }
+    }
+
+    // Input
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    canvas.addEventListener('pointerdown', (e) => {
+      const cellPos = screenToCell(e.clientX, e.clientY);
+      const erase = (e.button === 2) || e.shiftKey;
+      applyAtCell(cellPos, erase);
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      state.zoom = Math.max(8, Math.min(96, state.zoom + (e.deltaY > 0 ? -1 : 1)));
+      zoomEl.value = String(state.zoom);
+      draw();
+    }, { passive: false });
+
+    // Import/Export
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'application/json';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    $('btn-import').addEventListener('click', () => { fileInput.value = ''; fileInput.click(); });
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const payload = JSON.parse(String(r.result || ''));
+          if (!payload || !Array.isArray(payload.blocks)) throw new Error('invalid');
+          state.map = {
+            version: payload.version || 1,
+            player: payload.player || { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0 },
+            blocks: (payload.blocks || []).map(b => ({...b})),
+            items: (payload.items || []).map(i => ({...i})),
+            entities: (payload.entities || []).map(e => ({...e})),
+          };
+          setStatus(`Carregado. Blocos: ${state.map.blocks.length}, NPCs: ${state.map.entities.length}, Itens: ${state.map.items.length}`);
+          draw();
+        } catch {
+          setStatus('Falha ao importar: JSON inválido.');
+        }
+      };
+      r.readAsText(file);
+    });
+
+    $('btn-export').addEventListener('click', () => {
+      const payload = {
+        version: 1,
+        player: state.map.player || { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0 },
+        blocks: state.map.blocks.map(b => ({ x: b.x, y: b.y, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor })),
+        items: state.map.items.map(i => ({ kind: i.kind, blockTypeId: i.blockTypeId || null, itemId: i.itemId || null, amount: i.amount || 1, x: i.x, y: i.y, z: i.z })),
+        entities: state.map.entities.map(e => ({
+          type: e.type,
+          npcTypeId: e.npcTypeId || null,
+          name: e.name || null,
+          faction: e.faction || null,
+          x: e.x, y: e.y, z: e.z,
+          yaw: e.yaw || 0,
+          pitch: e.pitch || 0,
+          hp: (typeof e.hp === 'number') ? e.hp : 100,
+          maxHP: (typeof e.maxHP === 'number') ? e.maxHP : 100,
+          isHostile: !!e.isHostile,
+        })),
+      };
+      const data = JSON.stringify(payload, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'map.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus('Exportado: map.json');
+    });
+
+    $('btn-load-default').addEventListener('click', async () => {
+      try {
+        const resp = await fetch('./data/maps/default.json');
+        if (!resp.ok) throw new Error(String(resp.status));
+        const payload = await resp.json();
+        state.map = {
+          version: payload.version || 1,
+          player: payload.player || { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0 },
+          blocks: (payload.blocks || []).map(b => ({...b})),
+          items: (payload.items || []).map(i => ({...i})),
+          entities: (payload.entities || []).map(e => ({...e})),
+        };
+        setStatus(`Carregado default. Blocos: ${state.map.blocks.length}`);
+        draw();
+      } catch {
+        setStatus('Falha ao carregar ./data/maps/default.json');
+      }
+    });
+
+    $('btn-clear').addEventListener('click', () => {
+      state.map.blocks = [];
+      state.map.items = [];
+      state.map.entities = [];
+      setStatus('Mapa limpo.');
+      draw();
+    });
+
+    // Boot
+    function boot() {
+      state.toolMode = toolEl.value;
+      state.layerY = Math.trunc(Number(layerEl.value || 0));
+      state.zoom = Math.trunc(Number(zoomEl.value || 26));
+      renderPalette();
+      resizeCanvas();
+      draw();
+    }
+    boot();
+
+  </script>
+</body>
+</html>
