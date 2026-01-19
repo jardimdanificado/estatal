@@ -29,6 +29,7 @@ DEFAULT_STATS = {
 }
 
 CATEGORY_OVERRIDES: Dict[str, Dict] = {
+    '': {'faction': 'demon'},
     'animals': {'faction': 'animal_predator', 'maxHP': 160, 'width': 0.8, 'height': 1.4},
     'aquatic': {'faction': 'aquatic', 'maxHP': 150, 'height': 1.1},
     'abyss': {'faction': 'abyss', 'maxHP': 260, 'width': 1.0, 'height': 1.9, 'itemDrops': {'food_piece_of_ambrosia': 1}},
@@ -37,18 +38,45 @@ CATEGORY_OVERRIDES: Dict[str, Dict] = {
     'demons': {'faction': 'demon', 'maxHP': 280, 'width': 1.05, 'height': 2.0, 'itemDrops': {'food_piece_of_ambrosia': 1}},
     'demonspawn': {'faction': 'demon', 'maxHP': 300, 'width': 1.1, 'height': 2.1, 'itemDrops': {'food_piece_of_ambrosia': 1}},
     'dragons': {'faction': 'demon', 'maxHP': 360, 'width': 1.2, 'height': 2.3, 'itemDrops': {'food_piece_of_ambrosia': 1}},
+    'draco': {'faction': 'demon', 'maxHP': 300, 'width': 1.15, 'height': 2.2},
+    'draconic': {'faction': 'demon', 'maxHP': 300, 'width': 1.1, 'height': 2.1},
     'unique': {'faction': 'demon', 'maxHP': 340, 'width': 1.15, 'height': 2.2, 'itemDrops': {'food_piece_of_ambrosia': 1}},
     'amorphous': {'faction': 'demon', 'maxHP': 200, 'itemDrops': {'food_chunk': 1}},
-    'undead': {'faction': 'undead', 'maxHP': 190, 'itemDrops': {'food_chunk_rotten': 1}},
+    'eyes': {'faction': 'spirit', 'maxHP': 150, 'width': 0.7, 'height': 0.9},
+    'holy': {'faction': 'spirit', 'maxHP': 220},
+    'plants': {'faction': 'plant', 'maxHP': 160, 'isHostile': False},
+    'fungi_plants': {'faction': 'infested_plant', 'maxHP': 150, 'itemDrops': {'food_honeycomb': 1}},
     'humanoids': {'faction': 'demon', 'maxHP': 210},
+    'humanoids/demonspawn': {'faction': 'demon', 'maxHP': 260},
+    'humanoids/elves': {'faction': 'demon', 'maxHP': 220},
+    'humanoids/giants': {'faction': 'beast', 'maxHP': 320, 'width': 1.3, 'height': 2.3},
+    'humanoids/humans': {'faction': 'demon', 'maxHP': 200},
+    'humanoids/orcs': {'faction': 'demon', 'maxHP': 230},
+    'humanoids/spriggans': {'faction': 'animal_predator', 'maxHP': 220},
     'demihumanoids': {'faction': 'demon', 'maxHP': 210},
+    'demihumanoids/merfolk': {'faction': 'aquatic', 'maxHP': 180, 'height': 1.4},
+    'demihumanoids/naga': {'faction': 'demon', 'maxHP': 230},
+    'demihumanoids/taurs': {'faction': 'beast', 'maxHP': 220},
+    'mutantbeast': {'faction': 'beast', 'maxHP': 240},
     'nonliving': {'faction': 'construct', 'maxHP': 260, 'isHostile': False, 'itemDrops': {}},
+    'nonliving/shadows': {'faction': 'undead', 'maxHP': 200},
+    'panlord': {'faction': 'demon', 'maxHP': 280},
+    'player': {'faction': 'player', 'isHostile': False},
+    'sprint': {'faction': 'demon', 'maxHP': 250},
     'statues': {'faction': 'construct', 'maxHP': 240, 'isHostile': False, 'itemDrops': {}},
     'spriggan': {'faction': 'animal_predator', 'maxHP': 220},
-    'gods': {'faction': 'demon', 'maxHP': 380},
-    'naga': {'faction': 'demon', 'maxHP': 230},
-    'demonshapes': {'faction': 'demon', 'maxHP': 250},
+    'skeletons': {'faction': 'undead', 'maxHP': 190, 'itemDrops': {'food_chunk_rotten': 1}},
+    'undead': {'faction': 'undead', 'maxHP': 190, 'itemDrops': {'food_chunk_rotten': 1}},
+    'undead/bound_souls': {'faction': 'undead', 'maxHP': 200},
+    'undead/draugr': {'faction': 'undead', 'maxHP': 220},
+    'undead/simulacra': {'faction': 'undead', 'maxHP': 210},
+    'undead/skeletons': {'faction': 'undead', 'maxHP': 210},
+    'undead/spectrals': {'faction': 'undead', 'maxHP': 180},
+    'undead/zombies': {'faction': 'undead', 'maxHP': 200},
+    'vault': {'faction': 'guard', 'maxHP': 260},
 }
+
+
 
 TEXTURE_PATTERN = re.compile(r"\{\s*key:\s*'([^']+)',\s*url:\s*'([^']+)'\s*\}")
 TEXTURE_URL_MONSTER = '/monster/'
@@ -92,6 +120,12 @@ def should_skip_base(base: str) -> bool:
     return any(lower.endswith(suffix) for suffix in PART_SUFFIXES)
 
 
+def normalize_category_path(parent: Path) -> str:
+    if not parent or parent == Path('.'):
+        return ''
+    return parent.as_posix()
+
+
 def format_entry_name(base: str) -> str:
     clean = base.replace('_', ' ').replace('-', ' ')
     words = [w.capitalize() for w in clean.split() if w]
@@ -102,12 +136,23 @@ def format_key(base: str) -> str:
     return 'AUTO_' + re.sub(r'[^A-Za-z0-9]', '_', base).upper()
 
 
-def get_category_stats(category: Optional[str]) -> Dict:
+def get_category_stats(category_path: Optional[str]) -> Dict:
     stats = dict(DEFAULT_STATS)
-    if category:
-        override = CATEGORY_OVERRIDES.get(category.lower())
+    if not category_path:
+        override = CATEGORY_OVERRIDES.get('')
         if override:
             stats.update(override)
+        return stats
+    parts = category_path.split('/')
+    for depth in range(len(parts), 0, -1):
+        key = '/'.join(parts[:depth]).lower()
+        override = CATEGORY_OVERRIDES.get(key)
+        if override:
+            stats.update(override)
+            return stats
+    override = CATEGORY_OVERRIDES.get(parts[0].lower())
+    if override:
+        stats.update(override)
     return stats
 
 
@@ -167,11 +212,11 @@ def main():
             if existing_variant != 'old' and variant == 'old':
                 replace = True
         if replace:
-            category = parts[0] if len(parts) > 1 else None
+            category_path = normalize_category_path(rel.parent)
             base_map[base_name] = {
                 'path': path,
                 'variant': variant,
-                'category': category
+                'category_path': category_path
             }
 
     texture_entries = []
@@ -188,7 +233,7 @@ def main():
             })
         if texture_key in existing_npc_textures:
             continue
-        stats = get_category_stats(entry_data.get('category'))
+        stats = get_category_stats(entry_data.get('category_path'))
         name = format_entry_name(base)
         entry = {
             'id': next_id,
