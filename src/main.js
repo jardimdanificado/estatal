@@ -2089,6 +2089,7 @@ function buildSelectionList(world, player) {
         list.push({ kind: 'empty' });
     }
     Object.values(BLOCK_TYPES).forEach((blockType) => {
+        if (blockType.editorOnly && !isEditor) return;
         const count = player.inventory ? (player.inventory[blockType.id] || 0) : 0;
         if (count > 0) {
             list.push({ kind: 'block', blockType });

@@ -1,4 +1,6 @@
-export default {
+import AUTO_MONSTER_NPCS from './auto-monster-npcs.js';
+
+const MANUAL_NPC_TYPES = {
     VILLAGER: {
         id: 1,
         name: 'Aldeao',
@@ -8332,3 +8334,10 @@ export default {
         itemDrops: { food_honeycomb: 1 }
     },
 };
+
+const NPC_TYPES = {
+    ...MANUAL_NPC_TYPES,
+    ...AUTO_MONSTER_NPCS
+};
+
+export default NPC_TYPES;

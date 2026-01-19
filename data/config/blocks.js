@@ -179,6 +179,98 @@ const BLOCK_TYPES = {
             all: 'grass',
         },
     },
+    DEBUFF_SLOW: {
+        id: 1004,
+        name: 'Pedra Retardante',
+        solid: true,
+        maxHP: 90,
+        breakDamage: 18,
+        bulletSpeed: 0.22,
+        bulletLifetime: 40,
+        isFloor: false,
+        opacity: 1,
+        droppable: true,
+        textures: {
+            all: 'stone',
+        },
+        debuffOnHit: {
+            id: 'block_debuff_slow',
+            duration: 10,
+            modifiers: {
+                speed: -0.18,
+                damage: -2
+            }
+        }
+    },
+    DEBUFF_REGEN: {
+        id: 1005,
+        name: 'Bloco do Esmorecimento',
+        solid: true,
+        maxHP: 100,
+        breakDamage: 15,
+        bulletSpeed: 0.24,
+        bulletLifetime: 42,
+        isFloor: false,
+        opacity: 1,
+        droppable: true,
+        textures: {
+            all: 'dirt',
+        },
+        debuffOnHit: {
+            id: 'block_debuff_regen',
+            duration: 12,
+            modifiers: {
+                regen: -0.25,
+                speed: -0.05
+            }
+        }
+    },
+    DEBUFF_FAMINE: {
+        id: 1006,
+        name: 'Bloco Famélico',
+        solid: true,
+        maxHP: 110,
+        breakDamage: 12,
+        bulletSpeed: 0.26,
+        bulletLifetime: 38,
+        isFloor: false,
+        opacity: 1,
+        droppable: true,
+        textures: {
+            all: 'sand',
+        },
+        debuffOnHit: {
+            id: 'block_debuff_hunger',
+            duration: 14,
+            modifiers: {
+                hungerDecay: 0.02,
+                maxHunger: -10
+            }
+        }
+    },
+    DEBUFF_WEAKNESS: {
+        id: 1007,
+        name: 'Bloco Debilidade',
+        solid: true,
+        maxHP: 105,
+        breakDamage: 14,
+        bulletSpeed: 0.23,
+        bulletLifetime: 44,
+        isFloor: false,
+        opacity: 1,
+        droppable: true,
+        textures: {
+            all: 'wood',
+        },
+        debuffOnHit: {
+            id: 'block_debuff_maxhp',
+            duration: 12,
+            modifiers: {
+                maxHP: -35,
+                regen: -0.1
+            }
+        }
+    },
     WALL_WALL_ABYSS_0: {
         id: 9,
         name: 'Parede Abyss 0',

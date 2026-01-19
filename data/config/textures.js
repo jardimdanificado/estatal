@@ -1,4 +1,6 @@
-export default [
+import AUTO_MONSTER_TEXTURES from './auto-monster-textures.js';
+
+const MANUAL_TEXTURES = [
     { key: 'stone', url: './data/images/dcss/dungeon/wall/stone_gray_0.png' },
     { key: 'grass', url: './data/images/dcss/dungeon/floor/dirt_full_old.png' },
     { key: 'wood', url: './data/images/dcss/dungeon/floor/snake_1.png' },
@@ -1707,3 +1709,5 @@ export default [
     { key: 'spell_air_flight', url: './data/images/dcss/gui/spells/air/flight.png' },
     { key: 'spell_air_swiftness_old', url: './data/images/dcss/gui/spells/air/swiftness_old.png' },
 ];
+
+export default MANUAL_TEXTURES.concat(AUTO_MONSTER_TEXTURES);
