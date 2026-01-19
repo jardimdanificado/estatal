@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>2d map editor</title>
+  <title>Editor 2D Grid (camadas)</title>
   <style>
     :root {
       --bg: #0f1115;
@@ -198,6 +198,17 @@
           </div>
         </div>
 
+        <label>Forma de pintura</label>
+        <div class="row">
+          <select id="paint-shape">
+            <option value="brush">Pincel (1 célula)</option>
+            <option value="rect">Retângulo</option>
+          </select>
+          <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; padding:0 2px;">
+            <span style="font-size:12px; color: var(--muted);">Arrastar = pintar</span>
+          </div>
+        </div>
+
         <label>Zoom</label>
         <input id="zoom" type="number" value="26" min="8" max="96" step="1" />
 
@@ -210,6 +221,9 @@
           - Botão direito: apagar<br/>
           - Shift + clique: apagar (atalho)<br/>
           - Rodinha: zoom<br/>
+          - Shift + rodinha: trocar camada Y (invertido)<br/>
+          - Segurar e arrastar: pintar várias células<br/>
+          - Forma Retângulo: clique e arraste, solta pra aplicar<br/>
           <br/>
           <b>Camadas:</b> bloco em y = (camada + 0.5). Chão usa y = -0.5 com isFloor=true.
         </div>
@@ -290,6 +304,14 @@
       toolMode: 'block',
       layerY: 0,
       zoom: 26,
+      paintShape: "brush",
+      isPointerDown: false,
+      dragButton: 0,
+      lastPaintKey: null,
+      hover: null,
+      rectStart: null,
+      rectEnd: null,
+      rectErase: false,
       selected: null,
       map: { version: 1, player: { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0 }, blocks: [], items: [], entities: [] },
       view: { minX: 0, minZ: 0, maxX: 15, maxZ: 15 },
@@ -320,6 +342,7 @@
     const toolEl = $('tool-mode');
     const layerEl = $('layer-y');
     const zoomEl = $('zoom');
+    const paintShapeEl = $('paint-shape');
 
     function renderPalette() {
       paletteEl.innerHTML = '';
@@ -369,6 +392,8 @@
     toolEl.addEventListener('change', () => { state.toolMode = toolEl.value; renderPalette(); });
     layerEl.addEventListener('change', () => { state.layerY = Math.trunc(Number(layerEl.value||0)); layerEl.value = String(state.layerY); draw(); });
     zoomEl.addEventListener('change', () => { state.zoom = Math.max(8, Math.min(96, Math.trunc(Number(zoomEl.value||26)))); zoomEl.value = String(state.zoom); draw(); });
+
+    paintShapeEl.addEventListener('change', () => { state.paintShape = String(paintShapeEl.value||'brush'); state.rectStart = null; state.rectEnd = null; draw(); });
     searchEl.addEventListener('input', renderPalette);
 
     // Map helpers
@@ -399,11 +424,25 @@
       // padding
       state.view = { minX: minX - 2, minZ: minZ - 2, maxX: maxX + 2, maxZ: maxZ + 2 };
     }
-
     function getLayerY() {
+      // Coordenadas Y no formato do seu mapa:
+      // - blocos: (camada + 0.5)
+      // - chao:  -0.5 (isFloor=true)
+      // - NPCs:  y inteiro (0,1,2...)
+      // - itens: y levemente acima do piso (camada + 0.2)
       if (state.toolMode === 'floor') return -0.5;
       if (state.toolMode === 'block') return state.layerY + 0.5;
-      return 0;
+      if (state.toolMode === 'npc') return state.layerY;
+      if (state.toolMode === 'item') return state.layerY + 0.2;
+      // fallback: tratar como bloco
+      return state.layerY + 0.5;
+    }
+
+    function layerFromWorldY(y) {
+      // NPCs usam y inteiro (0,1,2...). Itens tipicamente (camada+0.2).
+      // Arredondar faz 0.2 -> 0, 1.2 -> 1, etc.
+      if (typeof y !== 'number' || !isFinite(y)) return 0;
+      return Math.round(y);
     }
 
     function findBlockAt(x,y,z) {
@@ -419,17 +458,21 @@
       }
       state.map.blocks.push({ x,y,z,typeId,isFloor: !!isFloor });
     }
-
     function eraseAtCell(x,z) {
-      const y = getLayerY();
-      // remove a block at this layer
-      state.map.blocks = state.map.blocks.filter(b => !(b.x===x && b.z===z && b.y===y));
+      // 1) Sempre remove bloco da camada de bloco atual (camada+0.5)
+      //    e, se estiver no modo chao, remove o chao (y=-0.5).
+      const blockY = state.layerY + 0.5;
+      const floorY = -0.5;
+      const yToErase = (state.toolMode === 'floor') ? floorY : blockY;
+      state.map.blocks = state.map.blocks.filter(b => !(b.x===x && b.z===z && b.y===yToErase));
 
-      // if erasing on entity/item modes, also remove entity/item in cell
+      // 2) Remove NPC/Item SOMENTE do andar atual (state.layerY).
       const cx = x + 0.5;
       const cz = z + 0.5;
-      state.map.entities = state.map.entities.filter(e => !(Math.abs((e.x??0)-cx)<0.51 && Math.abs((e.z??0)-cz)<0.51));
-      state.map.items = state.map.items.filter(it => !(Math.abs((it.x??0)-cx)<0.51 && Math.abs((it.z??0)-cz)<0.51));
+      const targetLayer = state.layerY;
+
+      state.map.entities = state.map.entities.filter(e => !((Math.abs((e.x??0)-cx)<0.51) && (Math.abs((e.z??0)-cz)<0.51) && (layerFromWorldY(e.y)===targetLayer)));
+      state.map.items = state.map.items.filter(it => !((Math.abs((it.x??0)-cx)<0.51) && (Math.abs((it.z??0)-cz)<0.51) && (layerFromWorldY(it.y)===targetLayer)));
     }
 
     // Canvas sizing
@@ -479,11 +522,15 @@
         ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox + spanX * cell, y); ctx.stroke();
       }
 
-      const activeY = (state.toolMode === 'floor') ? -0.5 : (state.layerY + 0.5);
+      const blockLayerY = state.layerY + 0.5;
+      const floorLayerY = -0.5;
+      const showFloor = (state.toolMode === 'floor');
+      const drawY = showFloor ? floorLayerY : blockLayerY;
+      const activeEntityLayer = state.layerY;
 
       // draw blocks on current layer
       for (const b of state.map.blocks) {
-        if (b.y !== activeY) continue;
+        if (b.y !== drawY) continue;
         const bt = Object.values(BLOCK_TYPES).find(t => t.id === b.typeId);
         const txKey = bt ? getBlockThumbKey(bt) : null;
         const img = txKey ? loadImg(txKey) : null;
@@ -505,9 +552,10 @@
         ctx.strokeRect(px + 0.5, pz + 0.5, cell - 1, cell - 1);
       }
 
-      // draw entities/items as overlays (always shown, regardless of layer)
+      // draw entities/items as overlays (somente na camada Y selecionada)
       for (const e of state.map.entities) {
         if (!e || e.type !== 'npc') continue;
+        if (layerFromWorldY(e.y) !== activeEntityLayer) continue;
         const npc = Object.values(NPC_TYPES).find(n => n.id === e.npcTypeId);
         const txKey = npc ? (npc.texture || 'npc') : 'npc';
         const img = loadImg(txKey);
@@ -534,6 +582,7 @@
 
       for (const it of state.map.items) {
         if (!it || it.kind !== 'item') continue;
+        if (layerFromWorldY(it.y) !== activeEntityLayer) continue;
         const def = Object.values(ITEMS).find(i => i.id === it.itemId);
         const txKey = def ? (def.textureKey || null) : null;
         const img = txKey ? loadImg(txKey) : null;
@@ -556,8 +605,51 @@
         ctx.fillText('ITEM', px + 4, pz + cell - 4);
       }
 
+
+      // hover highlight
+      if (state.hover) {
+        const hx = state.hover.x - state.view.minX;
+        const hz = state.hover.z - state.view.minZ;
+        if (hx >= 0 && hz >= 0 && hx < spanX && hz < spanZ) {
+          const px = ox + hx * cell;
+          const pz = oz + hz * cell;
+          ctx.strokeStyle = 'rgba(167, 139, 250, 0.85)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px + 1, pz + 1, cell - 2, cell - 2);
+        }
+      }
+
+      // rectangle preview (when dragging)
+      if (state.paintShape === 'rect' && state.rectStart && state.rectEnd) {
+        const a = state.rectStart;
+        const b = state.rectEnd;
+        const minX = Math.min(a.x, b.x);
+        const maxX = Math.max(a.x, b.x);
+        const minZ = Math.min(a.z, b.z);
+        const maxZ = Math.max(a.z, b.z);
+
+        const gx0 = minX - state.view.minX;
+        const gz0 = minZ - state.view.minZ;
+        const gx1 = maxX - state.view.minX;
+        const gz1 = maxZ - state.view.minZ;
+
+        const px0 = ox + gx0 * cell;
+        const pz0 = oz + gz0 * cell;
+        const px1 = ox + (gx1 + 1) * cell;
+        const pz1 = oz + (gz1 + 1) * cell;
+
+        ctx.fillStyle = state.rectErase ? 'rgba(251, 113, 133, 0.16)' : 'rgba(52, 211, 153, 0.12)';
+        ctx.fillRect(px0, pz0, px1 - px0, pz1 - pz0);
+        ctx.strokeStyle = state.rectErase ? 'rgba(251, 113, 133, 0.85)' : 'rgba(52, 211, 153, 0.75)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px0 + 1, pz0 + 1, (px1 - px0) - 2, (pz1 - pz0) - 2);
+      }
+
       // overlay info
-      overlayEl.textContent = `Modo: ${state.toolMode}\nCamada Y: ${state.layerY} (render y=${activeY})\nZoom: ${cell}px\nBlocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens: ${state.map.items.length}`;
+      overlayEl.textContent = `Modo: ${state.toolMode}
+Andar (camada Y): ${state.layerY} | blocos y=${drawY} | npc/item layer=${activeEntityLayer}
+Zoom: ${cell}px
+Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens: ${state.map.items.length}`;
     }
 
     // Mouse mapping
@@ -593,7 +685,7 @@
       const mode = state.toolMode;
       if (isErase || mode === 'erase') {
         eraseAtCell(x, z);
-        setStatus(`Apagado em (${x}, ${getLayerY()}, ${z}).`);
+        setStatus(`Apagado em (${x}, layer=${state.layerY}, ${z}).`);
         draw();
         return;
       }
@@ -619,7 +711,7 @@
           name: npc.name,
           faction: npc.faction || null,
           x: x + 0.5,
-          y: 0,
+          y: state.layerY,
           z: z + 0.5,
           yaw: 0,
           pitch: 0,
@@ -628,9 +720,13 @@
           isHostile: !!npc.isHostile,
         };
         // replace any npc in the cell
-        state.map.entities = state.map.entities.filter(e => !(Math.abs((e.x??0)-(x+0.5))<0.51 && Math.abs((e.z??0)-(z+0.5))<0.51));
+        state.map.entities = state.map.entities.filter(e => !(
+          Math.abs((e.x??0)-(x+0.5))<0.51 &&
+          Math.abs((e.z??0)-(z+0.5))<0.51 &&
+          layerFromWorldY(e.y) === state.layerY
+        ));
         state.map.entities.push(entry);
-        setStatus(`NPC: ${npc.name} em (${x + 0.5}, 0, ${z + 0.5})`);
+        setStatus(`NPC: ${npc.name} em (${x + 0.5}, ${entry.y}, ${z + 0.5})`);
         draw();
         return;
       }
@@ -638,9 +734,13 @@
       if (mode === 'item') {
         const it = state.selected.it;
         if (!it) return;
-        const entry = { kind: 'item', itemId: it.id, amount: 1, x: x + 0.5, y: 0.2, z: z + 0.5 };
+        const entry = { kind: 'item', itemId: it.id, amount: 1, x: x + 0.5, y: state.layerY + 0.2, z: z + 0.5 };
         // replace any item in the cell
-        state.map.items = state.map.items.filter(i => !(Math.abs((i.x??0)-(x+0.5))<0.51 && Math.abs((i.z??0)-(z+0.5))<0.51));
+        state.map.items = state.map.items.filter(i => !(
+          Math.abs((i.x??0)-(x+0.5))<0.51 &&
+          Math.abs((i.z??0)-(z+0.5))<0.51 &&
+          layerFromWorldY(i.y) === state.layerY
+        ));
         state.map.items.push(entry);
         setStatus(`Item: ${it.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
         draw();
@@ -651,14 +751,107 @@
     // Input
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+    function cellKey(c) { return `${c.x},${c.z}`; }
+
+    function getEraseFlag(e) {
+      return (e.button === 2) || e.shiftKey || String(toolEl.value || 'block') === 'erase';
+    }
+
     canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      state.isPointerDown = true;
+      state.dragButton = e.button;
+      state.lastPaintKey = null;
+
       const cellPos = screenToCell(e.clientX, e.clientY);
-      const erase = (e.button === 2) || e.shiftKey;
+      state.hover = cellPos;
+      const erase = getEraseFlag(e);
+
+      if (state.paintShape === 'rect') {
+        state.rectStart = cellPos;
+        state.rectEnd = cellPos;
+        state.rectErase = erase;
+        draw();
+        return;
+      }
+
+      // brush
       applyAtCell(cellPos, erase);
+      state.lastPaintKey = cellKey(cellPos);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      const cellPos = screenToCell(e.clientX, e.clientY);
+      state.hover = cellPos;
+
+      if (!state.isPointerDown) {
+        draw();
+        return;
+      }
+
+      if (state.paintShape === 'rect') {
+        state.rectEnd = cellPos;
+        draw();
+        return;
+      }
+
+      // brush drag-paint
+      const k = cellKey(cellPos);
+      if (k === state.lastPaintKey) return;
+      state.lastPaintKey = k;
+
+      const erase = (state.dragButton === 2) || e.shiftKey || String(toolEl.value || 'block') === 'erase';
+      applyAtCell(cellPos, erase);
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      state.isPointerDown = false;
+
+      if (state.paintShape === 'rect' && state.rectStart && state.rectEnd) {
+        const a = state.rectStart;
+        const b = state.rectEnd;
+        const minX = Math.min(a.x, b.x);
+        const maxX = Math.max(a.x, b.x);
+        const minZ = Math.min(a.z, b.z);
+        const maxZ = Math.max(a.z, b.z);
+        const erase = !!state.rectErase;
+
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) {
+            applyAtCell({ x, z }, erase);
+          }
+        }
+
+        setStatus(`${erase ? 'Apagado' : 'Aplicado'} retângulo: (${minX},${minZ}) → (${maxX},${maxZ}) em Y=${state.layerY}`);
+        state.rectStart = null;
+        state.rectEnd = null;
+        draw();
+      }
+    });
+
+    canvas.addEventListener('pointercancel', () => {
+      state.isPointerDown = false;
+      state.rectStart = null;
+      state.rectEnd = null;
+      draw();
     });
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
+      // Shift + scroll => muda a camada Y (invertido)
+      if (e.shiftKey) {
+        const dir = (e.deltaY > 0) ? 1 : -1;
+        const next = Math.max(0, (state.layerY | 0) + dir);
+        if (next !== state.layerY) {
+          state.layerY = next;
+          layerEl.value = String(state.layerY);
+          setStatus(`Camada Y: ${state.layerY}`);
+          draw();
+        }
+        return;
+      }
+
+      // Scroll normal => zoom
       state.zoom = Math.max(8, Math.min(96, state.zoom + (e.deltaY > 0 ? -1 : 1)));
       zoomEl.value = String(state.zoom);
       draw();
