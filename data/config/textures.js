@@ -1,6 +1,4 @@
-import AUTO_MONSTER_TEXTURES from './auto-monster-textures.js';
-
-const MANUAL_TEXTURES = [
+export default [
     { key: 'stone', url: './data/images/dcss/dungeon/wall/stone_gray_0.png' },
     { key: 'grass', url: './data/images/dcss/dungeon/floor/dirt_full_old.png' },
     { key: 'wood', url: './data/images/dcss/dungeon/floor/snake_1.png' },
@@ -1681,33 +1679,4 @@ const MANUAL_TEXTURES = [
     { key: 'prop_chest_2_closed', url: './data/images/dcss/dungeon/chest_2_closed.png' },
     { key: 'prop_large_box', url: './data/images/dcss/dungeon/large_box.png' },
     { key: 'prop_misc_box', url: './data/images/dcss/item/misc/misc_box.png' },
-    { key: 'potion_golden', url: './data/images/dcss/item/potion/potion_golden.png' },
-    { key: 'potion_bubbly', url: './data/images/dcss/item/potion/potion_bubbly.png' },
-    { key: 'potion_cloudy', url: './data/images/dcss/item/potion/potion_cloudy.png' },
-    { key: 'potion_effervescent', url: './data/images/dcss/item/potion/potion_effervescent.png' },
-    { key: 'potion_murky', url: './data/images/dcss/item/potion/potion_murky.png' },
-    { key: 'potion_puce', url: './data/images/dcss/item/potion/potion_puce.png' },
-    { key: 'potion_purple_red', url: './data/images/dcss/item/potion/potion_purple_red.png' },
-    { key: 'potion_sky_blue', url: './data/images/dcss/item/potion/potion_sky_blue.png' },
-    { key: 'book_stone_might', url: './data/images/dcss/item/book/manual_1.png' },
-    { key: 'book_arcane_focus', url: './data/images/dcss/item/book/manual_2.png' },
-    { key: 'book_swift_stride', url: './data/images/dcss/item/book/cloth_old.png' },
-    { key: 'book_red', url: './data/images/dcss/item/book/red_old.png' },
-    { key: 'book_blue', url: './data/images/dcss/item/book/light_blue_old.png' },
-    { key: 'book_cyan', url: './data/images/dcss/item/book/cyan_old.png' },
-    { key: 'book_gold', url: './data/images/dcss/item/book/gold.png' },
-    { key: 'book_magenta', url: './data/images/dcss/item/book/magenta_old.png' },
-    { key: 'scroll_fire_burst', url: './data/images/dcss/item/scroll/scroll-red.png' },
-    { key: 'scroll_healing_wave', url: './data/images/dcss/item/scroll/scroll-blue.png' },
-    { key: 'scroll_green', url: './data/images/dcss/item/scroll/scroll-green.png' },
-    { key: 'scroll_grey', url: './data/images/dcss/item/scroll/scroll-grey.png' },
-    { key: 'misc_mana_orb', url: './data/images/dcss/item/misc/misc_orb.png' },
-    { key: 'skill_stone_icon', url: './data/images/dcss/gui/skills/armor.png' },
-    { key: 'skill_arcane_icon', url: './data/images/dcss/gui/skills/spellcasting.png' },
-    { key: 'skill_swift_icon', url: './data/images/dcss/gui/skills/evocations.png' },
-    { key: 'spell_fireball_old', url: './data/images/dcss/gui/spells/fire/fireball_old.png' },
-    { key: 'spell_air_flight', url: './data/images/dcss/gui/spells/air/flight.png' },
-    { key: 'spell_air_swiftness_old', url: './data/images/dcss/gui/spells/air/swiftness_old.png' },
 ];
-
-export default MANUAL_TEXTURES.concat(AUTO_MONSTER_TEXTURES);

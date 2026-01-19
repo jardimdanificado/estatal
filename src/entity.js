@@ -3,7 +3,6 @@ import BLOCK_TYPES from '../data/config/blocks.js';
 import { checkCollision, getGroundLevel } from './collision.js';
 import { getFactionRelation } from '../data/config/factions.js';
 import { alertEntitiesFromShot } from './bullet.js';
-import { updateEntityNeeds, getEntityMoveSpeed, getEntityDamageBonus } from './survival.js';
 import ITEMS from '../data/config/items.js';
 import { useItem } from './item.js';
 
@@ -456,9 +455,6 @@ export function updateEntity(world, entity) {
         }
     }
     
-    // Atualiza fome e sede
-    updateEntityNeeds(entity);
-
     // Física Y para TODAS as entidades
     if (!noClip)
         applyPhysics(world, entity);
@@ -535,11 +531,9 @@ export function updateEditorControlled(world, entity) {
     entity.isCrouching = false;
     entity.onGround = false;
     
-    const forwardVec = new THREE.Vector3(
-        -Math.sin(entity.yaw),
-        0,
-        -Math.cos(entity.yaw)
-    ).normalize();
+    const forwardVec = new THREE.Vector3(0, 0, -1).applyEuler(
+        new THREE.Euler(entity.pitch, entity.yaw, 0, 'YXZ')
+    );
     const rightVec = new THREE.Vector3().crossVectors(forwardVec, new THREE.Vector3(0, 1, 0)).normalize();
     
     let moveX = 0;
@@ -548,24 +542,28 @@ export function updateEditorControlled(world, entity) {
     
     if (keys['KeyW']) {
         moveX += forwardVec.x * speed;
+        moveY += forwardVec.y * speed;
         moveZ += forwardVec.z * speed;
     }
     if (keys['KeyS']) {
         moveX -= forwardVec.x * speed;
+        moveY -= forwardVec.y * speed;
         moveZ -= forwardVec.z * speed;
     }
     if (keys['KeyA']) {
         moveX -= rightVec.x * speed;
+        moveY -= rightVec.y * speed;
         moveZ -= rightVec.z * speed;
     }
     if (keys['KeyD']) {
         moveX += rightVec.x * speed;
+        moveY += rightVec.y * speed;
         moveZ += rightVec.z * speed;
     }
     if (keys['Space']) {
         moveY += speed;
     }
-    if (keys['KeyC']) {
+    if (keys['ControlLeft'] || keys['ControlRight']) {
         moveY -= speed;
     }
 
@@ -635,10 +633,9 @@ export function updatePlayerControlled(world, entity) {
     let moveX = 0;
     let moveZ = 0;
     
-    const baseSpeed = getEntityMoveSpeed(entity);
     const speed = entity.isCrouching 
-        ? baseSpeed * CONFIG.CROUCH_SPEED_MULTIPLIER 
-        : baseSpeed;
+        ? CONFIG.MOVE_SPEED * CONFIG.CROUCH_SPEED_MULTIPLIER 
+        : CONFIG.MOVE_SPEED;
     
     if (keys['KeyW']) {
         moveX += forward.x * speed;
@@ -732,10 +729,9 @@ export function updateAIControlled(world, entity) {
     }
     
     // Move em direção ao alvo
-    const baseSpeed = getEntityMoveSpeed(entity);
     const speed = entity.isCrouching 
-        ? baseSpeed * CONFIG.CROUCH_SPEED_MULTIPLIER 
-        : baseSpeed;
+        ? CONFIG.MOVE_SPEED * CONFIG.CROUCH_SPEED_MULTIPLIER 
+        : CONFIG.MOVE_SPEED;
     
     const moveX = (dx / distance) * speed;
     const moveZ = (dz / distance) * speed;
@@ -1007,10 +1003,9 @@ export function updateHostileMovement(world, entity) {
     }
     
     // Move em direção ao alvo
-    const baseSpeed = getEntityMoveSpeed(entity);
     const speed = entity.isCrouching 
-        ? baseSpeed * CONFIG.CROUCH_SPEED_MULTIPLIER 
-        : baseSpeed;
+        ? CONFIG.MOVE_SPEED * CONFIG.CROUCH_SPEED_MULTIPLIER 
+        : CONFIG.MOVE_SPEED;
     
     const moveX = (dx / distance) * speed;
     const moveZ = (dz / distance) * speed;
@@ -1053,7 +1048,7 @@ export function shootProjectileFromEntity(world, shooter, target) {
         shooter.inventory[shooter.selectedBlockType.id]--;
     }
     
-    const damage = (shooter.selectedBlockType.breakDamage || 0) + getEntityDamageBonus(shooter);
+    const damage = shooter.selectedBlockType.breakDamage;
     const speed = shooter.selectedBlockType.bulletSpeed || 0.5;
     
     const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);

@@ -277,7 +277,7 @@ export function openInspectorWindow(target, options = {}) {
     refreshBtn.onclick = render;
     closeBtn.onclick = () => window.close();
     render();
-    <\/script>
+  </script>
 </body>
 </html>`;
     win.document.open();

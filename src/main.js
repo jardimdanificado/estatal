@@ -9,7 +9,6 @@ import texturesToLoad from "../data/config/textures.js"
 import { vocabulario } from "../lib/vocabulario.js"
 import { FACTIONS, FACTION_ORDER } from "../data/config/factions.js"
 import world from "./world.js"
-import { setupEntityNeeds } from "./survival.js";
 import { updateEntity, checkInteractionTarget, refreshEntityIndicators } from "./entity.js"
 import { handleInteraction } from './entity.js';
 import { createProjectile, placeBlock } from './bullet.js';
@@ -307,7 +306,7 @@ function createPlayer(world) {
         editorInventory[BLOCK_TYPES.PLAYER_SPAWN.id] = 999;
     }
 
-    const playerEntity = world.addEntity({
+    world.addEntity({
         name: 'Player',
         type: 'player',
         x: 7.5,
@@ -334,41 +333,6 @@ function createPlayer(world) {
         maxHP: isEditor ? 999999 : 100,
         faction: FACTIONS.PLAYER.id
     });
-    setupEntityNeeds(playerEntity, {
-        maxHunger: isEditor ? 999999 : 240,
-        maxThirst: isEditor ? 999999 : 200,
-        hungerDecay: isEditor ? 0.001 : 0.03,
-        thirstDecay: isEditor ? 0.001 : 0.035
-    });
-    return playerEntity;
-}
-
-function getDefaultItemDropsForNpc(npcType) {
-    const faction = npcType && npcType.faction ? npcType.faction : 'neutral';
-    const defaults = {
-        village: { food_bread_ration: 1, drink_water_flask: 1 },
-        guard: { food_beef_jerky: 1, drink_water_flask: 1 },
-        outlaw: { food_meat_ration: 1, drink_stout_ale: 1 },
-        animal_friendly: { food_fruit: 1 },
-        animal_prey: { food_fruit: 1, drink_water_flask: 1 },
-        animal_predator: { food_meat_ration: 2 },
-        beast: { food_meat_ration: 1 },
-        hunter: { food_beef_jerky: 1, drink_water_flask: 1 },
-        aquatic: { food_fruit: 1, drink_water_flask: 1 },
-        plant: { food_honeycomb: 1, drink_sweet_tea: 1 },
-        infested_plant: { potion_stoneskin: 1 },
-        undead: { potion_restorative: 1 },
-        abyss: { potion_iron_totem: 1 },
-        demon: { potion_berserk: 1 },
-        infernal: { potion_berserk: 1, drink_stout_ale: 1 },
-        spirit: { drink_sweet_tea: 1, potion_restorative: 1 },
-        elemental: { potion_vigor: 1 },
-        cult: { scroll_fire_burst: 1 },
-        construct: {},
-        neutral: {}
-    };
-    const drop = defaults[faction] || {};
-    return { ...drop };
 }
 
 function createNpcEntity(world, npcType, position, nameOverride = null, factionOverride = null, options = {}) {
@@ -388,12 +352,9 @@ function createNpcEntity(world, npcType, position, nameOverride = null, factionO
     if (options.inventory && typeof options.inventory === 'object') {
         Object.assign(inventory, options.inventory);
     }
-    let itemInventory = options.itemInventory && typeof options.itemInventory === 'object'
+    const itemInventory = options.itemInventory && typeof options.itemInventory === 'object'
         ? { ...options.itemInventory }
         : (npcType.itemDrops || npcType.itemInventory || {});
-    if (!itemInventory || Object.keys(itemInventory).length === 0) {
-        itemInventory = getDefaultItemDropsForNpc(npcType);
-    }
     if (!Object.keys(inventory).length) {
         const faction = factionOverride || npcType.faction || 'neutral';
         const fallbackByFaction = {
@@ -403,19 +364,9 @@ function createNpcEntity(world, npcType, position, nameOverride = null, factionO
             beast: BLOCK_TYPES.GRASS,
             aquatic: BLOCK_TYPES.SAND,
             undead: BLOCK_TYPES.STONE,
-            demon: BLOCK_TYPES.WALL_WALL_HELL_1,
+            demon: BLOCK_TYPES.GOLD,
             plant: BLOCK_TYPES.PLANT,
-            infested_plant: BLOCK_TYPES.PLANT,
-            abyss: BLOCK_TYPES.WALL_WALL_ABYSS_0,
-            infernal: BLOCK_TYPES.FLOOR_FLOOR_INFERNAL_1,
             construct: BLOCK_TYPES.STONE,
-            animal_prey: BLOCK_TYPES.GRASS,
-            animal_friendly: BLOCK_TYPES.GRASS,
-            animal_predator: BLOCK_TYPES.SAND,
-            spirit: BLOCK_TYPES.PLANT,
-            elemental: BLOCK_TYPES.STONE,
-            cult: BLOCK_TYPES.GOLD,
-            hunter: BLOCK_TYPES.WOOD,
             neutral: BLOCK_TYPES.STONE
         };
         const fallback = fallbackByFaction[faction] || BLOCK_TYPES.STONE;
@@ -473,11 +424,11 @@ function createNpcEntity(world, npcType, position, nameOverride = null, factionO
                 entity.audioInstance = instance;
             });
             
-    spawnMessage(world, `${entity.name}: ${dialogue}`, {
-        relative: entity,
-        offset: { x: 0, y: 1.9, z: 0 },
-        duration: 2500
-    });
+            spawnMessage(world, `${entity.name}: ${dialogue}`, {
+                relative: entity,
+                offset: { x: 0, y: 1.9, z: 0 },
+                duration: 2500
+            });
 
             setTimeout(() => {
                 if (entity.audioInstance) {
@@ -487,13 +438,6 @@ function createNpcEntity(world, npcType, position, nameOverride = null, factionO
                 entity.isSpeaking = false;
             }, 2400);
         }
-    });
-
-    setupEntityNeeds(entity, {
-        maxHunger: npcType.maxHunger || 120,
-        maxThirst: npcType.maxThirst || 110,
-        hungerDecay: npcType.hungerDecay || 0.02,
-        thirstDecay: npcType.thirstDecay || 0.025
     });
 
     return entity;
@@ -1080,8 +1024,7 @@ function openUnifiedPickerPanel({ title, categories, onPick }) {
 }
 
 function getInventoryOptionList(category) {
-    if (category === 'block') return INVENTORY_BLOCK_OPTIONS;
-    return INVENTORY_ITEM_OPTIONS;
+    return category === 'block' ? INVENTORY_BLOCK_OPTIONS : INVENTORY_ITEM_OPTIONS;
 }
 
 function isInventoryEditorOpen() {
@@ -1312,7 +1255,7 @@ function ensureEntityInventoryPanel() {
         if (categoryValue === 'block') {
             entity.inventory = entity.inventory || {};
             const key = String(option.id);
-            entity.inventory[key] = (entity.inventory[key] || 0) + Math.max(1, qty);
+            entity.inventory[key] = (entity.inventory[key] || 0) + qty;
         } else {
             entity.itemInventory = entity.itemInventory || {};
             const key = option.id;
@@ -2089,7 +2032,6 @@ function buildSelectionList(world, player) {
         list.push({ kind: 'empty' });
     }
     Object.values(BLOCK_TYPES).forEach((blockType) => {
-        if (blockType.editorOnly && !isEditor) return;
         const count = player.inventory ? (player.inventory[blockType.id] || 0) : 0;
         if (count > 0) {
             list.push({ kind: 'block', blockType });
@@ -2254,10 +2196,6 @@ function updateHud(world) {
     
     const hpMax = player.maxHP || 0;
     const hp = typeof player.hp === 'number' ? player.hp : 0;
-    const hunger = typeof player.hunger === 'number' ? player.hunger : 0;
-    const thirst = typeof player.thirst === 'number' ? player.thirst : 0;
-    const maxHunger = typeof player.maxHunger === 'number' ? player.maxHunger : 0;
-    const maxThirst = typeof player.maxThirst === 'number' ? player.maxThirst : 0;
     let itemName = '-';
     let itemCount = '-';
     if (!player.selectedItem && player.selectedBlockType) {
@@ -2282,7 +2220,7 @@ function updateHud(world) {
         }
     }
     
-    hudText.textContent = `HP: ${hp}/${hpMax}\nFome: ${Math.round(hunger)}/${maxHunger}\nSede: ${Math.round(thirst)}/${maxThirst}\nItem: ${itemName} x${itemCount}\nCoins: -`;
+    hudText.textContent = `HP: ${hp}/${hpMax}\nItem: ${itemName} x${itemCount}\nCoins: -`;
 
     let previewKey = null;
     if (player.selectedItem) {
@@ -2300,7 +2238,6 @@ function updateHud(world) {
     }
     const previewUrl = resolvePreviewTextureUrl(previewKey);
     hudPreview.style.backgroundImage = previewUrl ? `url("${previewUrl}")` : 'none';
-
 }
 
 function handleUseAction(world) {
@@ -2309,7 +2246,6 @@ function handleUseAction(world) {
     if (player.selectedItem && player.selectedItem.kind === 'item') {
         const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
         if (itemDef) {
-            if (itemDef.unusable) return false;
             const count = player.itemInventory ? (player.itemInventory[itemDef.id] || 0) : 0;
             if (world.mode === 'editor' || count > 0) {
                 const used = useItem(world, player, itemDef, 1);
