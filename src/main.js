@@ -29,6 +29,20 @@ function resolvePreviewTextureUrl(key) {
     return TEXTURE_PREVIEW_MAP[key] || null;
 }
 
+function getItemTextureKey(itemDef, purpose = 'ui') {
+    if (!itemDef) return null;
+    if (purpose === 'hand') {
+        return itemDef.handTextureKey || itemDef.uiTextureKey || itemDef.textureKey || null;
+    }
+    if (purpose === 'drop') {
+        return itemDef.dropTextureKey || itemDef.textureKey || null;
+    }
+    if (purpose === 'projectile') {
+        return itemDef.projectileTextureKey || itemDef.textureKey || null;
+    }
+    return itemDef.uiTextureKey || itemDef.textureKey || null;
+}
+
 function getBlockThumbnailTextureKey(blockType) {
     if (!blockType || !blockType.textures) return null;
     return blockType.textures.all ||
@@ -84,8 +98,8 @@ const INVENTORY_ITEM_OPTIONS = Object.values(ITEMS)
     .map((itemDef) => ({
         id: itemDef.id,
         label: itemDef.name,
-        textureKey: itemDef.textureKey || null,
-        textureUrl: resolvePreviewTextureUrl(itemDef.textureKey)
+        textureKey: getItemTextureKey(itemDef, 'ui'),
+        textureUrl: resolvePreviewTextureUrl(getItemTextureKey(itemDef, 'ui'))
     }));
 
 const INVENTORY_BLOCK_OPTIONS = Object.values(BLOCK_TYPES)
@@ -180,6 +194,7 @@ async function init() {
     document.body.dataset.mode = world.mode;
     ensureItemLabel();
     ensureHud();
+    ensureHandOverlay();
     
     setupMobileControls(world);
     
@@ -316,17 +331,16 @@ function createPlayer(world) {
         isInteractable: false,
         isEditor: isEditor,
         noClip: isEditor,
-        inventory: isEditor ? editorInventory : {
-            [BLOCK_TYPES.STONE.id]: 20,
-            [BLOCK_TYPES.GRASS.id]: 30,
-            [BLOCK_TYPES.WOOD.id]: 25,
-            [BLOCK_TYPES.GOLD.id]: 10,
-            [BLOCK_TYPES.DOOR.id]: 15,
-            [BLOCK_TYPES.SAND.id]: 20
+        inventory: isEditor ? editorInventory : {},
+        itemInventory: isEditor ? {} : {
+            revolver: 24,
+            cuscuz: 6,
+            pedra: 12
         },
-        itemInventory: {},
-        selectedBlockType: BLOCK_TYPES.PLAYER_SPAWN,
-        selectedItem: { kind: 'block', id: BLOCK_TYPES.PLAYER_SPAWN.id },
+        selectedBlockType: isEditor ? BLOCK_TYPES.PLAYER_SPAWN : null,
+        selectedItem: isEditor
+            ? { kind: 'block', id: BLOCK_TYPES.PLAYER_SPAWN.id }
+            : { kind: 'empty' },
         entitySpawners: [],
         npcData: playerNpcData,
         hp: isEditor ? 999999 : 100,
@@ -481,13 +495,41 @@ function ensureHud() {
     hud.style.left = '10px';
     hud.style.color = 'white';
     hud.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
-    hud.style.fontSize = '14px';
+    hud.style.fontSize = '15px';
     hud.style.lineHeight = '1.4';
     hud.style.whiteSpace = 'pre-line';
     hud.style.zIndex = '10';
     hud.style.display = 'flex';
     hud.style.alignItems = 'center';
-    hud.style.gap = '10px';
+    hud.style.gap = '12px';
+    hud.style.padding = '10px 12px';
+    hud.style.border = '1px solid rgba(255,255,255,0.2)';
+    hud.style.borderRadius = '10px';
+
+    const playerCard = document.createElement('div');
+    playerCard.id = 'hud-player';
+    playerCard.style.display = 'flex';
+    playerCard.style.flexDirection = 'column';
+    playerCard.style.alignItems = 'center';
+    playerCard.style.gap = '6px';
+
+    const playerPhoto = document.createElement('img');
+    playerPhoto.id = 'hud-player-photo';
+    playerPhoto.src = './data/images/a.s.s.jpg';
+    playerPhoto.alt = 'Foto do jogador';
+    playerPhoto.style.width = '68px';
+    playerPhoto.style.height = '68px';
+    playerPhoto.style.borderRadius = '10px';
+    playerPhoto.style.border = '1px solid rgba(255,255,255,0.45)';
+    playerPhoto.style.objectFit = 'cover';
+    playerPhoto.style.boxShadow = '0 2px 6px rgba(0,0,0,0.5)';
+
+    const playerName = document.createElement('div');
+    playerName.id = 'hud-player-name';
+    playerName.textContent = 'A.S.S';
+    playerName.style.fontSize = '13px';
+    playerName.style.letterSpacing = '0.4px';
+    playerName.style.textTransform = 'uppercase';
 
     const hudText = document.createElement('div');
     hudText.id = 'hud-text';
@@ -506,9 +548,43 @@ function ensureHud() {
     hudPreview.style.backgroundPosition = 'center';
     hudPreview.style.boxShadow = 'inset 0 0 10px rgba(0,0,0,0.6)';
 
-    hud.appendChild(hudText);
-    hud.appendChild(hudPreview);
+    const hudStats = document.createElement('div');
+    hudStats.id = 'hud-stats';
+    hudStats.style.display = 'flex';
+    hudStats.style.alignItems = 'center';
+    hudStats.style.gap = '10px';
+
+    playerCard.appendChild(playerPhoto);
+    playerCard.appendChild(playerName);
+    hudStats.appendChild(hudText);
+    hudStats.appendChild(hudPreview);
+    hud.appendChild(playerCard);
+    hud.appendChild(hudStats);
     document.body.appendChild(hud);
+}
+
+function ensureHandOverlay() {
+    if (document.getElementById('hand-item')) return;
+    const hand = document.createElement('div');
+    hand.id = 'hand-item';
+    hand.style.position = 'fixed';
+    hand.style.right = '0';
+    hand.style.bottom = '-80px';
+    hand.style.width = '420px';
+    hand.style.height = '420px';
+    hand.style.pointerEvents = 'none';
+    hand.style.zIndex = '12';
+    hand.style.display = 'none';
+
+    const handImg = document.createElement('img');
+    handImg.id = 'hand-item-image';
+    handImg.alt = 'Item na mão';
+    handImg.style.width = '100%';
+    handImg.style.height = '100%';
+    handImg.style.objectFit = 'contain';
+
+    hand.appendChild(handImg);
+    document.body.appendChild(hand);
 }
 
 function ensureEditorCoords() {
@@ -1342,7 +1418,7 @@ function getEntityInventoryEntries(entity) {
                 id: itemDef.id,
                 name: itemDef.name,
                 count: qty,
-                textureUrl: resolvePreviewTextureUrl(itemDef.textureKey)
+                textureUrl: resolvePreviewTextureUrl(getItemTextureKey(itemDef, 'ui'))
             });
         }
     }
@@ -1587,12 +1663,15 @@ function openEditorContextMenu(world, event) {
             const itemOptions = Object.values(ITEMS)
                 .slice()
                 .sort((a, b) => a.name.localeCompare(b.name))
-                .map((itemDef) => ({
-                    label: itemDef.name,
-                    value: itemDef.id,
-                    textureKey: itemDef.textureKey || null,
-                    textureUrl: resolvePreviewTextureUrl(itemDef.textureKey)
-                }));
+                .map((itemDef) => {
+                    const textureKey = getItemTextureKey(itemDef, 'ui');
+                    return {
+                        label: itemDef.name,
+                        value: itemDef.id,
+                        textureKey: textureKey || null,
+                        textureUrl: resolvePreviewTextureUrl(textureKey)
+                    };
+                });
             openUnifiedPickerPanel({
                 title: 'Selecionar tipo',
                 categories: [
@@ -2183,6 +2262,7 @@ function updateHud(world) {
     if (!hud || !hudText || !hudPreview) return;
     if (world.mode !== 'game') {
         hud.style.display = 'none';
+        updateHandOverlay(world, null);
         return;
     }
     hud.style.display = 'flex';
@@ -2191,6 +2271,7 @@ function updateHud(world) {
     if (!player) {
         hudText.textContent = 'HP: -\nItem: -\nCoins: -';
         hudPreview.style.backgroundImage = 'none';
+        updateHandOverlay(world, null);
         return;
     }
     
@@ -2227,8 +2308,8 @@ function updateHud(world) {
         if (player.selectedItem.kind === 'block') {
             previewKey = getBlockThumbnailTextureKey(player.selectedBlockType);
         } else if (player.selectedItem.kind === 'item') {
-            const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
-            previewKey = itemDef ? itemDef.textureKey : null;
+        const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
+        previewKey = itemDef ? getItemTextureKey(itemDef, 'ui') : null;
         } else if (player.selectedItem.kind === 'entity') {
             const npcType = getNpcTypeById(player.selectedItem.npcTypeId);
             previewKey = npcType ? npcType.texture : null;
@@ -2238,6 +2319,50 @@ function updateHud(world) {
     }
     const previewUrl = resolvePreviewTextureUrl(previewKey);
     hudPreview.style.backgroundImage = previewUrl ? `url("${previewUrl}")` : 'none';
+
+    updateHandOverlay(world, player);
+}
+
+function updateHandOverlay(world, player) {
+    const hand = document.getElementById('hand-item');
+    const handImg = document.getElementById('hand-item-image');
+    if (!hand || !handImg) return;
+    if (world.mode !== 'game') {
+        hand.style.display = 'none';
+        return;
+    }
+    let handKey = null;
+    let useEmptyHand = true;
+    if (player) {
+        if (!player.selectedItem && player.selectedBlockType) {
+            player.selectedItem = { kind: 'block', id: player.selectedBlockType.id };
+        }
+        if (player.selectedItem) {
+            if (player.selectedItem.kind === 'block') {
+                handKey = player.selectedBlockType
+                    ? (player.selectedBlockType.handTextureKey || null)
+                    : null;
+                useEmptyHand = !handKey;
+            } else if (player.selectedItem.kind === 'item') {
+                const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
+                handKey = itemDef ? (itemDef.handTextureKey || null) : null;
+                useEmptyHand = !handKey;
+            } else if (player.selectedItem.kind === 'empty') {
+                useEmptyHand = true;
+            }
+        } else if (player.selectedBlockType) {
+            handKey = player.selectedBlockType.handTextureKey || null;
+            useEmptyHand = !handKey;
+        }
+    }
+    const handUrl = resolvePreviewTextureUrl(handKey);
+    const finalUrl = handUrl || (useEmptyHand ? './data/images/empty-hand.png' : null);
+    if (finalUrl) {
+        handImg.src = finalUrl;
+        hand.style.display = 'block';
+    } else {
+        hand.style.display = 'none';
+    }
 }
 
 function handleUseAction(world) {

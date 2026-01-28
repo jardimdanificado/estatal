@@ -105,6 +105,57 @@ function createBlockMaterials(world, blockType) {
     return [fallback, fallback, fallback, fallback, fallback, fallback];
 }
 
+function createProjectileSprite(world, textureKey, size = 0.35) {
+    const texture = textureKey ? world._internal.blockTextures[textureKey] : null;
+    let aspect = 1;
+    if (texture && texture.image && texture.image.width && texture.image.height) {
+        aspect = texture.image.width / texture.image.height;
+    }
+    const geometry = new THREE.PlaneGeometry(size * aspect, size);
+    const material = new THREE.MeshBasicMaterial({
+        map: texture || null,
+        color: 0xffffff,
+        transparent: true,
+        alphaTest: 0.1,
+        side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData.faceCamera = true;
+    return mesh;
+}
+
+function createProjectileMesh(world, blockType) {
+    let textureKey = blockType && blockType.projectileTextureKey ? blockType.projectileTextureKey : null;
+    if (!textureKey && blockType && blockType.textures) {
+        textureKey = blockType.textures.all ||
+            blockType.textures.top ||
+            blockType.textures.side ||
+            blockType.textures.bottom ||
+            null;
+    }
+    if (textureKey) {
+        const size = typeof blockType.projectileSize === 'number' ? blockType.projectileSize : 0.35;
+        return createProjectileSprite(world, textureKey, size);
+    }
+    const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    const materials = createBlockMaterials(world, blockType);
+    return new THREE.Mesh(geometry, materials);
+}
+
+function createItemProjectileMesh(world, itemDef) {
+    if (!itemDef) {
+        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+        return new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    }
+    const textureKey = itemDef.projectileTextureKey || itemDef.textureKey || null;
+    if (textureKey) {
+        const size = typeof itemDef.projectileSize === 'number' ? itemDef.projectileSize : 0.22;
+        return createProjectileSprite(world, textureKey, size);
+    }
+    const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    return new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0xffffff }));
+}
+
 function ensureFxStore(world) {
     if (!world._internal.fx) {
         world._internal.fx = [];
@@ -464,6 +515,40 @@ export function createProjectile(world) {
     if (!player) return;
     const isEditor = player.isEditor || world.mode === 'editor';
     
+    if (player.selectedItem && player.selectedItem.kind === 'item') {
+        const itemDef = Object.values(ITEMS).find((item) => item.id === player.selectedItem.id);
+        const projectileSpeed = itemDef && typeof itemDef.projectileSpeed === 'number'
+            ? itemDef.projectileSpeed
+            : null;
+        if (!projectileSpeed) return;
+        const count = itemDef && player.itemInventory ? (player.itemInventory[itemDef.id] || 0) : 0;
+        if (!isEditor && count <= 0) return;
+        const damage = itemDef && typeof itemDef.projectileDamage === 'number'
+            ? itemDef.projectileDamage
+            : (itemDef && typeof itemDef.damage === 'number' ? itemDef.damage : 0);
+        const mesh = createItemProjectileMesh(world, itemDef);
+        mesh.position.copy(world._internal.camera.position);
+        const direction = new THREE.Vector3();
+        world._internal.camera.getWorldDirection(direction);
+        const projectile = {
+            mesh: mesh,
+            velocity: direction.multiplyScalar(projectileSpeed),
+            damage: damage,
+            shooter: player,
+            itemDef: itemDef || null,
+            faceCamera: Boolean(mesh.userData && mesh.userData.faceCamera),
+            gravityScale: itemDef && typeof itemDef.projectileGravityScale === 'number' ? itemDef.projectileGravityScale : undefined,
+            drag: itemDef && typeof itemDef.projectileDrag === 'number' ? itemDef.projectileDrag : undefined
+        };
+        world._internal.scene.add(mesh);
+        world.projectiles.push(projectile);
+        if (!isEditor && itemDef && player.itemInventory) {
+            player.itemInventory[itemDef.id] = Math.max(0, count - 1);
+        }
+        alertEntitiesFromShot(world, player);
+        return;
+    }
+    
     if (player.selectedItem && player.selectedItem.kind !== 'block' && player.selectedItem.kind !== 'empty') return;
     if (player.selectedItem && player.selectedItem.kind === 'empty') {
         if (!isEditor) {
@@ -498,9 +583,7 @@ export function createProjectile(world) {
     const damage = player.selectedBlockType.breakDamage;
     const speed = player.selectedBlockType.bulletSpeed || 0.5;
     
-    const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-    const materials = createBlockMaterials(world, player.selectedBlockType);
-    const mesh = new THREE.Mesh(geometry, materials);
+    const mesh = createProjectileMesh(world, player.selectedBlockType);
     
     mesh.position.copy(world._internal.camera.position);
     
@@ -512,7 +595,8 @@ export function createProjectile(world) {
         velocity: direction.multiplyScalar(speed),
         damage: damage,
         shooter: player,
-        blockType: player.selectedBlockType
+        blockType: player.selectedBlockType,
+        faceCamera: Boolean(mesh.userData && mesh.userData.faceCamera)
     };
     
     world._internal.scene.add(mesh);
@@ -634,6 +718,9 @@ export function updateProjectiles(world) {
         proj.velocity.y -= CONFIG.GRAVITY * gravityScale;
         proj.velocity.multiplyScalar(drag);
         proj.mesh.position.add(proj.velocity);
+        if (proj.faceCamera) {
+            proj.mesh.lookAt(world._internal.camera.position);
+        }
         
         let hitSomething = false;
         

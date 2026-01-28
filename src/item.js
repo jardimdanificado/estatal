@@ -45,6 +45,14 @@ function createBillboardMesh(texture, baseHeight = 0.5) {
     return new THREE.Mesh(geometry, material);
 }
 
+function getItemTextureKey(itemDef, purpose = 'drop') {
+    if (!itemDef) return null;
+    if (purpose === 'drop') return itemDef.dropTextureKey || itemDef.textureKey || null;
+    if (purpose === 'projectile') return itemDef.projectileTextureKey || itemDef.textureKey || null;
+    if (purpose === 'hand') return itemDef.handTextureKey || itemDef.uiTextureKey || itemDef.textureKey || null;
+    return itemDef.uiTextureKey || itemDef.textureKey || null;
+}
+
 export function spawnBlockDrop(world, blockType, amount, position, options = {}) {
     const textureKey = getBlockTextureKey(blockType);
     const texture = textureKey ? world._internal.blockTextures[textureKey] : null;
@@ -72,7 +80,7 @@ export function spawnBlockDrop(world, blockType, amount, position, options = {})
 
 export function spawnItemDrop(world, itemId, amount, position, options = {}) {
     const itemDef = Object.values(ITEMS).find(it => it.id === itemId);
-    const textureKey = itemDef ? itemDef.textureKey : null;
+    const textureKey = getItemTextureKey(itemDef, 'drop');
     const texture = textureKey ? world._internal.blockTextures[textureKey] : null;
     const mesh = createBillboardMesh(texture);
     mesh.position.set(position.x, position.y, position.z);
