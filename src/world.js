@@ -232,6 +232,31 @@ export default {
             side: THREE.DoubleSide
         });
     },
+    setTerrainRenderEnabled(enabled) {
+        const useTerrain = !!enabled;
+        if (this._internal.useTerrainMesh === useTerrain) return;
+        this._internal.useTerrainMesh = useTerrain;
+
+        if (useTerrain) {
+            // hide block meshes, show terrain
+            for (const block of this.blocks) {
+                if (!block || !block.mesh) continue;
+                if (block.type && block.type.render === 'cross') continue;
+                if (block.mesh.parent) block.mesh.parent.remove(block.mesh);
+            }
+            if (this._internal.terrainGroup) this._internal.terrainGroup.visible = true;
+            this.markTerrainDirtyAll();
+        } else {
+            // show block meshes, hide terrain
+            if (this._internal.terrainGroup) this._internal.terrainGroup.visible = false;
+            for (const block of this.blocks) {
+                if (!block || !block.mesh) continue;
+                if (block.type && block.type.render === 'cross') continue;
+                if (block.type && block.type.editorOnly && this.mode !== 'editor') continue;
+                if (!block.mesh.parent) this._internal.scene.add(block.mesh);
+            }
+        }
+    },
     ensureTerrainWorker() {
         if (this._internal.terrainWorker) return this._internal.terrainWorker;
         if (typeof Worker === 'undefined') return null;

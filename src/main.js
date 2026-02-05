@@ -195,6 +195,7 @@ async function init() {
     ensureItemLabel();
     ensureHud();
     ensureHandOverlay();
+    setupRenderDebugHotkey(world);
     
     setupMobileControls(world);
     
@@ -222,6 +223,16 @@ async function init() {
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     
     animate(world);
+}
+
+function setupRenderDebugHotkey(world) {
+    if (window.__RENDER_DEBUG_HOTKEY__) return;
+    window.__RENDER_DEBUG_HOTKEY__ = true;
+    document.addEventListener('keydown', (e) => {
+        if (e.code !== 'F9') return;
+        const next = !world._internal.useTerrainMesh;
+        world.setTerrainRenderEnabled(next);
+    });
 }
 
 // ============================================================
