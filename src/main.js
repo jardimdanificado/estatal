@@ -265,6 +265,8 @@ function loadTextures(world) {
         loader.load(url, (tex) => {
             tex.magFilter = THREE.NearestFilter;
             tex.minFilter = THREE.NearestFilter;
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
             world._internal.blockTextures[key] = tex;
             checkLoaded();
         }, undefined, () => {
@@ -289,6 +291,8 @@ function loadTextures(world) {
             const texture = new THREE.CanvasTexture(canvas);
             texture.magFilter = THREE.NearestFilter;
             texture.minFilter = THREE.NearestFilter;
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
             world._internal.blockTextures[key] = texture;
             checkLoaded();
         });
@@ -1953,6 +1957,7 @@ function applyMap(world, payload) {
 
     world._internal.usedNames = new Set();
     
+    world.beginTerrainBatch();
     world.clearBlocks();
     for (const item of world.items) {
         world._internal.scene.remove(item.mesh);
@@ -1986,6 +1991,7 @@ function applyMap(world, payload) {
         if (entry.z < minZ) minZ = entry.z;
         if (entry.z > maxZ) maxZ = entry.z;
     }
+    world.endTerrainBatch();
     if (minX !== Infinity) {
         world._internal.mapBounds = { minX, maxX, minZ, maxZ };
     } else {

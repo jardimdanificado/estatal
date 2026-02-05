@@ -139,10 +139,14 @@ export function handleInteraction(world, target) {
                 solid: target.solid,
                 isFloor: target.isFloor
             },
-            material: target.mesh.material,
+            material: target.mesh ? target.mesh.material : [],
             position: {
                 set: (x, y, z) => {
-                    target.mesh.position.set(x, y, z);
+                    if (target.mesh) {
+                        target.mesh.position.set(x, y, z);
+                        target.mesh.updateMatrix();
+                        target.mesh.updateMatrixWorld(true);
+                    }
                     target.x = x;
                     target.y = y;
                     target.z = z;

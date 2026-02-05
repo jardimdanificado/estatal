@@ -1,5 +1,6 @@
 import CONFIG from '../data/config/config.js';
 import BLOCK_TYPES from '../data/config/blocks.js';
+import { buildSurfaceNetGeometryData } from './surfaceNets.js';
 
 export default {
     entities: [],
@@ -29,7 +30,16 @@ export default {
         editorMoveCommand: null,
         editorMoveLine: null,
         mapBounds: null,
-        fx: []
+        fx: [],
+        terrainGroup: null,
+        terrainWorker: null,
+        terrainBuildId: 0,
+        terrainBuilding: false,
+        terrainDirty: false,
+        terrainBuildTimer: null,
+        terrainBuildDelay: 120,
+        terrainBatchDepth: 0,
+        useTerrainMesh: true
     },
 
     recalculateMapBounds() {
@@ -76,6 +86,9 @@ export default {
         }
         
         mesh.position.set(x, y, z);
+        mesh.matrixAutoUpdate = false;
+        mesh.updateMatrix();
+        mesh.updateMatrixWorld(true);
         if (blockType.editorOnly && this.mode !== 'editor') {
             mesh.visible = false;
         }
@@ -96,9 +109,16 @@ export default {
         
         mesh.userData = block;
         
-        this._internal.scene.add(mesh);
+        if (this._internal.useTerrainMesh && blockType.render !== 'cross') {
+            mesh.updateMatrixWorld(true);
+        } else {
+            this._internal.scene.add(mesh);
+        }
         this.blocks.push(block);
         this.recalculateMapBounds();
+        if (this._internal.useTerrainMesh && blockType.render !== 'cross' && block.solid) {
+            this.markTerrainDirty();
+        }
         
         return block;
     },
@@ -111,6 +131,9 @@ export default {
             }
             this.blocks.splice(index, 1);
             this.recalculateMapBounds();
+            if (this._internal.useTerrainMesh && block.type && block.type.render !== 'cross' && block.solid) {
+                this.markTerrainDirty();
+            }
         }
     },
 
@@ -120,6 +143,10 @@ export default {
         }
         this.blocks = [];
         this._internal.mapBounds = null;
+        this.disposeTerrainGroup();
+        if (this._internal.useTerrainMesh) {
+            this.markTerrainDirty();
+        }
     },
     
     isPositionOccupied(x, y, z) {
@@ -188,6 +215,167 @@ export default {
         group.add(planeA);
         group.add(planeB);
         return group;
+    },
+    createTerrainMaterial(blockType) {
+        const textures = this._internal.blockTextures;
+        const opacity = typeof blockType.opacity === 'number' ? blockType.opacity : 1;
+        const transparent = opacity < 1;
+        const key = blockType.textures
+            ? (blockType.textures.all || blockType.textures.top || blockType.textures.side || blockType.textures.bottom || null)
+            : null;
+        const map = key ? (textures[key] || null) : null;
+        return new THREE.MeshLambertMaterial({
+            map: map || null,
+            color: map ? 0xffffff : 0x9bb0a3,
+            transparent,
+            opacity,
+            side: THREE.DoubleSide
+        });
+    },
+    ensureTerrainWorker() {
+        if (this._internal.terrainWorker) return this._internal.terrainWorker;
+        if (typeof Worker === 'undefined') return null;
+        const worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
+        worker.onmessage = (event) => {
+            const payload = event.data;
+            if (!payload || payload.type !== 'result') return;
+            if (payload.id !== this._internal.terrainBuildId) return;
+            this.applyTerrainResult(payload.results || []);
+            this._internal.terrainBuilding = false;
+            if (this._internal.terrainDirty) {
+                this.scheduleTerrainRebuild();
+            }
+        };
+        worker.onerror = () => {
+            this._internal.terrainBuilding = false;
+        };
+        this._internal.terrainWorker = worker;
+        return worker;
+    },
+    disposeTerrainGroup() {
+        const group = this._internal.terrainGroup;
+        if (!group) return;
+        if (group.parent) group.parent.remove(group);
+        for (const child of group.children) {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) child.material.dispose();
+        }
+        this._internal.terrainGroup = null;
+    },
+    beginTerrainBatch() {
+        this._internal.terrainBatchDepth += 1;
+    },
+    endTerrainBatch() {
+        if (this._internal.terrainBatchDepth > 0) {
+            this._internal.terrainBatchDepth -= 1;
+        }
+        if (this._internal.terrainBatchDepth === 0 && this._internal.terrainDirty) {
+            this.scheduleTerrainRebuild();
+        }
+    },
+    markTerrainDirty() {
+        if (!this._internal.useTerrainMesh) return;
+        this._internal.terrainDirty = true;
+        if (this._internal.terrainBatchDepth > 0) return;
+        this.scheduleTerrainRebuild();
+    },
+    scheduleTerrainRebuild() {
+        if (this._internal.terrainBuilding) return;
+        if (this._internal.terrainBuildTimer) return;
+        this._internal.terrainBuildTimer = setTimeout(() => {
+            this._internal.terrainBuildTimer = null;
+            this.rebuildTerrainMesh();
+        }, this._internal.terrainBuildDelay);
+    },
+    rebuildTerrainMesh() {
+        if (!this._internal.useTerrainMesh) return;
+        if (!this._internal.scene) return;
+        if (this._internal.terrainBuilding) return;
+
+        const grouped = new Map();
+        for (const block of this.blocks) {
+            if (!block || !block.solid) continue;
+            if (block.type && block.type.render === 'cross') continue;
+            if (block.type && block.type.editorOnly && this.mode !== 'editor') continue;
+            const typeId = block.type ? block.type.id : 'unknown';
+            if (!grouped.has(typeId)) grouped.set(typeId, []);
+            grouped.get(typeId).push({ x: block.x, y: block.y, z: block.z });
+        }
+
+        if (grouped.size === 0) {
+            this.disposeTerrainGroup();
+            this._internal.terrainDirty = false;
+            return;
+        }
+
+        const subdivisions = this.mode === 'game' ? 4 : 8;
+        const padding = this.mode === 'game' ? 4 : 6;
+        const dilation = this.mode === 'game' ? 1 : 2;
+        const isoLevel = 0.5;
+        const scale = CONFIG.BLOCK_SIZE / subdivisions;
+        const uvScaleTop = this.mode === 'game' ? 1.0 : 0.8;
+        const uvScaleSide = this.mode === 'game' ? 0.55 : 0.35;
+
+        const options = {
+            isoLevel,
+            padding,
+            scale,
+            uvScaleTop,
+            uvScaleSide,
+            dilation,
+            subdivisions
+        };
+
+        this._internal.terrainDirty = false;
+        this._internal.terrainBuilding = true;
+        this._internal.terrainBuildId += 1;
+        const buildId = this._internal.terrainBuildId;
+
+        const groups = [];
+        for (const [typeId, list] of grouped.entries()) {
+            groups.push({ typeId, blocks: list });
+        }
+
+        const worker = this.ensureTerrainWorker();
+        if (worker) {
+            worker.postMessage({ type: 'build', id: buildId, groups, options });
+            return;
+        }
+
+        const results = [];
+        for (const group of groups) {
+            const data = buildSurfaceNetGeometryData(group.blocks, options);
+            if (!data) continue;
+            results.push({ typeId: group.typeId, ...data });
+        }
+        this.applyTerrainResult(results);
+        this._internal.terrainBuilding = false;
+    },
+    applyTerrainResult(results) {
+        this.disposeTerrainGroup();
+        if (!results.length || !this._internal.scene) return;
+
+        const group = new THREE.Group();
+        group.name = 'terrain-group';
+
+        for (const result of results) {
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(result.positions, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(result.normals, 3));
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(result.uvs, 2));
+
+            const blockType = Object.values(BLOCK_TYPES).find((b) => b.id === result.typeId);
+            const material = this.createTerrainMaterial(blockType || {});
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.receiveShadow = true;
+            mesh.castShadow = false;
+            mesh.frustumCulled = false;
+            mesh.userData.blockTypeId = result.typeId;
+            group.add(mesh);
+        }
+
+        this._internal.scene.add(group);
+        this._internal.terrainGroup = group;
     },
     addEntity(entityData) {
         const entity = {

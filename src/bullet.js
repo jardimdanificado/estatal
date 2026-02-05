@@ -715,6 +715,7 @@ export function updateProjectiles(world) {
 
         const gravityScale = typeof proj.gravityScale === 'number' ? proj.gravityScale : 0.6;
         const drag = typeof proj.drag === 'number' ? proj.drag : 0.985;
+        const prevPos = proj.mesh.position.clone();
         proj.velocity.y -= CONFIG.GRAVITY * gravityScale;
         proj.velocity.multiplyScalar(drag);
         proj.mesh.position.add(proj.velocity);
@@ -777,7 +778,71 @@ export function updateProjectiles(world) {
         
         if (hitSomething) continue;
         
-        // Verifica colisão com blocos
+        // Verifica colisão com blocos (raycast contínuo)
+        if (!hitSomething && world.blocks.length) {
+            const raycaster = world._internal.raycaster;
+            const dir = proj.mesh.position.clone().sub(prevPos);
+            const dist = dir.length();
+            if (dist > 0.0001) {
+                dir.normalize();
+                raycaster.set(prevPos, dir);
+
+                let targets = null;
+                if (world._internal.useTerrainMesh && world._internal.terrainGroup) {
+                    targets = world._internal.terrainGroup.children;
+                } else {
+                    targets = world.blocks.map((block) => block.mesh).filter(Boolean);
+                }
+
+                const hits = raycaster.intersectObjects(targets, true);
+                if (hits.length && hits[0].distance <= dist + 0.05) {
+                    const hit = hits[0];
+                    let block = world.blocks.find((b) => b.mesh === hit.object);
+                    if (!block && world._internal.useTerrainMesh && hit.point) {
+                        // tenta mapear pelo ponto de impacto na malha
+                        const maxDist = 1.2;
+                        let best = null;
+                        let bestD2 = maxDist * maxDist;
+                        for (const candidate of world.blocks) {
+                            if (!candidate || !candidate.solid) continue;
+                            if (candidate.type && candidate.type.render === 'cross') continue;
+                            const dx = candidate.x - hit.point.x;
+                            const dy = candidate.y - hit.point.y;
+                            const dz = candidate.z - hit.point.z;
+                            if (Math.abs(dx) > maxDist || Math.abs(dy) > maxDist || Math.abs(dz) > maxDist) continue;
+                            const d2 = dx * dx + dy * dy + dz * dz;
+                            if (d2 < bestD2) {
+                                bestD2 = d2;
+                                best = candidate;
+                            }
+                        }
+                        block = best;
+                    }
+
+                    if (block) {
+                        block.hp -= proj.damage;
+                        applyBlockHitEffects(world, block, proj.blockType || null);
+                        if (block.hp <= 0) {
+                            if (world.mode === 'game' && block.type.droppable) {
+                                spawnBlockDrop(world, block.type, 1, {
+                                    x: block.x,
+                                    y: block.y + 0.3,
+                                    z: block.z
+                                });
+                            }
+                            world.removeBlock(block);
+                        }
+                    }
+                    world._internal.scene.remove(proj.mesh);
+                    world.projectiles.splice(i, 1);
+                    hitSomething = true;
+                }
+            }
+        }
+
+        if (hitSomething) continue;
+
+        // Verifica colisão com blocos (distância)
         for (let block of world.blocks) {
             const distance = Math.sqrt(
                 Math.pow(proj.mesh.position.x - block.x, 2) +

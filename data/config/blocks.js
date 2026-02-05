@@ -51,6 +51,9 @@ const DOOR_USE = function(world, block, creature) {
         ];
         queue.push(...neighbors);
     }
+    if (world && typeof world.markTerrainDirty === 'function') {
+        world.markTerrainDirty();
+    }
 };
 
 export default {
