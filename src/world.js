@@ -33,6 +33,7 @@ export default {
         fx: [],
         terrainGroup: null,
         terrainWorker: null,
+        terrainWorkerFailed: false,
         terrainBuildId: 0,
         terrainBuilding: false,
         terrainDirty: false,
@@ -258,9 +259,16 @@ export default {
         }
     },
     ensureTerrainWorker() {
+        if (this._internal.terrainWorkerFailed) return null;
         if (this._internal.terrainWorker) return this._internal.terrainWorker;
         if (typeof Worker === 'undefined') return null;
-        const worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
+        let worker = null;
+        try {
+            worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
+        } catch (error) {
+            this._internal.terrainWorkerFailed = true;
+            return null;
+        }
         worker.onmessage = (event) => {
             const payload = event.data;
             if (!payload || payload.type !== 'result') return;
@@ -273,6 +281,10 @@ export default {
         };
         worker.onerror = () => {
             this._internal.terrainBuilding = false;
+            this._internal.terrainWorkerFailed = true;
+            this._internal.terrainWorker = null;
+            this._internal.terrainDirty = true;
+            this.scheduleTerrainRebuild();
         };
         this._internal.terrainWorker = worker;
         return worker;
@@ -303,6 +315,9 @@ export default {
         this._internal.terrainDirty = true;
         if (this._internal.terrainBatchDepth > 0) return;
         this.scheduleTerrainRebuild();
+    },
+    markTerrainDirtyAll() {
+        this.markTerrainDirty();
     },
     scheduleTerrainRebuild() {
         if (this._internal.terrainBuilding) return;
@@ -345,6 +360,8 @@ export default {
         const scale = CONFIG.BLOCK_SIZE / subdivisions;
         const uvScaleTop = this.mode === 'game' ? 1.0 : 0.8;
         const uvScaleSide = this.mode === 'game' ? 0.55 : 0.35;
+        const uvScaleSideU = uvScaleSide * 2.0;
+        const uvScaleSideV = uvScaleSide * 2.0;
         const fillInset = 0;
 
         const options = {
@@ -353,6 +370,8 @@ export default {
             scale,
             uvScaleTop,
             uvScaleSide,
+            uvScaleSideU,
+            uvScaleSideV,
             dilation,
             subdivisions,
             fillInset

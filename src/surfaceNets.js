@@ -49,7 +49,7 @@ function computeTriNormal(ax, ay, az, bx, by, bz, cx, cy, cz) {
   return [nx, ny, nz];
 }
 
-function pushProjectedUVs(uvs, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, uvScaleSide) {
+function pushProjectedUVs(uvs, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, uvScaleSideU, uvScaleSideV) {
   const [nx, ny, nz] = computeTriNormal(ax, ay, az, bx, by, bz, cx, cy, cz);
   const anx = Math.abs(nx);
   const any = Math.abs(ny);
@@ -62,25 +62,27 @@ function pushProjectedUVs(uvs, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, u
     u2 = bx * s; v2 = bz * s;
     u3 = cx * s; v3 = cz * s;
   } else if (anx >= any && anx >= anz) {
-    const s = uvScaleSide;
-    u1 = az * s; v1 = ay * s;
-    u2 = bz * s; v2 = by * s;
-    u3 = cz * s; v3 = cy * s;
+    const su = uvScaleSideU;
+    const sv = uvScaleSideV;
+    u1 = az * su; v1 = ay * sv;
+    u2 = bz * su; v2 = by * sv;
+    u3 = cz * su; v3 = cy * sv;
   } else {
-    const s = uvScaleSide;
-    u1 = ax * s; v1 = ay * s;
-    u2 = bx * s; v2 = by * s;
-    u3 = cx * s; v3 = cy * s;
+    const su = uvScaleSideU;
+    const sv = uvScaleSideV;
+    u1 = ax * su; v1 = ay * sv;
+    u2 = bx * su; v2 = by * sv;
+    u3 = cx * su; v3 = cy * sv;
   }
 
   uvs.push(u1, v1, u2, v2, u3, v3);
 }
 
-function emitTriangle(out, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, uvScaleSide) {
+function emitTriangle(out, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, uvScaleSideU, uvScaleSideV) {
   const [nx, ny, nz] = computeTriNormal(ax, ay, az, bx, by, bz, cx, cy, cz);
   out.positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
   out.normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-  pushProjectedUVs(out.uvs, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, uvScaleSide);
+  pushProjectedUVs(out.uvs, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, uvScaleSideU, uvScaleSideV);
 }
 
 export function buildSurfaceNetGeometryData(blocks, options = {}) {
@@ -89,6 +91,8 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
   const scale = typeof options.scale === 'number' ? options.scale : 1;
   const uvScaleTop = typeof options.uvScaleTop === 'number' ? options.uvScaleTop : 1;
   const uvScaleSide = typeof options.uvScaleSide === 'number' ? options.uvScaleSide : 1;
+  const uvScaleSideU = typeof options.uvScaleSideU === 'number' ? options.uvScaleSideU : uvScaleSide;
+  const uvScaleSideV = typeof options.uvScaleSideV === 'number' ? options.uvScaleSideV : uvScaleSide;
   const dilation = typeof options.dilation === 'number' ? options.dilation : 0;
   const subdivisions = Math.max(1, Math.floor(options.subdivisions || 1));
   const fillInset = Math.max(0, Number(options.fillInset || 0));
@@ -228,11 +232,11 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
     const [cx, cy, cz] = getPos(c);
     const [dx, dy, dz] = getPos(d);
     if (flip) {
-      emitTriangle(out, ax, ay, az, cx, cy, cz, bx, by, bz, uvScaleTop, uvScaleSide);
-      emitTriangle(out, ax, ay, az, dx, dy, dz, cx, cy, cz, uvScaleTop, uvScaleSide);
+      emitTriangle(out, ax, ay, az, cx, cy, cz, bx, by, bz, uvScaleTop, uvScaleSideU, uvScaleSideV);
+      emitTriangle(out, ax, ay, az, dx, dy, dz, cx, cy, cz, uvScaleTop, uvScaleSideU, uvScaleSideV);
     } else {
-      emitTriangle(out, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, uvScaleSide);
-      emitTriangle(out, ax, ay, az, cx, cy, cz, dx, dy, dz, uvScaleTop, uvScaleSide);
+      emitTriangle(out, ax, ay, az, bx, by, bz, cx, cy, cz, uvScaleTop, uvScaleSideU, uvScaleSideV);
+      emitTriangle(out, ax, ay, az, cx, cy, cz, dx, dy, dz, uvScaleTop, uvScaleSideU, uvScaleSideV);
     }
   }
 
