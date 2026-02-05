@@ -310,11 +310,12 @@ export default {
 
         const subdivisions = this.mode === 'game' ? 4 : 8;
         const padding = this.mode === 'game' ? 4 : 6;
-        const dilation = this.mode === 'game' ? 1 : 2;
-        const isoLevel = 0.5;
+        const dilation = this.mode === 'game' ? 0 : 1;
+        const isoLevel = this.mode === 'game' ? 0.56 : 0.5;
         const scale = CONFIG.BLOCK_SIZE / subdivisions;
         const uvScaleTop = this.mode === 'game' ? 1.0 : 0.8;
         const uvScaleSide = this.mode === 'game' ? 0.55 : 0.35;
+        const fillInset = 0;
 
         const options = {
             isoLevel,
@@ -323,7 +324,8 @@ export default {
             uvScaleTop,
             uvScaleSide,
             dilation,
-            subdivisions
+            subdivisions,
+            fillInset
         };
 
         this._internal.terrainDirty = false;

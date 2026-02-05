@@ -91,6 +91,7 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
   const uvScaleSide = typeof options.uvScaleSide === 'number' ? options.uvScaleSide : 1;
   const dilation = typeof options.dilation === 'number' ? options.dilation : 0;
   const subdivisions = Math.max(1, Math.floor(options.subdivisions || 1));
+  const fillInset = Math.max(0, Number(options.fillInset || 0));
 
   if (!blocks || !blocks.length) return null;
 
@@ -139,12 +140,14 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
   }
 
   for (const voxel of voxelList) {
-    const startX = Math.max(gridMinX, voxel.vx - dilation);
-    const endX = Math.min(gridMaxX, voxel.vx + subdivisions + dilation);
-    const startY = Math.max(gridMinY, voxel.vy - dilation);
-    const endY = Math.min(gridMaxY, voxel.vy + subdivisions + dilation);
-    const startZ = Math.max(gridMinZ, voxel.vz - dilation);
-    const endZ = Math.min(gridMaxZ, voxel.vz + subdivisions + dilation);
+    const startX = Math.max(gridMinX, Math.ceil(voxel.vx + fillInset - dilation));
+    const endX = Math.min(gridMaxX, Math.floor(voxel.vx + subdivisions - fillInset + dilation));
+    const startY = Math.max(gridMinY, Math.ceil(voxel.vy + fillInset - dilation));
+    const endY = Math.min(gridMaxY, Math.floor(voxel.vy + subdivisions - fillInset + dilation));
+    const startZ = Math.max(gridMinZ, Math.ceil(voxel.vz + fillInset - dilation));
+    const endZ = Math.min(gridMaxZ, Math.floor(voxel.vz + subdivisions - fillInset + dilation));
+
+    if (startX > endX || startY > endY || startZ > endZ) continue;
 
     for (let z = startZ; z <= endZ; z++) {
       for (let y = startY; y <= endY; y++) {
