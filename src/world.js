@@ -307,10 +307,15 @@ export default {
     scheduleTerrainRebuild() {
         if (this._internal.terrainBuilding) return;
         if (this._internal.terrainBuildTimer) return;
+        if (this.mode === 'editor') {
+            this.rebuildTerrainMesh();
+            return;
+        }
+        const delay = this._internal.terrainBuildDelay;
         this._internal.terrainBuildTimer = setTimeout(() => {
             this._internal.terrainBuildTimer = null;
             this.rebuildTerrainMesh();
-        }, this._internal.terrainBuildDelay);
+        }, delay);
     },
     rebuildTerrainMesh() {
         if (!this._internal.useTerrainMesh) return;
