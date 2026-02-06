@@ -226,6 +226,36 @@
     td select { font-size: 11px; padding: 4px; border-radius: 2px; }
 
     .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .menu-stage {
+      position: relative;
+      width: 100%;
+      min-height: 360px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: #000;
+      overflow: hidden;
+    }
+    .menu-node {
+      position: absolute;
+      border: 1px dashed rgba(255,255,255,0.55);
+      box-sizing: border-box;
+      cursor: move;
+      user-select: none;
+    }
+    .menu-node.active {
+      outline: 2px solid var(--accent);
+      z-index: 2;
+    }
+    .menu-node .menu-node-resize {
+      position: absolute;
+      right: -5px;
+      bottom: -5px;
+      width: 10px;
+      height: 10px;
+      background: #fff;
+      border: 1px solid #111;
+      cursor: nwse-resize;
+    }
 
     #app.no-stage .primary-tabs {
       position: sticky;
@@ -276,6 +306,7 @@
           <option value="textures">Texturas</option>
           <option value="ui">UI</option>
           <option value="config">Config</option>
+          <option value="menus">Menus</option>
           <option value="presets">Presets Inv.</option>
           <option value="rom">ROM</option>
         </select>
@@ -723,6 +754,103 @@
           </div>
         </div>
 
+        <div id="tab-menus" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Menus</label>
+              <div id="menu-list" class="listbox"></div>
+              <div class="row" style="margin-top:8px;">
+                <input type="text" id="menu-id" placeholder="menu_id" />
+                <input type="text" id="menu-title" placeholder="Título" />
+              </div>
+              <label>Cor de fundo (hex)</label>
+              <input type="text" id="menu-bg" placeholder="#000000" />
+              <label>Menu padrão do ESC</label>
+              <select id="menu-default-esc"></select>
+              <label>Menu inicial (abre ao carregar)</label>
+              <select id="menu-start-menu"></select>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="menu-save">Salvar menu</button>
+                <button id="menu-new">Novo</button>
+                <button class="bad" id="menu-delete">Excluir</button>
+              </div>
+
+              <h2 style="margin-top:14px;">Elementos</h2>
+              <div id="menu-element-list" class="listbox"></div>
+              <div class="row" style="margin-top:8px;">
+                <select id="menu-element-type">
+                  <option value="button">Button</option>
+                  <option value="input">Text Input</option>
+                  <option value="text">Text Output</option>
+                </select>
+                <button id="menu-element-add">Adicionar</button>
+              </div>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="bad" id="menu-element-delete">Excluir elemento</button>
+              </div>
+            </div>
+            <div>
+              <label>Editor visual (arraste para mover, alça para redimensionar)</label>
+              <div id="menu-stage" class="menu-stage"></div>
+              <div class="row3" style="margin-top:8px;">
+                <div><label>X</label><input type="number" id="menu-el-x" step="1" /></div>
+                <div><label>Y</label><input type="number" id="menu-el-y" step="1" /></div>
+                <div><label>Rotação</label><input type="number" id="menu-el-rotation" step="1" /></div>
+              </div>
+              <div class="row3">
+                <div><label>Largura</label><input type="number" id="menu-el-w" step="1" /></div>
+                <div><label>Altura</label><input type="number" id="menu-el-h" step="1" /></div>
+                <div>
+                  <label>Flip</label>
+                  <div class="row">
+                    <select id="menu-el-flipx"><option value="false">FlipX: false</option><option value="true">FlipX: true</option></select>
+                    <select id="menu-el-flipy"><option value="false">FlipY: false</option><option value="true">FlipY: true</option></select>
+                  </div>
+                </div>
+              </div>
+              <label>Texto / Placeholder</label>
+              <input type="text" id="menu-el-text" placeholder="Texto (suporta {{saveName}} etc.)" />
+              <label>Bind variável (inputs)</label>
+              <input type="text" id="menu-el-bind" placeholder="saveName" />
+              <div class="row">
+                <div>
+                  <label>Cor base</label>
+                  <input type="text" id="menu-el-bg" placeholder="#335577" />
+                </div>
+                <div>
+                  <label>Cor texto</label>
+                  <input type="text" id="menu-el-color" placeholder="#ffffff" />
+                </div>
+              </div>
+              <div class="row">
+                <div>
+                  <label>Sprite key</label>
+                  <input type="text" id="menu-el-sprite" placeholder="texture_key" />
+                </div>
+                <div>
+                  <label>Font size</label>
+                  <input type="number" id="menu-el-font" step="1" value="16" />
+                </div>
+              </div>
+              <label>Ação do botão</label>
+              <select id="menu-el-action">
+                <option value="none">none</option>
+                <option value="close_menu">close_menu</option>
+                <option value="back_menu">back_menu</option>
+                <option value="open_menu">open_menu</option>
+                <option value="script">script</option>
+              </select>
+              <label>Menu alvo (open_menu)</label>
+              <input type="text" id="menu-el-target" placeholder="save" />
+              <label>Script do botão (action=script)</label>
+              <textarea id="menu-el-script" placeholder="api.openMenu('save');"></textarea>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="menu-el-save">Salvar elemento</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="tab-config" class="tab-pane content-tab-pane">
           <label>Objeto do arquivo <code>data/config/config.js</code></label>
           <textarea id="config-json" style="min-height:320px;" spellcheck="false"></textarea>
@@ -765,6 +893,7 @@
       { default: NPC_TYPES },
       { default: ITEMS },
       { default: texturesToLoad },
+      { default: MENU_CONFIG },
       factionsModule,
     ] = await Promise.all([
       importWithFallback(['./src/rom-config/config.js', './src/config.js']),
@@ -772,6 +901,7 @@
       importWithFallback(['./src/rom-config/npcs.js', './src/npcs.js']),
       importWithFallback(['./src/rom-config/items.js', './src/items.js']),
       importWithFallback(['./src/rom-config/textures.js', './src/textures.js']),
+      importWithFallback(['./src/rom-config/menus.js', './src/menus.js']),
       importWithFallback(['./src/rom-config/factions.js', './src/factions.js'])
     ]);
 
@@ -824,6 +954,8 @@
       selectedTextureKey: null,
       selectedPresetKey: null,
       selectedUiAliasKey: null,
+      selectedMenuKey: null,
+      selectedMenuElementId: null,
       settingPlayerSpawn: false,
       layerClipboard: null,
       importedZip: null,
@@ -843,6 +975,7 @@
           playerName: 'A.S.S',
           aliases: {}
         },
+        menus: deepCloneWithFns(MENU_CONFIG || {}),
         config: deepCloneWithFns(CONFIG),
         embeddedImages: {}
       },
@@ -1094,11 +1227,37 @@
     const uiAliasValueEl = $('ui-alias-value');
     const uiAliasImageEl = $('ui-alias-image');
     const uiAliasPreviewEl = $('ui-alias-preview');
+    const menuListEl = $('menu-list');
+    const menuIdEl = $('menu-id');
+    const menuTitleEl = $('menu-title');
+    const menuBgEl = $('menu-bg');
+    const menuDefaultEscEl = $('menu-default-esc');
+    const menuStartMenuEl = $('menu-start-menu');
+    const menuElementListEl = $('menu-element-list');
+    const menuElementTypeEl = $('menu-element-type');
+    const menuStageEl = $('menu-stage');
+    const menuElX = $('menu-el-x');
+    const menuElY = $('menu-el-y');
+    const menuElW = $('menu-el-w');
+    const menuElH = $('menu-el-h');
+    const menuElRotation = $('menu-el-rotation');
+    const menuElFlipX = $('menu-el-flipx');
+    const menuElFlipY = $('menu-el-flipy');
+    const menuElText = $('menu-el-text');
+    const menuElBind = $('menu-el-bind');
+    const menuElBg = $('menu-el-bg');
+    const menuElColor = $('menu-el-color');
+    const menuElSprite = $('menu-el-sprite');
+    const menuElFont = $('menu-el-font');
+    const menuElAction = $('menu-el-action');
+    const menuElTarget = $('menu-el-target');
+    const menuElScript = $('menu-el-script');
     const configJsonEl = $('config-json');
 
     const inventoryState = { targetKey: 'player', category: 'item' };
     const presetEditorState = { category: 'block' };
     let presetDraft = { inventory: {}, itemInventory: {} };
+    const menuEditorState = { mode: null, startMouseX: 0, startMouseY: 0, baseX: 0, baseY: 0, baseW: 0, baseH: 0 };
 
     function renderPalette() {
       paletteEl.innerHTML = '';
@@ -2487,6 +2646,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       renderFactionsTab();
       renderTexturesTab();
       renderUiTab();
+      renderMenusTab();
       renderConfigTab();
       renderPresetsTab();
       updatePlayerImagePreview();
@@ -3272,6 +3432,395 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       renderPresetInventoryList();
     });
 
+    function normalizeMenusDb() {
+      if (!state.db.menus || typeof state.db.menus !== 'object') state.db.menus = {};
+      if (!state.db.menus.menus || typeof state.db.menus.menus !== 'object') state.db.menus.menus = {};
+      if (typeof state.db.menus.defaultEscapeMenu !== 'string') state.db.menus.defaultEscapeMenu = '';
+      if (typeof state.db.menus.startMenu !== 'string' && state.db.menus.startMenu !== null) state.db.menus.startMenu = null;
+      for (const [key, menu] of Object.entries(state.db.menus.menus)) {
+        if (!menu || typeof menu !== 'object') {
+          delete state.db.menus.menus[key];
+          continue;
+        }
+        menu.id = String(menu.id || key);
+        menu.title = String(menu.title || menu.id);
+        menu.backgroundColor = String(menu.backgroundColor || '#000000');
+        if (!Array.isArray(menu.elements)) menu.elements = [];
+        menu.elements = menu.elements.map((el, i) => ({
+          id: String(el.id || `el_${i}`),
+          type: ['button', 'input', 'text'].includes(String(el.type || 'button')) ? String(el.type) : 'button',
+          x: Number(el.x || 20),
+          y: Number(el.y || 20),
+          width: Math.max(12, Number(el.width || 160)),
+          height: Math.max(12, Number(el.height || 40)),
+          rotation: Number(el.rotation || 0),
+          flipX: !!el.flipX,
+          flipY: !!el.flipY,
+          text: String(el.text || ''),
+          placeholder: String(el.placeholder || ''),
+          bind: String(el.bind || ''),
+          flatColor: String(el.flatColor || '#333333'),
+          textColor: String(el.textColor || '#ffffff'),
+          spriteKey: String(el.spriteKey || ''),
+          action: String(el.action || 'none'),
+          targetMenu: String(el.targetMenu || ''),
+          script: String(el.script || ''),
+          fontSize: Math.max(8, Number(el.fontSize || 16))
+        }));
+      }
+    }
+
+    function getMenuEntries() {
+      normalizeMenusDb();
+      return Object.values(state.db.menus.menus).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+    }
+
+    function getSelectedMenu() {
+      normalizeMenusDb();
+      const key = state.selectedMenuKey;
+      return key ? state.db.menus.menus[key] || null : null;
+    }
+
+    function getSelectedMenuElement() {
+      const menu = getSelectedMenu();
+      if (!menu) return null;
+      return menu.elements.find((e) => e.id === state.selectedMenuElementId) || null;
+    }
+
+    function createDefaultMenuElement(type = 'button') {
+      return {
+        id: `el_${Math.random().toString(36).slice(2, 8)}`,
+        type,
+        x: 24,
+        y: 24,
+        width: type === 'text' ? 220 : 180,
+        height: type === 'text' ? 34 : 44,
+        rotation: 0,
+        flipX: false,
+        flipY: false,
+        text: type === 'button' ? 'Button' : (type === 'text' ? 'Text output' : ''),
+        placeholder: type === 'input' ? 'text...' : '',
+        bind: type === 'input' ? 'inputValue' : '',
+        flatColor: '#2a2a2a',
+        textColor: '#ffffff',
+        spriteKey: '',
+        action: type === 'button' ? 'none' : 'none',
+        targetMenu: '',
+        script: '',
+        fontSize: 16
+      };
+    }
+
+    function renderMenuElementForm() {
+      const el = getSelectedMenuElement();
+      const menu = getSelectedMenu();
+      const hasEl = !!el;
+      for (const inputEl of [menuElX, menuElY, menuElW, menuElH, menuElRotation, menuElText, menuElBind, menuElBg, menuElColor, menuElSprite, menuElFont, menuElAction, menuElTarget, menuElScript, menuElFlipX, menuElFlipY]) {
+        if (inputEl) inputEl.disabled = !hasEl;
+      }
+      if (!el) {
+        menuElX.value = '';
+        menuElY.value = '';
+        menuElW.value = '';
+        menuElH.value = '';
+        menuElRotation.value = '';
+        menuElText.value = '';
+        menuElBind.value = '';
+        menuElBg.value = '';
+        menuElColor.value = '';
+        menuElSprite.value = '';
+        menuElFont.value = '16';
+        menuElAction.value = 'none';
+        menuElTarget.value = '';
+        menuElScript.value = '';
+        menuElFlipX.value = 'false';
+        menuElFlipY.value = 'false';
+      } else {
+        menuElX.value = String(Math.round(el.x));
+        menuElY.value = String(Math.round(el.y));
+        menuElW.value = String(Math.round(el.width));
+        menuElH.value = String(Math.round(el.height));
+        menuElRotation.value = String(Math.round(el.rotation || 0));
+        menuElText.value = el.type === 'input' ? (el.placeholder || '') : (el.text || '');
+        menuElBind.value = String(el.bind || '');
+        menuElBg.value = String(el.flatColor || '');
+        menuElColor.value = String(el.textColor || '#ffffff');
+        menuElSprite.value = String(el.spriteKey || '');
+        menuElFont.value = String(el.fontSize || 16);
+        menuElAction.value = String(el.action || 'none');
+        menuElTarget.value = String(el.targetMenu || '');
+        menuElScript.value = String(el.script || '');
+        menuElFlipX.value = String(!!el.flipX);
+        menuElFlipY.value = String(!!el.flipY);
+      }
+      menuElAction.disabled = !(hasEl && el.type === 'button');
+      menuElTarget.disabled = !(hasEl && el.type === 'button');
+      menuElScript.disabled = !(hasEl && el.type === 'button');
+      menuElementTypeEl.disabled = !menu;
+    }
+
+    function renderMenuStage() {
+      const menu = getSelectedMenu();
+      menuStageEl.innerHTML = '';
+      menuStageEl.style.background = menu ? String(menu.backgroundColor || '#000000') : '#000000';
+      if (!menu) return;
+      for (const el of menu.elements) {
+        const node = document.createElement('div');
+        node.className = 'menu-node' + (el.id === state.selectedMenuElementId ? ' active' : '');
+        node.dataset.menuElementId = el.id;
+        node.style.left = `${el.x}px`;
+        node.style.top = `${el.y}px`;
+        node.style.width = `${el.width}px`;
+        node.style.height = `${el.height}px`;
+        node.style.transformOrigin = 'center center';
+        node.style.transform = `rotate(${Number(el.rotation || 0)}deg) scale(${el.flipX ? -1 : 1}, ${el.flipY ? -1 : 1})`;
+        node.style.background = el.flatColor || '#2a2a2a';
+        node.style.color = el.textColor || '#fff';
+        node.style.fontSize = `${Math.max(8, Number(el.fontSize || 16))}px`;
+        node.style.display = 'flex';
+        node.style.alignItems = 'center';
+        node.style.justifyContent = 'center';
+        node.style.overflow = 'hidden';
+        node.style.padding = '4px';
+        if (el.spriteKey) {
+          const spriteUrl = getTextureUrl(el.spriteKey);
+          if (spriteUrl) {
+            node.style.backgroundImage = `url("${spriteUrl}")`;
+            node.style.backgroundSize = 'cover';
+            node.style.backgroundPosition = 'center';
+          }
+        }
+        if (el.type === 'input') {
+          node.textContent = el.placeholder || 'input';
+        } else {
+          node.textContent = el.text || (el.type === 'button' ? 'button' : 'text');
+        }
+        node.addEventListener('mousedown', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          state.selectedMenuElementId = el.id;
+          menuEditorState.mode = ev.target && ev.target.classList && ev.target.classList.contains('menu-node-resize') ? 'resize' : 'move';
+          menuEditorState.startMouseX = ev.clientX;
+          menuEditorState.startMouseY = ev.clientY;
+          menuEditorState.baseX = Number(el.x || 0);
+          menuEditorState.baseY = Number(el.y || 0);
+          menuEditorState.baseW = Number(el.width || 10);
+          menuEditorState.baseH = Number(el.height || 10);
+          renderMenusTab();
+        });
+        const handle = document.createElement('div');
+        handle.className = 'menu-node-resize';
+        node.appendChild(handle);
+        menuStageEl.appendChild(node);
+      }
+    }
+
+    function renderMenusTab() {
+      normalizeMenusDb();
+      const menus = getMenuEntries();
+      if (!state.selectedMenuKey && menus.length) state.selectedMenuKey = menus[0].id;
+      if (state.selectedMenuKey && !state.db.menus.menus[state.selectedMenuKey]) state.selectedMenuKey = menus[0] ? menus[0].id : null;
+      const menu = getSelectedMenu();
+      if (menu && (!state.selectedMenuElementId || !menu.elements.find((e) => e.id === state.selectedMenuElementId))) {
+        state.selectedMenuElementId = menu.elements[0] ? menu.elements[0].id : null;
+      }
+      renderSimpleList(
+        menuListEl,
+        menus,
+        (entry) => entry.id === state.selectedMenuKey,
+        (entry) => entry.title ? `${entry.title} (${entry.id})` : entry.id,
+        (entry) => {
+          state.selectedMenuKey = entry.id;
+          state.selectedMenuElementId = null;
+          renderMenusTab();
+        }
+      );
+      menuIdEl.value = menu ? String(menu.id || '') : '';
+      menuTitleEl.value = menu ? String(menu.title || '') : '';
+      menuBgEl.value = menu ? String(menu.backgroundColor || '#000000') : '#000000';
+
+      menuDefaultEscEl.innerHTML = '';
+      menuStartMenuEl.innerHTML = '';
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = '(nenhum)';
+      menuDefaultEscEl.appendChild(noneOpt);
+      menuStartMenuEl.appendChild(noneOpt.cloneNode(true));
+      for (const m of menus) {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.title || m.id} (${m.id})`;
+        menuDefaultEscEl.appendChild(opt);
+        menuStartMenuEl.appendChild(opt.cloneNode(true));
+      }
+      menuDefaultEscEl.value = String(state.db.menus.defaultEscapeMenu || '');
+      menuStartMenuEl.value = String(state.db.menus.startMenu || '');
+
+      if (!menu) {
+        menuElementListEl.innerHTML = '';
+      } else {
+        renderSimpleList(
+          menuElementListEl,
+          menu.elements,
+          (entry) => entry.id === state.selectedMenuElementId,
+          (entry) => `${entry.type} • ${entry.id}`,
+          (entry) => {
+            state.selectedMenuElementId = entry.id;
+            renderMenusTab();
+          }
+        );
+      }
+
+      renderMenuElementForm();
+      renderMenuStage();
+    }
+
+    document.addEventListener('mousemove', (ev) => {
+      if (!menuEditorState.mode) return;
+      const menu = getSelectedMenu();
+      const el = getSelectedMenuElement();
+      if (!menu || !el) return;
+      const dx = ev.clientX - menuEditorState.startMouseX;
+      const dy = ev.clientY - menuEditorState.startMouseY;
+      if (menuEditorState.mode === 'move') {
+        el.x = Math.round(menuEditorState.baseX + dx);
+        el.y = Math.round(menuEditorState.baseY + dy);
+      } else if (menuEditorState.mode === 'resize') {
+        el.width = Math.max(12, Math.round(menuEditorState.baseW + dx));
+        el.height = Math.max(12, Math.round(menuEditorState.baseH + dy));
+      }
+      renderMenuElementForm();
+      renderMenuStage();
+      markMapDirty();
+    });
+    document.addEventListener('mouseup', () => {
+      menuEditorState.mode = null;
+    });
+    menuStageEl.addEventListener('wheel', (ev) => {
+      const el = getSelectedMenuElement();
+      if (!el) return;
+      ev.preventDefault();
+      const delta = ev.deltaY > 0 ? 1 : -1;
+      el.rotation = Number(el.rotation || 0) + delta * 3;
+      renderMenuElementForm();
+      renderMenuStage();
+      markMapDirty();
+    }, { passive: false });
+
+    $('menu-new').addEventListener('click', () => {
+      normalizeMenusDb();
+      let i = 1;
+      let id = 'menu_new';
+      while (state.db.menus.menus[id]) {
+        i += 1;
+        id = `menu_new_${i}`;
+      }
+      state.db.menus.menus[id] = { id, title: 'Novo menu', backgroundColor: '#000000', elements: [] };
+      state.selectedMenuKey = id;
+      state.selectedMenuElementId = null;
+      renderMenusTab();
+      setDbStatus(`Menu criado: ${id}`);
+    });
+
+    $('menu-save').addEventListener('click', () => {
+      normalizeMenusDb();
+      const current = getSelectedMenu();
+      if (!current) return;
+      const oldId = current.id;
+      const newId = String(menuIdEl.value || oldId).trim().replace(/[^A-Za-z0-9_-]/g, '_') || oldId;
+      const nextMenu = {
+        ...current,
+        id: newId,
+        title: String(menuTitleEl.value || newId).trim() || newId,
+        backgroundColor: String(menuBgEl.value || '#000000').trim() || '#000000'
+      };
+      if (oldId !== newId) {
+        delete state.db.menus.menus[oldId];
+      }
+      state.db.menus.menus[newId] = nextMenu;
+      state.selectedMenuKey = newId;
+      state.db.menus.defaultEscapeMenu = String(menuDefaultEscEl.value || '').trim();
+      state.db.menus.startMenu = String(menuStartMenuEl.value || '').trim() || null;
+      renderMenusTab();
+      markMapDirty();
+      setDbStatus(`Menu salvo: ${newId}`);
+    });
+
+    $('menu-delete').addEventListener('click', () => {
+      const menu = getSelectedMenu();
+      if (!menu) return;
+      delete state.db.menus.menus[menu.id];
+      if (state.db.menus.defaultEscapeMenu === menu.id) state.db.menus.defaultEscapeMenu = '';
+      if (state.db.menus.startMenu === menu.id) state.db.menus.startMenu = null;
+      state.selectedMenuKey = Object.keys(state.db.menus.menus)[0] || null;
+      state.selectedMenuElementId = null;
+      renderMenusTab();
+      markMapDirty();
+      setDbStatus(`Menu removido: ${menu.id}`);
+    });
+
+    menuDefaultEscEl.addEventListener('change', () => {
+      normalizeMenusDb();
+      state.db.menus.defaultEscapeMenu = String(menuDefaultEscEl.value || '').trim();
+      markMapDirty();
+    });
+    menuStartMenuEl.addEventListener('change', () => {
+      normalizeMenusDb();
+      state.db.menus.startMenu = String(menuStartMenuEl.value || '').trim() || null;
+      markMapDirty();
+    });
+
+    $('menu-element-add').addEventListener('click', () => {
+      const menu = getSelectedMenu();
+      if (!menu) return;
+      const el = createDefaultMenuElement(menuElementTypeEl.value || 'button');
+      menu.elements.push(el);
+      state.selectedMenuElementId = el.id;
+      renderMenusTab();
+      markMapDirty();
+    });
+
+    $('menu-element-delete').addEventListener('click', () => {
+      const menu = getSelectedMenu();
+      const el = getSelectedMenuElement();
+      if (!menu || !el) return;
+      menu.elements = menu.elements.filter((entry) => entry.id !== el.id);
+      state.selectedMenuElementId = menu.elements[0] ? menu.elements[0].id : null;
+      renderMenusTab();
+      markMapDirty();
+    });
+
+    $('menu-el-save').addEventListener('click', () => {
+      const el = getSelectedMenuElement();
+      if (!el) return;
+      el.x = Math.round(Number(menuElX.value || el.x || 0));
+      el.y = Math.round(Number(menuElY.value || el.y || 0));
+      el.width = Math.max(12, Math.round(Number(menuElW.value || el.width || 12)));
+      el.height = Math.max(12, Math.round(Number(menuElH.value || el.height || 12)));
+      el.rotation = Number(menuElRotation.value || 0);
+      el.flipX = String(menuElFlipX.value) === 'true';
+      el.flipY = String(menuElFlipY.value) === 'true';
+      if (el.type === 'input') el.placeholder = String(menuElText.value || '');
+      else el.text = String(menuElText.value || '');
+      el.bind = String(menuElBind.value || '').trim();
+      el.flatColor = String(menuElBg.value || '').trim();
+      el.textColor = String(menuElColor.value || '#ffffff').trim();
+      el.spriteKey = sanitizeTextureKey(menuElSprite.value || '');
+      el.fontSize = Math.max(8, Number(menuElFont.value || 16));
+      if (el.type === 'button') {
+        el.action = String(menuElAction.value || 'none').trim();
+        el.targetMenu = String(menuElTarget.value || '').trim();
+        el.script = String(menuElScript.value || '');
+      } else {
+        el.action = 'none';
+        el.targetMenu = '';
+        el.script = '';
+      }
+      renderMenusTab();
+      markMapDirty();
+      setDbStatus(`Elemento salvo: ${el.id}`);
+    });
+
     function renderUiTab() {
       ensureMandatoryUiTextures();
       const keys = Object.keys(state.db.ui.aliases || {}).sort((a, b) => a.localeCompare(b));
@@ -3354,6 +3903,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       factions: 'tab-factions',
       textures: 'tab-textures',
       ui: 'tab-ui',
+      menus: 'tab-menus',
       config: 'tab-config',
       presets: 'tab-presets'
     };
@@ -3368,7 +3918,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function setActiveSection(section) {
       const requestedRaw = String(section || 'world');
-      const validSections = new Set(['world', 'inventory', 'rom', 'blocks', 'items', 'creatures', 'factions', 'textures', 'ui', 'config', 'presets']);
+      const validSections = new Set(['world', 'inventory', 'rom', 'blocks', 'items', 'creatures', 'factions', 'textures', 'ui', 'menus', 'config', 'presets']);
       const requested = validSections.has(requestedRaw) ? requestedRaw : 'world';
       const contentTabId = CONTENT_TAB_BY_SECTION[requested] || null;
       const sectionForPane = contentTabId ? 'content' : requested;
@@ -3444,6 +3994,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function buildConfigJS() {
       return `export default ${serializeJS(state.db.config || {})};\n`;
+    }
+
+    function buildMenusJS() {
+      return `export default ${serializeJS(state.db.menus || {})};\n`;
     }
 
     function normalizeZipPath(path) {
@@ -3613,6 +4167,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const texturesFile = pickZipFile(zip, ['data/config/textures.js', './data/config/textures.js', 'config/textures.js']);
       const factionsFile = pickZipFile(zip, ['data/config/factions.js', './data/config/factions.js', 'config/factions.js']);
       const configFile = pickZipFile(zip, ['data/config/config.js', './data/config/config.js', 'config/config.js']);
+      const menusFile = pickZipFile(zip, ['data/config/menus.js', './data/config/menus.js', 'config/menus.js']);
       const presetsFile = pickZipFile(zip, ['data/config/inventory-presets.json', './data/config/inventory-presets.json', 'config/inventory-presets.json']);
       const uiFile = pickZipFile(zip, ['data/config/ui.json', './data/config/ui.json', 'config/ui.json']);
       const mapFile = pickZipFile(zip, ['data/maps/default.json', './data/maps/default.json', 'maps/default.json', 'map.json']);
@@ -3622,6 +4177,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       if (npcsFile) state.db.npcs = deepCloneWithFns(parseDefaultExportModule(await npcsFile.async('string')) || state.db.npcs);
       if (texturesFile) state.db.textures = deepCloneWithFns(parseDefaultExportModule(await texturesFile.async('string')) || state.db.textures);
       if (configFile) state.db.config = deepCloneWithFns(parseDefaultExportModule(await configFile.async('string')) || state.db.config);
+      if (menusFile) state.db.menus = deepCloneWithFns(parseDefaultExportModule(await menusFile.async('string')) || state.db.menus);
 
       if (factionsFile) {
         const parsed = parseFactionsModule(await factionsFile.async('string'));
@@ -3780,6 +4336,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
             path === 'data/config/items.js' ||
             path === 'data/config/npcs.js' ||
             path === 'data/config/config.js' ||
+            path === 'data/config/menus.js' ||
             path === 'data/config/textures.js' ||
             path === 'data/config/factions.js' ||
             path === 'data/config/inventory-presets.json' ||
@@ -3797,6 +4354,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       out.file('data/config/items.js', buildItemsJS());
       out.file('data/config/npcs.js', buildNpcsJS());
       out.file('data/config/config.js', buildConfigJS());
+      out.file('data/config/menus.js', buildMenusJS());
       out.file('data/config/textures.js', buildTexturesJS());
       out.file('data/config/factions.js', buildFactionsJS());
       out.file('data/config/inventory-presets.json', JSON.stringify(state.db.inventoryPresets || {}, null, 2));
@@ -3825,6 +4383,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           items: Object.keys(state.db.items).length,
           npcs: Object.keys(state.db.npcs).length,
           factions: Object.keys(state.db.factions.list).length,
+          menus: Object.keys((state.db.menus && state.db.menus.menus) || {}).length,
           textures: state.db.textures.length,
           mapBlocks: state.map.blocks.length
         }
@@ -3897,6 +4456,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       renderFactionsTab();
       renderTexturesTab();
       renderUiTab();
+      renderMenusTab();
       renderConfigTab();
       renderPresetsTab();
       primarySectionSelectEl.value = state.activeSection;

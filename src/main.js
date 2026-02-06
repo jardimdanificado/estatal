@@ -6,6 +6,7 @@ import NPC_TYPES from "./rom-config/npcs.js"
 import BLOCK_TYPES from "./rom-config/blocks.js"
 import ITEMS from "./rom-config/items.js"
 import texturesToLoad from "./rom-config/textures.js"
+import MENUS from "./rom-config/menus.js"
 import { vocabulario } from "../lib/vocabulario.js"
 import { FACTIONS, FACTION_RELATIONS, FACTION_ORDER } from "./rom-config/factions.js"
 import world from "./world.js"
@@ -534,6 +535,329 @@ function hideLoadingOverlay() {
     loadingOverlay.style.display = 'none';
 }
 
+function setGameplayUiVisible(world, visible) {
+    const ids = ['crosshair', 'interaction', 'block-outline', 'current-item', 'hud', 'hand-item', 'mobile-controls'];
+    for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.style.display = visible ? '' : 'none';
+    }
+}
+
+function normalizeMenuElement(el = {}, index = 0) {
+    const type = String(el.type || 'button').toLowerCase();
+    const out = {
+        id: String(el.id || `element_${index}`),
+        type: (type === 'input' || type === 'text' || type === 'button') ? type : 'button',
+        x: Number(el.x || 0),
+        y: Number(el.y || 0),
+        width: Math.max(12, Number(el.width || 160)),
+        height: Math.max(12, Number(el.height || 40)),
+        rotation: Number(el.rotation || 0),
+        flipX: Boolean(el.flipX),
+        flipY: Boolean(el.flipY),
+        text: String(el.text || ''),
+        placeholder: String(el.placeholder || ''),
+        bind: String(el.bind || ''),
+        flatColor: String(el.flatColor || ''),
+        textColor: String(el.textColor || '#ffffff'),
+        spriteKey: String(el.spriteKey || ''),
+        action: String(el.action || 'none'),
+        targetMenu: String(el.targetMenu || ''),
+        script: String(el.script || ''),
+        fontSize: Number(el.fontSize || 16),
+        align: String(el.align || 'center')
+    };
+    return out;
+}
+
+function normalizeMenusConfig(raw) {
+    const payload = raw && typeof raw === 'object' ? raw : {};
+    const menusRaw = payload.menus && typeof payload.menus === 'object' ? payload.menus : {};
+    const menus = {};
+    for (const [key, value] of Object.entries(menusRaw)) {
+        if (!value || typeof value !== 'object') continue;
+        const id = String(value.id || key).trim() || key;
+        const elements = Array.isArray(value.elements) ? value.elements.map((el, i) => normalizeMenuElement(el, i)) : [];
+        menus[id] = {
+            id,
+            title: String(value.title || id),
+            backgroundColor: String(value.backgroundColor || '#000000'),
+            elements
+        };
+    }
+    const menuIds = Object.keys(menus);
+    const defaultEscapeMenuId = String(payload.defaultEscapeMenu || '').trim() || (menuIds.includes('escape') ? 'escape' : (menuIds[0] || null));
+    const startMenu = String(payload.startMenu || '').trim() || null;
+    return {
+        defaultEscapeMenu: defaultEscapeMenuId,
+        startMenu,
+        menus
+    };
+}
+
+function isExclusiveMenuOpen(world) {
+    return Boolean(world && world._internal && world._internal.menuSystem && world._internal.menuSystem.activeMenuId);
+}
+
+function closeExclusiveMenu(world) {
+    const sys = world && world._internal ? world._internal.menuSystem : null;
+    if (!sys) return;
+    sys.activeMenuId = null;
+    sys.stack = [];
+    if (sys.root) {
+        sys.root.style.display = 'none';
+        sys.root.innerHTML = '';
+    }
+    world._internal.simulationPaused = false;
+    world._internal.keys = {};
+    setRendererVisible(world, true);
+    setGameplayUiVisible(world, true);
+    if (document.pointerLockElement !== document.body) {
+        document.body.requestPointerLock();
+    }
+}
+
+function goBackExclusiveMenu(world) {
+    const sys = world && world._internal ? world._internal.menuSystem : null;
+    if (!sys || !sys.stack.length) return closeExclusiveMenu(world);
+    if (sys.stack.length <= 1) return closeExclusiveMenu(world);
+    sys.stack.pop();
+    const prev = sys.stack[sys.stack.length - 1];
+    if (!prev) return closeExclusiveMenu(world);
+    sys.activeMenuId = prev;
+    renderExclusiveMenu(world);
+}
+
+function buildMenuText(world, menu, textRaw) {
+    const sys = world && world._internal ? world._internal.menuSystem : null;
+    const vars = sys && sys.vars ? sys.vars : {};
+    const text = String(textRaw || '');
+    return text.replace(/\{\{\s*([A-Za-z0-9_.$-]+)\s*\}\}/g, (_, token) => {
+        if (token === 'gameName') return getConfiguredGameName() || getRomDisplayName() || 'maquina estatal';
+        if (token === 'menu') return menu && menu.title ? menu.title : '';
+        if (Object.prototype.hasOwnProperty.call(vars, token)) return String(vars[token] ?? '');
+        return '';
+    });
+}
+
+function runExclusiveMenuAction(world, menu, element) {
+    const sys = world && world._internal ? world._internal.menuSystem : null;
+    if (!sys) return;
+    const action = String(element.action || 'none').trim();
+    if (action === 'close_menu') {
+        closeExclusiveMenu(world);
+        return;
+    }
+    if (action === 'back_menu') {
+        goBackExclusiveMenu(world);
+        return;
+    }
+    if (action === 'open_menu') {
+        const next = String(element.targetMenu || '').trim();
+        if (next) showExclusiveMenu(world, next, true);
+        return;
+    }
+    if (action === 'script' && element.script) {
+        try {
+            const api = {
+                closeMenu: () => closeExclusiveMenu(world),
+                backMenu: () => goBackExclusiveMenu(world),
+                openMenu: (id) => showExclusiveMenu(world, id, true),
+                getVar: (k) => sys.vars[String(k)] ?? '',
+                setVar: (k, v) => {
+                    sys.vars[String(k)] = v;
+                    renderExclusiveMenu(world);
+                },
+                exportMap: () => exportMap(world),
+                importMap: () => requestMapImport(world),
+                menuId: menu.id
+            };
+            const fn = new Function('api', 'world', 'menu', 'element', String(element.script));
+            fn(api, world, menu, element);
+        } catch (err) {
+            console.error('Menu script error:', err);
+        }
+    }
+}
+
+function renderExclusiveMenu(world) {
+    const sys = world && world._internal ? world._internal.menuSystem : null;
+    if (!sys || !sys.root) return;
+    const menu = sys.config.menus[sys.activeMenuId];
+    if (!menu) {
+        closeExclusiveMenu(world);
+        return;
+    }
+    const root = sys.root;
+    root.innerHTML = '';
+    root.style.display = 'block';
+    root.style.background = menu.backgroundColor || '#000000';
+
+    const layer = document.createElement('div');
+    layer.style.position = 'absolute';
+    layer.style.inset = '0';
+    layer.style.overflow = 'hidden';
+    root.appendChild(layer);
+
+    for (const element of menu.elements) {
+        const base = element.type === 'button'
+            ? document.createElement('button')
+            : (element.type === 'input' ? document.createElement('input') : document.createElement('div'));
+        base.className = `exclusive-menu-element type-${element.type}`;
+        base.style.position = 'absolute';
+        base.style.left = `${element.x}px`;
+        base.style.top = `${element.y}px`;
+        base.style.width = `${Math.max(1, element.width)}px`;
+        base.style.height = `${Math.max(1, element.height)}px`;
+        base.style.transformOrigin = 'center center';
+        const sx = element.flipX ? -1 : 1;
+        const sy = element.flipY ? -1 : 1;
+        base.style.transform = `rotate(${Number(element.rotation || 0)}deg) scale(${sx}, ${sy})`;
+        base.style.border = '1px solid rgba(255,255,255,0.25)';
+        base.style.backgroundColor = element.flatColor || 'rgba(255,255,255,0.05)';
+        base.style.color = element.textColor || '#ffffff';
+        base.style.fontSize = `${Math.max(8, Number(element.fontSize || 16))}px`;
+        base.style.fontFamily = '"Courier New", monospace';
+        base.style.display = 'flex';
+        base.style.alignItems = 'center';
+        base.style.justifyContent = element.align === 'left' ? 'flex-start' : (element.align === 'right' ? 'flex-end' : 'center');
+        base.style.padding = element.type === 'input' ? '0 8px' : '4px 8px';
+        base.style.boxSizing = 'border-box';
+        base.style.userSelect = 'none';
+
+        const spriteUrl = element.spriteKey ? resolvePreviewTextureUrl(element.spriteKey) : null;
+        if (spriteUrl) {
+            base.style.backgroundImage = `url("${spriteUrl}")`;
+            base.style.backgroundSize = 'cover';
+            base.style.backgroundPosition = 'center';
+            base.style.backgroundRepeat = 'no-repeat';
+        }
+
+        if (element.type === 'input') {
+            base.type = 'text';
+            base.placeholder = element.placeholder || '';
+            if (element.bind) {
+                base.value = String(sys.vars[element.bind] || '');
+                base.addEventListener('input', () => {
+                    sys.vars[element.bind] = base.value;
+                    const labels = layer.querySelectorAll('.exclusive-menu-element.type-text');
+                    labels.forEach((el) => {
+                        if (el.dataset.template) {
+                            el.textContent = buildMenuText(world, menu, el.dataset.template);
+                        }
+                    });
+                });
+            }
+        } else {
+            const text = buildMenuText(world, menu, element.text || '');
+            base.textContent = text;
+            if (element.type === 'text') {
+                base.dataset.template = String(element.text || '');
+                base.style.pointerEvents = 'none';
+                base.style.border = 'none';
+                base.style.backgroundColor = element.flatColor || 'transparent';
+            }
+        }
+
+        if (element.type === 'button') {
+            base.style.cursor = 'pointer';
+            base.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                runExclusiveMenuAction(world, menu, element);
+            });
+        }
+
+        layer.appendChild(base);
+    }
+}
+
+function showExclusiveMenu(world, menuId, pushStack = true) {
+    const sys = world && world._internal ? world._internal.menuSystem : null;
+    if (!sys) return false;
+    const id = String(menuId || '').trim();
+    if (!id || !sys.config.menus[id]) return false;
+    if (pushStack) {
+        if (!sys.stack.length || sys.stack[sys.stack.length - 1] !== id) {
+            sys.stack.push(id);
+        }
+    } else {
+        sys.stack = [id];
+    }
+    sys.activeMenuId = id;
+    world._internal.simulationPaused = true;
+    world._internal.keys = {};
+    if (document.pointerLockElement === document.body) {
+        document.exitPointerLock();
+    }
+    setRendererVisible(world, false);
+    setGameplayUiVisible(world, false);
+    renderExclusiveMenu(world);
+    return true;
+}
+
+function ensureExclusiveMenuRoot(world) {
+    let root = document.getElementById('exclusive-menu-root');
+    if (root) return root;
+    root = document.createElement('div');
+    root.id = 'exclusive-menu-root';
+    root.style.position = 'fixed';
+    root.style.inset = '0';
+    root.style.zIndex = '70';
+    root.style.display = 'none';
+    root.style.pointerEvents = 'auto';
+    root.style.background = '#000';
+    document.body.appendChild(root);
+    return root;
+}
+
+function initializeExclusiveMenus(world) {
+    const config = normalizeMenusConfig(MENUS);
+    world._internal.menuSystem = {
+        config,
+        root: ensureExclusiveMenuRoot(world),
+        activeMenuId: null,
+        stack: [],
+        vars: {
+            saveName: ''
+        }
+    };
+}
+
+function handleExclusiveMenuKeyDown(world, e) {
+    const sys = world && world._internal ? world._internal.menuSystem : null;
+    if (!sys) return false;
+    if (e.code === 'Escape') {
+        e.preventDefault();
+        if (isExclusiveMenuOpen(world)) {
+            if (sys.stack.length > 1) goBackExclusiveMenu(world);
+            else closeExclusiveMenu(world);
+        } else if (sys.config.defaultEscapeMenu) {
+            showExclusiveMenu(world, sys.config.defaultEscapeMenu, false);
+        }
+        return true;
+    }
+    if (isExclusiveMenuOpen(world)) {
+        if (e.code !== 'F8') {
+            e.preventDefault();
+            return true;
+        }
+    }
+    return false;
+}
+
+function handlePointerLockChangeForMenus(world) {
+    const sys = world && world._internal ? world._internal.menuSystem : null;
+    if (!sys) return;
+    const isLocked = document.pointerLockElement === document.body;
+    if (isLocked) return;
+    if (isExclusiveMenuOpen(world)) return;
+    if (world.mode !== 'game') return;
+    if (world._internal.simulationPaused) return;
+    if (!sys.config.defaultEscapeMenu) return;
+    showExclusiveMenu(world, sys.config.defaultEscapeMenu, false);
+}
+
 const INVENTORY_CATEGORIES = [
     { id: 'item', label: 'Itens' },
     { id: 'block', label: 'Blocos' }
@@ -623,6 +947,8 @@ async function init() {
     ensureItemLabel();
     ensureHud();
     ensureHandOverlay();
+    initializeExclusiveMenus(world);
+    setGameplayUiVisible(world, false);
     setupRenderDebugHotkey(world);
     
     setupMobileControls(world);
@@ -639,8 +965,10 @@ async function init() {
     document.addEventListener('keydown', (e) => onKeyDown(world, e));
     document.addEventListener('keyup', (e) => world._internal.keys[e.code] = false);
     document.addEventListener('wheel', (e) => onWheel(world, e), { passive: false });
+    document.addEventListener('pointerlockchange', () => handlePointerLockChangeForMenus(world));
     
     document.addEventListener('click', (event) => {
+        if (isExclusiveMenuOpen(world)) return;
         const menu = document.getElementById('editor-context-menu');
         if (menu && menu.style.display === 'block') return;
         const picker = document.getElementById('editor-picker-panel');
@@ -700,6 +1028,19 @@ function initAudioOnFirstGesture() {
 // ============================================================
 // CARREGAMENTO DE TEXTURAS
 // ============================================================
+function finalizeWorldBootstrap(world) {
+    const menuSystem = world && world._internal ? world._internal.menuSystem : null;
+    const startMenuId = menuSystem && menuSystem.config ? menuSystem.config.startMenu : null;
+    if (startMenuId) {
+        showExclusiveMenu(world, startMenuId, false);
+    } else {
+        world._internal.simulationPaused = false;
+        setRendererVisible(world, true);
+        setGameplayUiVisible(world, true);
+    }
+    hideLoadingOverlay();
+}
+
 function loadTextures(world) {
     const loader = new THREE.TextureLoader();
     let loaded = 0;
@@ -709,13 +1050,12 @@ function loadTextures(world) {
         world._internal.texturesLoaded = true;
         showLoadingOverlay('Gerando terreno…');
         initWorld(world).then(() => {
-            world._internal.simulationPaused = false;
-            setRendererVisible(world, true);
-            hideLoadingOverlay();
+            finalizeWorldBootstrap(world);
         }).catch((err) => {
             world._internal.simulationPaused = false;
             console.error(err);
             setRendererVisible(world, true);
+            setGameplayUiVisible(world, true);
             hideLoadingOverlay();
         });
         return;
@@ -727,13 +1067,12 @@ function loadTextures(world) {
             world._internal.texturesLoaded = true;
             showLoadingOverlay('Gerando terreno…');
             initWorld(world).then(() => {
-                world._internal.simulationPaused = false;
-                setRendererVisible(world, true);
-                hideLoadingOverlay();
+                finalizeWorldBootstrap(world);
             }).catch((err) => {
                 world._internal.simulationPaused = false;
                 console.error(err);
                 setRendererVisible(world, true);
+                setGameplayUiVisible(world, true);
                 hideLoadingOverlay();
             });
         }
@@ -1176,6 +1515,9 @@ function setWorldMode(world, mode) {
     }
     updateCurrentItemLabel(world);
     updateHud(world);
+    if (isExclusiveMenuOpen(world) && world.mode === 'editor') {
+        closeExclusiveMenu(world);
+    }
 }
 
 
@@ -2981,6 +3323,7 @@ function handleUseAction(world) {
 // Modifique o onKeyDown para usar o marcador visual:
 function onKeyDown(world, e) {
     world._internal.keys[e.code] = true;
+    if (handleExclusiveMenuKeyDown(world, e)) return;
     const player = world.getPlayerEntity();
     if (e.code === 'F8') {
         e.preventDefault();
@@ -3022,6 +3365,7 @@ function onKeyDown(world, e) {
 }
 
 function onWheel(world, event) {
+    if (isExclusiveMenuOpen(world)) return;
     const player = world.getPlayerEntity();
     if (!player) return;
     const list = buildSelectionList(world, player);
@@ -3047,6 +3391,7 @@ function stepSelection(world, delta) {
 }
 
 function onMouseMove(world, event) {
+    if (isExclusiveMenuOpen(world)) return;
     if (document.pointerLockElement !== document.body) return;
     
     const player = world.getPlayerEntity();
@@ -3058,6 +3403,7 @@ function onMouseMove(world, event) {
 }
 
 function onMouseDown(world, event) {
+    if (isExclusiveMenuOpen(world)) return;
     const isLocked = document.pointerLockElement === document.body;
     if (event.button === 1 && world.mode === 'editor') {
         if (isLocked) {
