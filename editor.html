@@ -848,6 +848,12 @@
                   <input type="text" id="menu-el-sprite" placeholder="texture_key" />
                 </div>
                 <div>
+                  <label>Sprite var</label>
+                  <input type="text" id="menu-el-sprite-var" placeholder="selectedItemTexture" />
+                </div>
+              </div>
+              <div class="row">
+                <div>
                   <label>Font size</label>
                   <input type="number" id="menu-el-font" step="1" value="16" />
                 </div>
@@ -1359,6 +1365,7 @@
     const menuElBg = $('menu-el-bg');
     const menuElColor = $('menu-el-color');
     const menuElSprite = $('menu-el-sprite');
+    const menuElSpriteVar = $('menu-el-sprite-var');
     const menuElFont = $('menu-el-font');
     const menuElSpriteFit = $('menu-el-sprite-fit');
     const menuElOpacity = $('menu-el-opacity');
@@ -3796,9 +3803,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           text: String(el.text || ''),
           placeholder: String(el.placeholder || ''),
           bind: String(el.bind || ''),
-          flatColor: String(el.flatColor || '#333333'),
+          flatColor: ('flatColor' in (el || {}))
+            ? String(el.flatColor == null ? '' : el.flatColor)
+            : ((String(el.type || 'button') === 'image' || String(el.type || 'button') === 'text') ? 'transparent' : '#333333'),
           textColor: String(el.textColor || '#ffffff'),
           spriteKey: String(el.spriteKey || ''),
+          spriteVar: String(el.spriteVar || ''),
           spriteFit: ['cover', 'contain', 'stretch'].includes(String(el.spriteFit || '').toLowerCase()) ? String(el.spriteFit).toLowerCase() : 'cover',
           opacity: Math.max(0, Math.min(1, Number(el.opacity == null ? 1 : el.opacity))),
           style: (el.style && typeof el.style === 'object' && !Array.isArray(el.style)) ? { ...el.style } : {},
@@ -3838,9 +3848,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           text: String(el.text || ''),
           placeholder: String(el.placeholder || ''),
           bind: String(el.bind || ''),
-          flatColor: String(el.flatColor || '#333333'),
+          flatColor: ('flatColor' in (el || {}))
+            ? String(el.flatColor == null ? '' : el.flatColor)
+            : ((String(el.type || 'button') === 'image' || String(el.type || 'button') === 'text') ? 'transparent' : '#333333'),
           textColor: String(el.textColor || '#ffffff'),
           spriteKey: String(el.spriteKey || ''),
+          spriteVar: String(el.spriteVar || ''),
           spriteFit: ['cover', 'contain', 'stretch'].includes(String(el.spriteFit || '').toLowerCase()) ? String(el.spriteFit).toLowerCase() : 'cover',
           opacity: Math.max(0, Math.min(1, Number(el.opacity == null ? 1 : el.opacity))),
           style: (el.style && typeof el.style === 'object' && !Array.isArray(el.style)) ? { ...el.style } : {},
@@ -3850,6 +3863,40 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           script: String(el.script || ''),
           fontSize: Math.max(8, Number(el.fontSize || 16))
         }));
+      }
+      const hudLayer = state.db.uiLayout.layers.hud;
+      if (hudLayer && Array.isArray(hudLayer.elements)) {
+        for (const el of hudLayer.elements) {
+          if (!el || typeof el !== 'object') continue;
+          if (el.id === 'hud_player_photo' && !el.spriteVar && !el.spriteKey) el.spriteVar = 'playerPortraitTexture';
+          if (el.id === 'hud_item_preview' && !el.spriteVar && !el.spriteKey) el.spriteVar = 'selectedItemTexture';
+          if (el.id === 'hud_hand' && !el.spriteVar && !el.spriteKey) el.spriteVar = 'selectedHandTexture';
+          if (
+            el.type === 'image' &&
+            (el.id === 'hud_player_photo' || el.id === 'hud_item_preview' || el.id === 'hud_hand') &&
+            String(el.flatColor || '').trim().toLowerCase() === '#333333'
+          ) {
+            el.flatColor = 'transparent';
+          }
+          if (
+            el.type === 'text' &&
+            ['#333333', '#2a2a2a', 'rgba(0,0,0,0.35)'].includes(String(el.flatColor || '').trim().toLowerCase())
+          ) {
+            el.flatColor = 'transparent';
+          }
+        }
+      }
+      const mobileLayer = state.db.uiLayout.layers.mobile;
+      if (mobileLayer && Array.isArray(mobileLayer.elements)) {
+        for (const el of mobileLayer.elements) {
+          if (!el || typeof el !== 'object') continue;
+          if (
+            el.type === 'text' &&
+            ['#333333', '#2a2a2a', 'rgba(0,0,0,0.35)'].includes(String(el.flatColor || '').trim().toLowerCase())
+          ) {
+            el.flatColor = 'transparent';
+          }
+        }
       }
     }
 
@@ -3904,9 +3951,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         text: type === 'button' ? 'Button' : (type === 'text' ? 'Text output' : ''),
         placeholder: type === 'input' ? 'text...' : '',
         bind: type === 'input' ? 'inputValue' : '',
-        flatColor: type === 'image' ? 'transparent' : '#2a2a2a',
+        flatColor: (type === 'image' || type === 'text') ? 'transparent' : '#2a2a2a',
         textColor: '#ffffff',
         spriteKey: '',
+        spriteVar: '',
         spriteFit: 'cover',
         opacity: 1,
         style: {},
@@ -3922,7 +3970,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const el = getSelectedMenuElement();
       const menu = getSelectedMenu();
       const hasEl = !!el;
-      for (const inputEl of [menuElX, menuElY, menuElW, menuElH, menuElRotation, menuElAnchorX, menuElAnchorY, menuElText, menuElBind, menuElBg, menuElColor, menuElSprite, menuElFont, menuElSpriteFit, menuElOpacity, menuElAction, menuElKeycode, menuElTarget, menuElScript, menuElStyle, menuElFlipX, menuElFlipY]) {
+      for (const inputEl of [menuElX, menuElY, menuElW, menuElH, menuElRotation, menuElAnchorX, menuElAnchorY, menuElText, menuElBind, menuElBg, menuElColor, menuElSprite, menuElSpriteVar, menuElFont, menuElSpriteFit, menuElOpacity, menuElAction, menuElKeycode, menuElTarget, menuElScript, menuElStyle, menuElFlipX, menuElFlipY]) {
         if (inputEl) inputEl.disabled = !hasEl;
       }
       if (!el) {
@@ -3938,6 +3986,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         menuElBg.value = '';
         menuElColor.value = '';
         menuElSprite.value = '';
+        menuElSpriteVar.value = '';
         menuElFont.value = '16';
         menuElSpriteFit.value = 'cover';
         menuElOpacity.value = '1';
@@ -3961,6 +4010,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         menuElBg.value = String(el.flatColor || '');
         menuElColor.value = String(el.textColor || '#ffffff');
         menuElSprite.value = String(el.spriteKey || '');
+        menuElSpriteVar.value = String(el.spriteVar || '');
         menuElFont.value = String(el.fontSize || 16);
         menuElSpriteFit.value = String(el.spriteFit || 'cover');
         menuElOpacity.value = String(el.opacity == null ? 1 : el.opacity);
@@ -4279,6 +4329,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       el.flatColor = String(menuElBg.value || '').trim();
       el.textColor = String(menuElColor.value || '#ffffff').trim();
       el.spriteKey = sanitizeTextureKey(menuElSprite.value || '');
+      el.spriteVar = String(menuElSpriteVar.value || '').trim();
       el.fontSize = Math.max(8, Number(menuElFont.value || 16));
       el.spriteFit = String(menuElSpriteFit.value || 'cover').trim();
       if (!['cover', 'contain', 'stretch'].includes(el.spriteFit)) el.spriteFit = 'cover';
