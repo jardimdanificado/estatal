@@ -818,6 +818,7 @@ function initializeExclusiveMenus(world) {
         root: ensureExclusiveMenuRoot(world),
         activeMenuId: null,
         stack: [],
+        lastPointerLocked: document.pointerLockElement === document.body,
         vars: {
             saveName: ''
         }
@@ -849,8 +850,12 @@ function handleExclusiveMenuKeyDown(world, e) {
 function handlePointerLockChangeForMenus(world) {
     const sys = world && world._internal ? world._internal.menuSystem : null;
     if (!sys) return;
+    if (isMobile()) return;
     const isLocked = document.pointerLockElement === document.body;
+    const wasLocked = Boolean(sys.lastPointerLocked);
+    sys.lastPointerLocked = isLocked;
     if (isLocked) return;
+    if (!wasLocked) return;
     if (isExclusiveMenuOpen(world)) return;
     if (world.mode !== 'game') return;
     if (world._internal.simulationPaused) return;
@@ -968,6 +973,7 @@ async function init() {
     document.addEventListener('pointerlockchange', () => handlePointerLockChangeForMenus(world));
     
     document.addEventListener('click', (event) => {
+        if (isMobile()) return;
         if (isExclusiveMenuOpen(world)) return;
         const menu = document.getElementById('editor-context-menu');
         if (menu && menu.style.display === 'block') return;
