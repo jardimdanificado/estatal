@@ -657,10 +657,22 @@
             <div>
               <label>Nome do preset</label>
               <input type="text" id="preset-key" placeholder="starter_guard" />
-              <label>Inventário de blocos (JSON)</label>
-              <textarea id="preset-blocks" placeholder='{"1": 50, "5": 2}'></textarea>
-              <label>Inventário de itens (JSON)</label>
-              <textarea id="preset-items" placeholder='{"revolver": 24, "cuscuz": 5}'></textarea>
+              <label>Categoria</label>
+              <select id="preset-category">
+                <option value="block">Blocos</option>
+                <option value="item">Itens/Armas</option>
+              </select>
+              <div class="row" style="margin-top: 6px;">
+                <select id="preset-item"></select>
+                <input id="preset-qty" type="number" value="1" min="1" />
+              </div>
+              <div class="btnbar" style="margin-top: 8px;">
+                <button class="good" id="preset-add">Adicionar</button>
+                <button class="bad" id="preset-remove">Remover</button>
+                <button id="preset-clear">Limpar</button>
+              </div>
+              <label>Conteúdo do preset</label>
+              <div id="preset-list-content" class="listbox"></div>
               <div class="btnbar" style="margin-top:8px;">
                 <button class="good" id="preset-save">Salvar preset</button>
                 <button id="preset-new">Novo</button>
@@ -969,8 +981,12 @@
     function getTextureUrl(key) {
       if (!key) return null;
       if (state.db.embeddedImages[key]) return state.db.embeddedImages[key];
-      if (state.importedZip) return null;
-      return textureByKey.get(key) || null;
+      const raw = String(textureByKey.get(key) || '').trim();
+      if (!raw) return null;
+      if (/^data:image\//i.test(raw)) return raw;
+      if (/^blob:/i.test(raw)) return raw;
+      if (/^https?:\/\//i.test(raw)) return raw;
+      return null;
     }
 
     function loadImg(key) {
@@ -1050,8 +1066,10 @@
     const invApplyPresetEl = $('inv-apply-preset');
     const presetListEl = $('preset-list');
     const presetKeyEl = $('preset-key');
-    const presetBlocksEl = $('preset-blocks');
-    const presetItemsEl = $('preset-items');
+    const presetCategoryEl = $('preset-category');
+    const presetItemEl = $('preset-item');
+    const presetQtyEl = $('preset-qty');
+    const presetListContentEl = $('preset-list-content');
     const uiAliasListEl = $('ui-alias-list');
     const uiAliasKeyEl = $('ui-alias-key');
     const uiAliasValueEl = $('ui-alias-value');
@@ -1060,6 +1078,8 @@
     const configJsonEl = $('config-json');
 
     const inventoryState = { targetKey: 'player', category: 'item' };
+    const presetEditorState = { category: 'block' };
+    let presetDraft = { inventory: {}, itemInventory: {} };
 
     function renderPalette() {
       paletteEl.innerHTML = '';
@@ -3044,6 +3064,96 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       return out;
     }
 
+    function clonePresetData(preset) {
+      return {
+        inventory: normalizeInventoryObject(preset && preset.inventory),
+        itemInventory: normalizeInventoryObject(preset && preset.itemInventory)
+      };
+    }
+
+    function renderPresetEditorOptions() {
+      const category = presetCategoryEl.value || 'block';
+      presetItemEl.innerHTML = '';
+      const options = category === 'block' ? getBlockEntries() : getItemEntries();
+      for (const entry of options) {
+        const opt = document.createElement('option');
+        opt.value = String(entry.id);
+        opt.textContent = entry.name || String(entry.id);
+        presetItemEl.appendChild(opt);
+      }
+    }
+
+    function adjustPresetInventory(kind, id, delta) {
+      if (!presetDraft) presetDraft = { inventory: {}, itemInventory: {} };
+      presetDraft.inventory = presetDraft.inventory || {};
+      presetDraft.itemInventory = presetDraft.itemInventory || {};
+      const store = kind === 'block' ? presetDraft.inventory : presetDraft.itemInventory;
+      const key = String(id);
+      const current = Math.max(0, Math.floor(Number(store[key] || 0)));
+      const next = Math.max(0, current + delta);
+      if (next <= 0) delete store[key];
+      else store[key] = next;
+      renderPresetInventoryList();
+    }
+
+    function renderPresetInventoryList() {
+      presetListContentEl.innerHTML = '';
+      if (!presetDraft) presetDraft = { inventory: {}, itemInventory: {} };
+      const rows = [];
+      for (const [blockId, count] of Object.entries(presetDraft.inventory || {})) {
+        const qty = Math.max(0, Math.floor(Number(count) || 0));
+        if (!qty) continue;
+        const blockType = findBlockTypeById(blockId);
+        rows.push({ kind: 'block', id: blockId, name: blockType ? blockType.name : `Bloco ${blockId}`, count: qty });
+      }
+      for (const [itemId, count] of Object.entries(presetDraft.itemInventory || {})) {
+        const qty = Math.max(0, Math.floor(Number(count) || 0));
+        if (!qty) continue;
+        const itemDef = findItemTypeById(itemId);
+        rows.push({ kind: 'item', id: itemId, name: itemDef ? itemDef.name : `Item ${itemId}`, count: qty });
+      }
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      if (!rows.length) {
+        const empty = document.createElement('div');
+        empty.textContent = 'Preset vazio.';
+        presetListContentEl.appendChild(empty);
+        return;
+      }
+      for (const rowData of rows) {
+        const row = document.createElement('div');
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '1fr auto auto auto';
+        row.style.gap = '6px';
+        row.style.alignItems = 'center';
+        row.style.padding = '4px 0';
+
+        const label = document.createElement('div');
+        label.textContent = `${rowData.name} x${rowData.count}`;
+        label.style.fontSize = '12px';
+
+        const minus = document.createElement('button');
+        minus.textContent = '-';
+        minus.style.padding = '2px 8px';
+        minus.addEventListener('click', () => adjustPresetInventory(rowData.kind, rowData.id, -1));
+
+        const plus = document.createElement('button');
+        plus.textContent = '+';
+        plus.style.padding = '2px 8px';
+        plus.addEventListener('click', () => adjustPresetInventory(rowData.kind, rowData.id, 1));
+
+        const remove = document.createElement('button');
+        remove.textContent = 'x';
+        remove.style.padding = '2px 8px';
+        remove.addEventListener('click', () => adjustPresetInventory(rowData.kind, rowData.id, -rowData.count));
+
+        row.appendChild(label);
+        row.appendChild(minus);
+        row.appendChild(plus);
+        row.appendChild(remove);
+        presetListContentEl.appendChild(row);
+      }
+    }
+
     function renderPresetsTab() {
       const entries = Object.entries(state.db.inventoryPresets).sort((a, b) => a[0].localeCompare(b[0]));
       if (!state.selectedPresetKey && entries.length) state.selectedPresetKey = entries[0][0];
@@ -3061,16 +3171,19 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       );
 
       presetKeyEl.value = state.selectedPresetKey || '';
-      presetBlocksEl.value = selected ? JSON.stringify(selected.inventory || {}, null, 2) : '{}';
-      presetItemsEl.value = selected ? JSON.stringify(selected.itemInventory || {}, null, 2) : '{}';
+      presetDraft = clonePresetData(selected);
+      presetCategoryEl.value = presetEditorState.category || 'block';
+      renderPresetEditorOptions();
+      renderPresetInventoryList();
       renderInventoryPresetOptions();
     }
 
     $('preset-new').addEventListener('click', () => {
       state.selectedPresetKey = null;
       presetKeyEl.value = '';
-      presetBlocksEl.value = '{}';
-      presetItemsEl.value = '{}';
+      presetDraft = { inventory: {}, itemInventory: {} };
+      renderPresetEditorOptions();
+      renderPresetInventoryList();
     });
 
     $('preset-save').addEventListener('click', () => {
@@ -3079,16 +3192,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         setDbStatus('Nome do preset é obrigatório.');
         return;
       }
-      let blocks = {};
-      let items = {};
-      try {
-        blocks = normalizeInventoryObject(JSON.parse(String(presetBlocksEl.value || '{}')));
-        items = normalizeInventoryObject(JSON.parse(String(presetItemsEl.value || '{}')));
-      } catch {
-        setDbStatus('JSON inválido em inventários do preset.');
-        return;
-      }
-      state.db.inventoryPresets[key] = { inventory: blocks, itemInventory: items };
+      state.db.inventoryPresets[key] = clonePresetData(presetDraft);
       state.selectedPresetKey = key;
       setDbStatus(`Preset salvo: ${key}`);
       renderPresetsTab();
@@ -3101,6 +3205,30 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       state.selectedPresetKey = Object.keys(state.db.inventoryPresets)[0] || null;
       setDbStatus(`Preset removido: ${key}`);
       renderPresetsTab();
+    });
+
+    presetCategoryEl.addEventListener('change', () => {
+      presetEditorState.category = presetCategoryEl.value || 'block';
+      renderPresetEditorOptions();
+    });
+
+    $('preset-add').addEventListener('click', () => {
+      const qty = Math.max(1, Math.floor(Number(presetQtyEl.value || 1)));
+      const id = presetItemEl.value;
+      const kind = presetCategoryEl.value === 'block' ? 'block' : 'item';
+      adjustPresetInventory(kind, id, qty);
+    });
+
+    $('preset-remove').addEventListener('click', () => {
+      const qty = Math.max(1, Math.floor(Number(presetQtyEl.value || 1)));
+      const id = presetItemEl.value;
+      const kind = presetCategoryEl.value === 'block' ? 'block' : 'item';
+      adjustPresetInventory(kind, id, -qty);
+    });
+
+    $('preset-clear').addEventListener('click', () => {
+      presetDraft = { inventory: {}, itemInventory: {} };
+      renderPresetInventoryList();
     });
 
     function renderUiTab() {
@@ -3212,7 +3340,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       if (typeof value === 'number' || typeof value === 'boolean') return String(value);
       if (Array.isArray(value)) {
         if (!value.length) return '[]';
-        return `\n${pad}[\n${value.map((v) => `${padIn}${serializeJS(v, depth + 1)}`).join(',\n')}\n${pad}]`;
+        return `[\n${value.map((v) => `${padIn}${serializeJS(v, depth + 1)}`).join(',\n')}\n${pad}]`;
       }
       if (typeof value === 'object') {
         const entries = Object.entries(value);
@@ -3263,6 +3391,25 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function normalizeZipPath(path) {
       return String(path || '').replace(/^\.\//, '').replace(/^\/+/, '');
+    }
+
+    function canonicalizeRomPath(path) {
+      const normalized = normalizeZipPath(path);
+      if (!normalized) return '';
+      const lower = normalized.toLowerCase();
+      const dataAt = lower.lastIndexOf('/data/');
+      if (dataAt >= 0) return normalized.slice(dataAt + 1);
+      if (lower.startsWith('data/')) return normalized;
+      if (/^(images|audio|maps|config)\//i.test(normalized)) return `data/${normalized}`;
+      return normalized;
+    }
+
+    function normalizeTextureCatalogPaths() {
+      for (const texture of state.db.textures) {
+        if (!texture || typeof texture.url !== 'string') continue;
+        const next = canonicalizeRomPath(texture.url);
+        if (next) texture.url = next;
+      }
     }
 
     function pickZipFile(zip, candidates) {
@@ -3561,13 +3708,16 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         return;
       }
       ensureMandatoryUiTextures();
+      applyUiAliasMappings();
+      normalizeTextureCatalogPaths();
       const out = new window.JSZip();
 
       if (state.importedZip) {
         const entries = Object.values(state.importedZip.files);
         for (const entry of entries) {
           if (entry.dir) continue;
-          const path = normalizeZipPath(entry.name);
+          const path = canonicalizeRomPath(entry.name);
+          if (!path) continue;
           if (
             path === 'data/config/blocks.js' ||
             path === 'data/config/items.js' ||
@@ -3606,11 +3756,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       for (const [textureKey, dataUrl] of Object.entries(state.db.embeddedImages)) {
         const texture = state.db.textures.find((t) => t.key === textureKey);
         if (!texture) continue;
-        let targetPath = normalizeZipPath(texture.url);
+        let targetPath = canonicalizeRomPath(texture.url);
         if (!targetPath) targetPath = `data/images/custom/${textureKey}.png`;
         out.file(targetPath, dataUrlToUint8Array(dataUrl));
       }
-      applyUiAliasMappings();
 
       out.file('editor-manifest.json', JSON.stringify({
         generatedAt: new Date().toISOString(),

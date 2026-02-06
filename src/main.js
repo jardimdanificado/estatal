@@ -41,12 +41,19 @@ function replaceObjectContents(target, source) {
 }
 
 function replaceArrayContents(target, source) {
+    if (!Array.isArray(target)) return;
     target.splice(0, target.length, ...(Array.isArray(source) ? source : []));
 }
 
 function parseDefaultExportModule(code) {
-    const exec = new Function(`${code.replace(/export\s+default/, 'return')}`);
-    return exec();
+    const source = String(code || '');
+    try {
+        const transformed = source.replace(/export\s+default/, 'const __default_export__ =');
+        return new Function(`${transformed}\nreturn typeof __default_export__ !== 'undefined' ? __default_export__ : null;`)();
+    } catch {
+        const exec = new Function(`${source.replace(/export\s+default/, 'return')}`);
+        return exec();
+    }
 }
 
 function parseFactionsModule(code) {
@@ -94,11 +101,17 @@ function resolveTextureLoadUrl(key, fallbackUrl) {
     if (ROM_RUNTIME.enabled) {
         return ROM_RUNTIME.textureUrlByKey[key] || null;
     }
-    return ROM_RUNTIME.textureUrlByKey[key] || fallbackUrl;
+    const raw = String(ROM_RUNTIME.textureUrlByKey[key] || fallbackUrl || '').trim();
+    if (!raw) return null;
+    if (/^data:image\//i.test(raw)) return raw;
+    if (/^blob:/i.test(raw)) return raw;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return null;
 }
 
 function refreshCatalogCaches() {
-    TEXTURE_PREVIEW_MAP = texturesToLoad.reduce((map, entry) => {
+    const textureEntries = Array.isArray(texturesToLoad) ? texturesToLoad : [];
+    TEXTURE_PREVIEW_MAP = textureEntries.reduce((map, entry) => {
         map[entry.key] = entry.url;
         return map;
     }, {});
@@ -132,7 +145,12 @@ function resolvePreviewTextureUrl(key) {
     const romUrl = ROM_RUNTIME.textureUrlByKey[key];
     if (romUrl) return romUrl;
     if (isGeneratedUiTextureKey(key)) return getGeneratedUiTextureDataUrl(key);
-    return TEXTURE_PREVIEW_MAP[key] || null;
+    const raw = String(TEXTURE_PREVIEW_MAP[key] || '').trim();
+    if (!raw) return null;
+    if (/^data:image\//i.test(raw)) return raw;
+    if (/^blob:/i.test(raw)) return raw;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return null;
 }
 
 function isGeneratedUiTextureKey(key) {
@@ -240,7 +258,10 @@ async function loadRomFromZipFile(file) {
     if (blocksFile) replaceObjectContents(BLOCK_TYPES, parseDefaultExportModule(await blocksFile.async('string')));
     if (itemsFile) replaceObjectContents(ITEMS, parseDefaultExportModule(await itemsFile.async('string')));
     if (npcsFile) replaceObjectContents(NPC_TYPES, parseDefaultExportModule(await npcsFile.async('string')));
-    if (texturesFile) replaceArrayContents(texturesToLoad, parseDefaultExportModule(await texturesFile.async('string')));
+    if (texturesFile) {
+        const parsedTextures = parseDefaultExportModule(await texturesFile.async('string'));
+        replaceArrayContents(texturesToLoad, Array.isArray(parsedTextures) ? parsedTextures : []);
+    }
 
     if (factionsFile) {
         const parsedFactions = parseFactionsModule(await factionsFile.async('string'));

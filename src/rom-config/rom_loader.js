@@ -3,8 +3,14 @@ function normalizePath(path) {
 }
 
 function parseDefaultExportModule(code) {
-  const transformed = String(code || '').replace(/export\s+default/, 'return');
-  return new Function(transformed)();
+  const source = String(code || '');
+  try {
+    const transformed = source.replace(/export\s+default/, 'const __default_export__ =');
+    return new Function(`${transformed}\nreturn typeof __default_export__ !== 'undefined' ? __default_export__ : null;`)();
+  } catch {
+    const transformed = source.replace(/export\s+default/, 'return');
+    return new Function(transformed)();
+  }
 }
 
 function parseFactionsModule(code) {
@@ -104,7 +110,8 @@ export async function loadDefaultExportFromRom(path, fallbackValue) {
   try {
     const code = await readTextFromZip(path);
     if (!code) return fallbackValue;
-    return parseDefaultExportModule(code);
+    const parsed = parseDefaultExportModule(code);
+    return typeof parsed === 'undefined' ? fallbackValue : parsed;
   } catch {
     return fallbackValue;
   }
