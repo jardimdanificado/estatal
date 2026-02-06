@@ -168,6 +168,154 @@
       pointer-events: none;
       white-space: pre;
     }
+    #map-toolbar {
+      position: absolute;
+      left: 12px;
+      top: 112px;
+      z-index: 5;
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+      background: rgba(26, 26, 26, 0.9);
+      border: 1px solid #2f2f2f;
+      border-radius: 4px;
+      backdrop-filter: blur(2px);
+    }
+    .map-toolbar-group {
+      display: grid;
+      grid-template-columns: repeat(2, 38px);
+      gap: 6px;
+    }
+    .map-toolbar-btn {
+      width: 38px;
+      height: 38px;
+      border: 1px solid #4a4a4a;
+      border-radius: 3px;
+      background: #202020;
+      color: #f2f2f2;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+    .map-toolbar-btn:hover {
+      background: #2a2a2a;
+      border-color: #6a6a6a;
+    }
+    .map-toolbar-btn.active {
+      background: #0f4e95;
+      border-color: #6fb0ff;
+      color: #fff;
+    }
+    .map-toolbar-sep {
+      height: 1px;
+      background: #3a3a3a;
+      margin: 1px 0;
+    }
+    .map-toolbar-colors {
+      display: grid;
+      gap: 6px;
+    }
+    .map-toolbar-swatches {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .map-toolbar-swatch {
+      height: 20px;
+      border: 1px solid #5c5c5c;
+      border-radius: 3px;
+      background: #888;
+      background-size: cover;
+      background-position: center;
+      image-rendering: pixelated;
+    }
+    .map-toolbar-palette {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+    .map-toolbar-palette button {
+      width: 38px;
+      height: 22px;
+      border: 1px solid #5c5c5c;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      color: #111;
+      background-size: cover;
+      background-position: center;
+      image-rendering: pixelated;
+    }
+    .map-toolbar-palette button.active {
+      border-color: #8fc1ff;
+      box-shadow: 0 0 0 1px #8fc1ff inset;
+    }
+    #map-tile-picker {
+      position: absolute;
+      left: 108px;
+      top: 112px;
+      width: 340px;
+      max-height: calc(100vh - 128px);
+      display: none;
+      grid-template-rows: auto auto 1fr;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #2f2f2f;
+      border-radius: 4px;
+      background: rgba(22, 22, 22, 0.97);
+      z-index: 8;
+      color: #f0f0f0;
+    }
+    #map-tile-picker.open { display: grid; }
+    .map-tile-picker-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+    }
+    #map-tile-picker-search {
+      background: #121212;
+      color: #f0f0f0;
+      border-color: #444;
+    }
+    #map-tile-picker-list {
+      overflow: auto;
+      display: grid;
+      gap: 6px;
+      padding-right: 2px;
+    }
+    .map-tile-picker-item {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      border: 1px solid #4a4a4a;
+      background: #1c1c1c;
+      color: #f0f0f0;
+      text-align: left;
+      padding: 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .map-tile-picker-item:hover {
+      border-color: #8fc1ff;
+      background: #222;
+    }
+    .map-tile-picker-thumb {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #666;
+      border-radius: 2px;
+      background: #666;
+      background-size: cover;
+      background-position: center;
+      image-rendering: pixelated;
+    }
 
     .status {
       margin-top: 10px;
@@ -226,6 +374,20 @@
     td select { font-size: 11px; padding: 4px; border-radius: 2px; }
 
     .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .world-panel {
+      resize: vertical;
+      overflow: auto;
+      min-height: 120px;
+      max-height: 70vh;
+    }
+    .world-panel h2 {
+      cursor: grab;
+      user-select: none;
+    }
+    .world-panel.dragging {
+      opacity: 0.55;
+      outline: 1px dashed var(--accent);
+    }
     .menu-stage {
       position: relative;
       width: 100%;
@@ -304,7 +466,6 @@
           <option value="creatures">Criaturas</option>
           <option value="factions">Facções</option>
           <option value="textures">Texturas</option>
-          <option value="player">Player</option>
           <option value="config">Config</option>
           <option value="audio">Audio</option>
           <option value="menus">Menus</option>
@@ -321,7 +482,7 @@
         <div class="status" id="zip-status">Nenhuma ROM carregada.</div>
       </div>
 
-      <div class="card section-pane active" data-section="world">
+      <div class="card section-pane active world-panel" data-section="world" data-world-panel="map">
         <h2>Mapa</h2>
         <div class="btnbar">
           <button class="primary" id="btn-load-default">Carregar default.json</button>
@@ -342,8 +503,14 @@
         <div class="status" id="status">Pronto.</div>
       </div>
 
-      <div class="card section-pane active" data-section="world">
+      <div class="card section-pane active world-panel" data-section="world" data-world-panel="tools">
         <h2>Ferramenta</h2>
+        <label>Modo de edição</label>
+        <select id="editor-mode">
+          <option value="block">Blocos</option>
+          <option value="npc">Criaturas</option>
+          <option value="item">Itens</option>
+        </select>
         <label>Modo</label>
         <div class="row">
           <select id="tool-mode">
@@ -363,6 +530,10 @@
           <select id="paint-shape">
             <option value="brush">Pincel (1 célula)</option>
             <option value="rect">Retângulo</option>
+            <option value="line">Reta</option>
+            <option value="fill">Balde (flood fill)</option>
+            <option value="eyedropper">Conta-gotas</option>
+            <option value="move">Mover (criaturas/itens)</option>
           </select>
           <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; padding:0 2px;">
             <span style="font-size:12px; color: var(--muted);">Arrastar = pintar</span>
@@ -381,7 +552,15 @@
           <button class="bad" id="layer-clear">Limpar Y atual</button>
         </div>
 
-        <div class="hint">
+        <label>Paleta rápida</label>
+        <div class="hint" style="margin-top:6px;">
+          Clique esquerdo no slot para usar.<br/>
+          Clique direito no slot para escolher a tile.<br/>
+          Clique na amostra na toolbar para escolher a tile do slot ativo.<br/>
+          Clique direito na amostra para alterar a cor do slot ativo.
+        </div>
+
+      <div class="hint">
           <b>Controles:</b><br/>
           - Clique esquerdo: aplicar<br/>
           - Botão direito: apagar<br/>
@@ -390,13 +569,30 @@
           - Shift + rodinha: trocar camada Y<br/>
           - Arrastar: pintar várias células<br/>
           <br/>
-          <b>Camadas:</b> bloco em y = (camada + 0.5). Chão usa y = -0.5.
+          <b>Camadas:</b> todo bloco usa y = (camada + 0.5).
         </div>
       </div>
 
-      <div class="card section-pane active" data-section="world">
+      <div class="card section-pane active world-panel" data-section="world" data-world-panel="palette">
         <h2>Paleta</h2>
         <div class="palette" id="palette"></div>
+      </div>
+
+      <div class="card section-pane active world-panel" data-section="world" data-world-panel="player">
+        <h2>Player</h2>
+        <div class="btnbar">
+          <button id="map-set-player-pos">Set player pos (click no mapa)</button>
+        </div>
+        <label>Nome do jogador</label>
+        <input id="player-name" type="text" placeholder="A.S.S" />
+        <label>Texture ID da imagem do jogador (HUD)</label>
+        <input id="player-image-key" type="text" placeholder="ui_player_face" />
+        <label>Upload imagem do jogador (opcional)</label>
+        <input id="player-image" type="file" accept="image/*" />
+        <label>Preview da imagem</label>
+        <div id="player-image-preview" class="thumb" style="width:80px;height:80px;"></div>
+        <label>Posição atual de spawn</label>
+        <div class="status" id="player-spawn-status">x=- y=- z=-</div>
       </div>
 
       <div class="card section-pane" data-section="inventory">
@@ -485,6 +681,19 @@
           <div class="split">
             <div>
               <label>Lista de blocos</label>
+              <div class="row">
+                <input type="text" id="block-search" placeholder="Pesquisar..." />
+                <select id="block-sort">
+                  <option value="name">Ordenar: nome</option>
+                  <option value="id">Ordenar: id</option>
+                  <option value="key">Ordenar: key</option>
+                </select>
+                <select id="block-filter-render">
+                  <option value="all">Render: todos</option>
+                  <option value="box">Render: box</option>
+                  <option value="cross">Render: cross</option>
+                </select>
+              </div>
               <div id="block-list" class="listbox"></div>
             </div>
             <div>
@@ -522,6 +731,18 @@
                   <select id="block-droppable"><option value="true">true</option><option value="false">false</option></select>
                 </div>
               </div>
+              <div class="row">
+                <div>
+                  <label>Render</label>
+                  <select id="block-render">
+                    <option value="box">box (normal)</option>
+                    <option value="cross">cross (bush/folhagem)</option>
+                  </select>
+                </div>
+                <div class="btnbar" style="align-self:end;">
+                  <button id="block-preset-bush">Preset Bush</button>
+                </div>
+              </div>
               <label>Texture key</label>
               <input type="text" id="block-texture-key" placeholder="EX: basalt" />
               <label>Upload imagem (opcional)</label>
@@ -554,6 +775,19 @@
           <div class="split">
             <div>
               <label>Lista de itens/armas</label>
+              <div class="row">
+                <input type="text" id="item-search" placeholder="Pesquisar..." />
+                <select id="item-sort">
+                  <option value="name">Ordenar: nome</option>
+                  <option value="id">Ordenar: id</option>
+                  <option value="key">Ordenar: key</option>
+                </select>
+                <select id="item-filter-kind">
+                  <option value="all">Tipo: todos</option>
+                  <option value="weapon">Tipo: armas</option>
+                  <option value="utility">Tipo: utilitários</option>
+                </select>
+              </div>
               <div id="item-list" class="listbox"></div>
             </div>
             <div>
@@ -609,10 +843,16 @@
               <input type="text" id="item-texture-key" placeholder="EX: item-machado" />
               <label>Upload imagem (usa como texture/ui/drop)</label>
               <input type="file" id="item-image" accept="image/*" />
+              <label>Texture key da mão (hand)</label>
+              <input type="text" id="item-hand-texture-key" placeholder="EX: hand_machado" />
+              <label>Upload imagem da mão</label>
+              <input type="file" id="item-hand-image" accept="image/*" />
               <label>Texture key do projétil</label>
               <input type="text" id="item-proj-texture-key" placeholder="EX: bullet_machado" />
               <label>Upload imagem do projétil</label>
               <input type="file" id="item-proj-image" accept="image/*" />
+              <label>Preview da mão</label>
+              <div id="item-hand-preview" class="thumb" style="width:80px;height:80px;"></div>
               <label>Preview do projétil</label>
               <div id="item-proj-preview" class="thumb" style="width:80px;height:80px;"></div>
               <label>Preview da textura</label>
@@ -630,6 +870,19 @@
           <div class="split">
             <div>
               <label>Lista de criaturas</label>
+              <div class="row">
+                <input type="text" id="creature-search" placeholder="Pesquisar..." />
+                <select id="creature-sort">
+                  <option value="name">Ordenar: nome</option>
+                  <option value="id">Ordenar: id</option>
+                  <option value="key">Ordenar: key</option>
+                </select>
+                <select id="creature-filter-hostile">
+                  <option value="all">Hostilidade: todos</option>
+                  <option value="hostile">Apenas hostis</option>
+                  <option value="friendly">Apenas não hostis</option>
+                </select>
+              </div>
               <div id="creature-list" class="listbox"></div>
             </div>
             <div>
@@ -711,6 +964,18 @@
           <div class="split">
             <div>
               <label>Lista de texturas</label>
+              <div class="row">
+                <input type="text" id="texture-search" placeholder="Pesquisar..." />
+                <select id="texture-sort">
+                  <option value="key">Ordenar: key</option>
+                  <option value="url">Ordenar: path/url</option>
+                </select>
+                <select id="texture-filter-source">
+                  <option value="all">Fonte: todas</option>
+                  <option value="embedded">Fonte: embutidas</option>
+                  <option value="external">Fonte: sem embed</option>
+                </select>
+              </div>
               <div id="texture-list" class="listbox"></div>
             </div>
             <div>
@@ -726,33 +991,6 @@
                 <button class="good" id="texture-save">Salvar textura</button>
                 <button id="texture-new">Nova</button>
                 <button class="bad" id="texture-delete">Excluir</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div id="tab-player" class="tab-pane content-tab-pane">
-          <div class="split">
-            <div>
-              <label>Player / Spawn</label>
-              <div class="btnbar">
-                <button id="map-set-player-pos">Set player pos (click no mapa)</button>
-              </div>
-              <label>Nome do jogador</label>
-              <input id="player-name" type="text" placeholder="A.S.S" />
-              <label>Texture ID da imagem do jogador (HUD)</label>
-              <input id="player-image-key" type="text" placeholder="ui_player_face" />
-              <label>Upload imagem do jogador (opcional)</label>
-              <input id="player-image" type="file" accept="image/*" />
-              <label>Preview da imagem</label>
-              <div id="player-image-preview" class="thumb" style="width:80px;height:80px;"></div>
-            </div>
-            <div>
-              <label>Posição atual de spawn</label>
-              <div class="status" id="player-spawn-status">x=- y=- z=-</div>
-              <div class="hint">
-                O botão <b>Set player pos</b> usa o mapa para escolher o spawn.<br/>
-                Abra a aba <b>Mapa</b>, clique no ponto desejado e volte quando quiser.
               </div>
             </div>
           </div>
@@ -974,6 +1212,44 @@
     <main id="stage">
       <canvas id="canvas"></canvas>
       <div id="overlay"></div>
+      <div id="map-toolbar" aria-label="Map toolbar">
+        <div class="map-toolbar-group">
+          <button class="map-toolbar-btn" type="button" title="Bloco" data-tool-mode="block">🧱</button>
+          <button class="map-toolbar-btn" type="button" title="Criatura" data-tool-mode="npc">👾</button>
+          <button class="map-toolbar-btn" type="button" title="Item" data-tool-mode="item">🎒</button>
+          <button class="map-toolbar-btn" type="button" title="Apagar" data-tool-mode="erase">🧽</button>
+        </div>
+        <div class="map-toolbar-sep"></div>
+        <div class="map-toolbar-group">
+          <button class="map-toolbar-btn" type="button" title="Pincel" data-paint-shape="brush">🖌️</button>
+          <button class="map-toolbar-btn" type="button" title="Retângulo" data-paint-shape="rect">▭</button>
+          <button class="map-toolbar-btn" type="button" title="Balde" data-paint-shape="fill">🪣</button>
+          <button class="map-toolbar-btn" type="button" title="Conta-gotas" data-paint-shape="eyedropper">💧</button>
+        </div>
+        <div class="map-toolbar-sep"></div>
+        <div class="map-toolbar-group">
+          <button class="map-toolbar-btn" id="map-toolbar-copy-layer" type="button" title="Copiar camada Y">📄</button>
+          <button class="map-toolbar-btn" id="map-toolbar-paste-layer" type="button" title="Colar camada Y">📋</button>
+          <button class="map-toolbar-btn" id="map-toolbar-clear-layer" type="button" title="Limpar camada Y">🗑️</button>
+          <button class="map-toolbar-btn" id="map-toolbar-set-spawn" type="button" title="Definir spawn">📍</button>
+        </div>
+        <div class="map-toolbar-sep"></div>
+        <div class="map-toolbar-colors">
+          <div class="map-toolbar-swatches">
+            <div id="map-toolbar-color-current" class="map-toolbar-swatch" title="Cor atual"></div>
+          </div>
+          <div id="map-quick-palette" class="map-toolbar-palette"></div>
+        </div>
+      </div>
+      <input id="map-toolbar-color-picker" type="color" value="#88cc88" style="display:none;" />
+      <div id="map-tile-picker" aria-hidden="true">
+        <div class="map-tile-picker-head">
+          <strong id="map-tile-picker-title">Escolher tile</strong>
+          <button id="map-tile-picker-close" type="button">Fechar</button>
+        </div>
+        <input id="map-tile-picker-search" type="text" placeholder="Pesquisar tile..." />
+        <div id="map-tile-picker-list"></div>
+      </div>
     </main>
   </div>
 
@@ -1038,6 +1314,7 @@
     const state = {
       activeSection: 'world',
       toolMode: 'block',
+      mapEditMode: 'block',
       layerY: 0,
       zoom: 26,
       paintShape: 'brush',
@@ -1048,6 +1325,7 @@
       rectStart: null,
       rectEnd: null,
       rectErase: false,
+      moveDrag: null,
       selected: null,
       selectedBlockKey: null,
       selectedItemKey: null,
@@ -1104,16 +1382,59 @@
       maps: {},
       currentMapName: 'default.json',
       view: { minX: 0, minZ: 0, maxX: 15, maxZ: 15 },
-      viewDirty: true
+      viewDirty: true,
+      paletteCurrentColor: '#88cc88',
+      paletteCurrentBlockKey: '',
+      activeQuickPaletteSlot: 0,
+      quickPalettePickerSlot: null,
+      quickPaletteSlots: [],
+      filters: {
+        blocks: { search: '', sort: 'name', render: 'all' },
+        items: { search: '', sort: 'name', kind: 'all' },
+        creatures: { search: '', sort: 'name', hostile: 'all' },
+        textures: { search: '', sort: 'key', source: 'all' }
+      }
     };
 
     function updateSectionLayout() {
       const showMap = state.activeSection === 'world';
       appEl.classList.toggle('no-stage', !showMap);
+      if (mapToolbarEl) mapToolbarEl.style.display = showMap ? 'grid' : 'none';
+      if (!showMap) closeQuickPaletteTilePicker();
       if (showMap) {
         resizeCanvas();
         draw();
       }
+    }
+
+    function initWorldPanelLayout() {
+      const panels = Array.from(document.querySelectorAll('.world-panel[data-section="world"]'));
+      let draggingPanel = null;
+      panels.forEach((panel) => {
+        panel.draggable = true;
+        panel.addEventListener('dragstart', () => {
+          draggingPanel = panel;
+          panel.classList.add('dragging');
+        });
+        panel.addEventListener('dragend', () => {
+          panel.classList.remove('dragging');
+          draggingPanel = null;
+        });
+        panel.addEventListener('dragover', (e) => {
+          if (!draggingPanel || draggingPanel === panel) return;
+          e.preventDefault();
+        });
+        panel.addEventListener('drop', (e) => {
+          if (!draggingPanel || draggingPanel === panel) return;
+          e.preventDefault();
+          const rect = panel.getBoundingClientRect();
+          const after = e.clientY > rect.top + rect.height / 2;
+          const parent = panel.parentElement;
+          if (!parent) return;
+          if (after) parent.insertBefore(draggingPanel, panel.nextSibling);
+          else parent.insertBefore(draggingPanel, panel);
+        });
+      });
     }
 
     const BLOCK_SCRIPT_PRESETS = {
@@ -1290,11 +1611,127 @@
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     }
 
+    function sortByMode(entries, mode, getName, getId, getKey) {
+      const list = [...entries];
+      if (mode === 'id') {
+        list.sort((a, b) => String(getId(a)).localeCompare(String(getId(b)), undefined, { numeric: true }));
+      } else if (mode === 'key') {
+        list.sort((a, b) => String(getKey(a) || '').localeCompare(String(getKey(b) || '')));
+      } else if (mode === 'url') {
+        list.sort((a, b) => String((a.url || '')).localeCompare(String((b.url || ''))));
+      } else {
+        list.sort((a, b) => String(getName(a) || '').localeCompare(String(getName(b) || '')));
+      }
+      return list;
+    }
+
+    function getFilteredBlockEntries() {
+      const all = Object.entries(state.db.blocks).map(([key, bt]) => ({ key, ...bt }));
+      const f = state.filters.blocks || {};
+      const q = String(f.search || '').trim().toLowerCase();
+      const renderMode = String(f.render || 'all');
+      let list = all.filter((entry) => {
+        if (q) {
+          const hay = `${entry.key} ${entry.name || ''} ${entry.id || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        const render = String(entry.render || 'box').toLowerCase() === 'cross' ? 'cross' : 'box';
+        if (renderMode !== 'all' && render !== renderMode) return false;
+        return true;
+      });
+      list = sortByMode(list, f.sort || 'name', (e) => e.name, (e) => e.id, (e) => e.key);
+      return list;
+    }
+
+    function getFilteredItemEntries() {
+      const all = Object.entries(state.db.items).map(([key, it]) => ({ key, ...it }));
+      const f = state.filters.items || {};
+      const q = String(f.search || '').trim().toLowerCase();
+      const kind = String(f.kind || 'all');
+      let list = all.filter((entry) => {
+        if (q) {
+          const hay = `${entry.key} ${entry.name || ''} ${entry.id || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        const isWeapon = Number(entry.damage || 0) > 0 || Number(entry.projectileDamage || 0) > 0;
+        if (kind === 'weapon' && !isWeapon) return false;
+        if (kind === 'utility' && isWeapon) return false;
+        return true;
+      });
+      list = sortByMode(list, f.sort || 'name', (e) => e.name, (e) => e.id, (e) => e.key);
+      return list;
+    }
+
+    function getFilteredNpcEntries() {
+      const all = Object.entries(state.db.npcs).map(([key, npc]) => ({ key, ...npc }));
+      const f = state.filters.creatures || {};
+      const q = String(f.search || '').trim().toLowerCase();
+      const hostile = String(f.hostile || 'all');
+      let list = all.filter((entry) => {
+        if (q) {
+          const hay = `${entry.key} ${entry.name || ''} ${entry.id || ''} ${entry.faction || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        const isHostile = !!entry.isHostile;
+        if (hostile === 'hostile' && !isHostile) return false;
+        if (hostile === 'friendly' && isHostile) return false;
+        return true;
+      });
+      list = sortByMode(list, f.sort || 'name', (e) => e.name, (e) => e.id, (e) => e.key);
+      return list;
+    }
+
+    function getFilteredTextureEntries() {
+      const all = (state.db.textures || []).map((entry) => ({ ...(entry || {}) }));
+      const f = state.filters.textures || {};
+      const q = String(f.search || '').trim().toLowerCase();
+      const source = String(f.source || 'all');
+      let list = all.filter((entry) => {
+        if (!entry.key) return false;
+        if (q) {
+          const hay = `${entry.key} ${entry.url || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        const isEmbedded = !!state.db.embeddedImages[entry.key];
+        if (source === 'embedded' && !isEmbedded) return false;
+        if (source === 'external' && isEmbedded) return false;
+        return true;
+      });
+      list = sortByMode(list, f.sort || 'key', (e) => e.key, (e) => e.key, (e) => e.key);
+      return list;
+    }
+
+    function ensureQuickPaletteState() {
+      if (!Array.isArray(state.quickPaletteSlots) || !state.quickPaletteSlots.length) {
+        const fromConfig = state.db.config && Array.isArray(state.db.config.editorMapPalette)
+          ? state.db.config.editorMapPalette
+          : null;
+        if (fromConfig && fromConfig.length) {
+          state.quickPaletteSlots = fromConfig.slice(0, 24).map((slot) => ({
+            color: String((slot && slot.color) || '#88cc88'),
+            blockKey: String((slot && slot.blockKey) || '')
+          }));
+          return;
+        }
+        const blockEntries = getBlockEntries();
+        state.quickPaletteSlots = [];
+        for (let i = 0; i < 8; i++) {
+          const block = blockEntries[i % Math.max(1, blockEntries.length)] || null;
+          const seed = (i * 37) % 255;
+          state.quickPaletteSlots.push({
+            color: `#${(80 + seed).toString(16).padStart(2, '0')}${(140 + (seed / 2 | 0)).toString(16).padStart(2, '0')}${(90 + (seed / 3 | 0)).toString(16).padStart(2, '0')}`,
+            blockKey: block ? block.key : ''
+          });
+        }
+      }
+    }
+
     function getActiveList() {
-      if (state.toolMode === 'npc') {
+      const activeMode = state.toolMode === 'erase' ? state.mapEditMode : state.toolMode;
+      if (activeMode === 'npc') {
         return getNpcEntries().map((npc) => ({ kind: 'npc', id: npc.id, label: npc.name, npc, thumbKey: npc.texture || 'npc' }));
       }
-      if (state.toolMode === 'item') {
+      if (activeMode === 'item') {
         return getItemEntries().map((it) => ({ kind: 'item', id: it.id, label: it.name, it, thumbKey: it.uiTextureKey || it.textureKey || null }));
       }
       return getBlockEntries().map((bt) => ({ kind: 'block', id: bt.id, label: bt.name, bt, thumbKey: getBlockThumbKey(bt) }));
@@ -1302,10 +1739,19 @@
 
     const paletteEl = $('palette');
     const searchEl = $('search');
+    const editorModeEl = $('editor-mode');
     const toolEl = $('tool-mode');
     const layerEl = $('layer-y');
     const zoomEl = $('zoom');
     const paintShapeEl = $('paint-shape');
+    const mapQuickPaletteEl = $('map-quick-palette');
+    const mapToolbarColorPickerEl = $('map-toolbar-color-picker');
+    const mapTilePickerEl = $('map-tile-picker');
+    const mapTilePickerTitleEl = $('map-tile-picker-title');
+    const mapTilePickerSearchEl = $('map-tile-picker-search');
+    const mapTilePickerListEl = $('map-tile-picker-list');
+    const mapTilePickerCloseEl = $('map-tile-picker-close');
+    const mapToolbarColorCurrentEl = $('map-toolbar-color-current');
     const playerImageKeyEl = $('player-image-key');
     const playerImageEl = $('player-image');
     const playerNameEl = $('player-name');
@@ -1320,6 +1766,11 @@
     const mapDeleteEl = $('map-delete');
     const mapSetPlayerPosEl = $('map-set-player-pos');
     const playerSpawnStatusEl = $('player-spawn-status');
+    const mapToolbarEl = $('map-toolbar');
+    const mapToolbarCopyLayerEl = $('map-toolbar-copy-layer');
+    const mapToolbarPasteLayerEl = $('map-toolbar-paste-layer');
+    const mapToolbarClearLayerEl = $('map-toolbar-clear-layer');
+    const mapToolbarSetSpawnEl = $('map-toolbar-set-spawn');
 
     const invTargetEl = $('inv-target');
     const invCategoryEl = $('inv-category');
@@ -1385,6 +1836,19 @@
     const audioEventPathEl = $('audio-event-path');
     const configJsonEl = $('config-json');
 
+    const blockSearchEl = $('block-search');
+    const blockSortEl = $('block-sort');
+    const blockFilterRenderEl = $('block-filter-render');
+    const itemSearchEl = $('item-search');
+    const itemSortEl = $('item-sort');
+    const itemFilterKindEl = $('item-filter-kind');
+    const creatureSearchEl = $('creature-search');
+    const creatureSortEl = $('creature-sort');
+    const creatureFilterHostileEl = $('creature-filter-hostile');
+    const textureSearchEl = $('texture-search');
+    const textureSortEl = $('texture-sort');
+    const textureFilterSourceEl = $('texture-filter-source');
+
     const inventoryState = { targetKey: 'player', category: 'item' };
     const presetEditorState = { category: 'block' };
     let presetDraft = { inventory: {}, itemInventory: {} };
@@ -1395,7 +1859,8 @@
       const q = (searchEl.value || '').trim().toLowerCase();
       const list = getActiveList().filter(e => !q || (e.label || '').toLowerCase().includes(q));
 
-      if (!state.selected || state.selected.kind !== (state.toolMode === 'npc' ? 'npc' : state.toolMode === 'item' ? 'item' : 'block')) {
+      const activeMode = state.toolMode === 'erase' ? state.mapEditMode : state.toolMode;
+      if (!state.selected || state.selected.kind !== (activeMode === 'npc' ? 'npc' : activeMode === 'item' ? 'item' : 'block')) {
         state.selected = list[0] || null;
       }
 
@@ -1439,6 +1904,208 @@
       draw();
     }
 
+    function refreshMapToolbarState() {
+      if (!mapToolbarEl) return;
+      mapToolbarEl.querySelectorAll('[data-tool-mode]').forEach((btn) => {
+        btn.classList.toggle('active', String(btn.getAttribute('data-tool-mode')) === String(state.toolMode || 'block'));
+      });
+      mapToolbarEl.querySelectorAll('[data-paint-shape]').forEach((btn) => {
+        btn.classList.toggle('active', String(btn.getAttribute('data-paint-shape')) === String(state.paintShape || 'brush'));
+      });
+      if (mapToolbarSetSpawnEl) mapToolbarSetSpawnEl.classList.toggle('active', !!state.settingPlayerSpawn);
+    }
+
+    function setToolMode(mode) {
+      const normalized = ['block', 'npc', 'item', 'erase'].includes(String(mode)) ? String(mode) : 'block';
+      state.toolMode = normalized;
+      if (normalized !== 'erase') state.mapEditMode = normalized;
+      toolEl.value = normalized;
+      if (editorModeEl) editorModeEl.value = state.mapEditMode;
+      refreshMapToolbarState();
+      renderPalette();
+    }
+
+    function setPaintShape(shape) {
+      const normalized = ['brush', 'rect', 'line', 'fill', 'eyedropper', 'move'].includes(String(shape)) ? String(shape) : 'brush';
+      state.paintShape = normalized;
+      paintShapeEl.value = normalized;
+      state.rectStart = null;
+      state.rectEnd = null;
+      state.moveDrag = null;
+      refreshMapToolbarState();
+      draw();
+    }
+
+    function setEditorMode(mode, options = {}) {
+      const normalized = ['block', 'npc', 'item'].includes(String(mode)) ? String(mode) : 'block';
+      state.mapEditMode = normalized;
+      if (editorModeEl && editorModeEl.value !== normalized) editorModeEl.value = normalized;
+      if (!options.keepTool || state.toolMode !== 'erase') {
+        setToolMode(normalized);
+      } else {
+        renderPalette();
+      }
+    }
+
+    function togglePlayerSpawnPicking(active, options = {}) {
+      const next = active == null ? !state.settingPlayerSpawn : !!active;
+      state.settingPlayerSpawn = next;
+      mapSetPlayerPosEl.classList.toggle('primary', next);
+      refreshMapToolbarState();
+      if (!options.silentStatus) {
+        if (next) setStatus('Clique no mapa para definir o spawn do player.');
+        else setStatus('Definição de spawn cancelada.');
+      }
+    }
+
+    function selectBlockByKey(blockKey) {
+      if (!blockKey) return false;
+      const bt = state.db.blocks[blockKey];
+      if (!bt) return false;
+      setToolMode('block');
+      state.selected = { kind: 'block', id: bt.id, label: bt.name, bt, thumbKey: getBlockThumbKey(bt) };
+      renderPalette();
+      return true;
+    }
+
+    function applySwatchPreview(el, color, blockKey) {
+      if (!el) return;
+      el.style.backgroundColor = color || '#888';
+      const bt = blockKey ? state.db.blocks[blockKey] : null;
+      const texKey = bt ? getBlockThumbKey(bt) : '';
+      const texUrl = texKey ? getTextureUrl(texKey) : '';
+      el.style.backgroundImage = texUrl ? `url("${texUrl}")` : 'none';
+    }
+
+    function updateToolbarPaletteSwatches(nextColor, nextBlockKey) {
+      const parsed = String(nextColor || '').trim();
+      const valid = /^#[0-9a-fA-F]{6}$/.test(parsed) ? parsed : state.paletteCurrentColor || '#88cc88';
+      const blockKey = String(nextBlockKey || '').trim();
+      state.paletteCurrentColor = valid;
+      state.paletteCurrentBlockKey = blockKey;
+      applySwatchPreview(mapToolbarColorCurrentEl, state.paletteCurrentColor, state.paletteCurrentBlockKey);
+    }
+
+    function persistQuickPaletteConfig() {
+      state.db.config = state.db.config || {};
+      state.db.config.editorMapPalette = state.quickPaletteSlots.map((s) => ({
+        color: s.color,
+        blockKey: s.blockKey
+      }));
+    }
+
+    function getActiveQuickPaletteSlot() {
+      ensureQuickPaletteState();
+      const idx = Math.max(0, Math.min(state.quickPaletteSlots.length - 1, Number(state.activeQuickPaletteSlot || 0)));
+      state.activeQuickPaletteSlot = idx;
+      return { idx, slot: state.quickPaletteSlots[idx] || null };
+    }
+
+    function setActiveQuickPaletteSlot(idx, options = {}) {
+      ensureQuickPaletteState();
+      const next = Math.max(0, Math.min(state.quickPaletteSlots.length - 1, Number(idx || 0)));
+      state.activeQuickPaletteSlot = next;
+      const slot = state.quickPaletteSlots[next];
+      if (!slot) return;
+      updateToolbarPaletteSwatches(slot.color || '#88cc88', slot.blockKey || '');
+      if (options.applySelection && slot.blockKey) {
+        if (selectBlockByKey(slot.blockKey)) setStatus(`Paleta rápida: slot ${next + 1} -> ${slot.blockKey}`);
+      }
+      renderQuickPaletteEditor();
+    }
+
+    function closeQuickPaletteTilePicker() {
+      if (!mapTilePickerEl) return;
+      state.quickPalettePickerSlot = null;
+      mapTilePickerEl.classList.remove('open');
+      mapTilePickerEl.setAttribute('aria-hidden', 'true');
+    }
+
+    function renderQuickPaletteTilePickerList() {
+      if (!mapTilePickerListEl) return;
+      ensureQuickPaletteState();
+      const idx = Number(state.quickPalettePickerSlot);
+      const slot = state.quickPaletteSlots[idx];
+      if (!slot) {
+        mapTilePickerListEl.innerHTML = '';
+        return;
+      }
+      const query = String(mapTilePickerSearchEl && mapTilePickerSearchEl.value || '').trim().toLowerCase();
+      const blocks = getBlockEntries().filter((b) => {
+        if (!query) return true;
+        return `${b.key} ${b.name}`.toLowerCase().includes(query);
+      });
+      mapTilePickerListEl.innerHTML = '';
+      for (const b of blocks) {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'map-tile-picker-item';
+        const thumb = document.createElement('div');
+        thumb.className = 'map-tile-picker-thumb';
+        const texKey = getBlockThumbKey(b);
+        const texUrl = texKey ? getTextureUrl(texKey) : '';
+        thumb.style.backgroundImage = texUrl ? `url("${texUrl}")` : 'none';
+        const label = document.createElement('div');
+        label.textContent = `${b.name || b.key} (#${b.id})`;
+        row.appendChild(thumb);
+        row.appendChild(label);
+        row.addEventListener('click', () => {
+          slot.blockKey = String(b.key || '');
+          persistQuickPaletteConfig();
+          markMapDirty();
+          setActiveQuickPaletteSlot(idx, { applySelection: true });
+          closeQuickPaletteTilePicker();
+        });
+        mapTilePickerListEl.appendChild(row);
+      }
+    }
+
+    function openQuickPaletteTilePicker(slotIndex) {
+      if (!mapTilePickerEl) return;
+      ensureQuickPaletteState();
+      const idx = Math.max(0, Math.min(state.quickPaletteSlots.length - 1, Number(slotIndex || 0)));
+      state.quickPalettePickerSlot = idx;
+      const slot = state.quickPaletteSlots[idx];
+      if (mapTilePickerTitleEl) {
+        mapTilePickerTitleEl.textContent = `Escolher tile (slot ${idx + 1})`;
+      }
+      if (mapTilePickerSearchEl) mapTilePickerSearchEl.value = '';
+      mapTilePickerEl.classList.add('open');
+      mapTilePickerEl.setAttribute('aria-hidden', 'false');
+      renderQuickPaletteTilePickerList();
+      if (slot) updateToolbarPaletteSwatches(slot.color || '#88cc88', slot.blockKey || '');
+    }
+
+    function renderQuickPaletteEditor() {
+      ensureQuickPaletteState();
+      const active = getActiveQuickPaletteSlot();
+      const selectedSlot = active.slot || state.quickPaletteSlots[0] || null;
+      if (selectedSlot) updateToolbarPaletteSwatches(selectedSlot.color || '#88cc88', selectedSlot.blockKey || '');
+
+      mapQuickPaletteEl.innerHTML = '';
+      state.quickPaletteSlots.forEach((slot, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = `${idx + 1}`;
+        btn.title = slot.blockKey || '(sem bloco)';
+        btn.classList.toggle('active', idx === state.activeQuickPaletteSlot);
+        btn.style.background = slot.color || '#999';
+        const blockDef = slot.blockKey ? state.db.blocks[slot.blockKey] : null;
+        const blockTexKey = blockDef ? getBlockThumbKey(blockDef) : '';
+        const blockTexUrl = blockTexKey ? getTextureUrl(blockTexKey) : '';
+        btn.style.backgroundImage = blockTexUrl ? `url("${blockTexUrl}")` : 'none';
+        btn.addEventListener('click', () => {
+          setActiveQuickPaletteSlot(idx, { applySelection: true });
+        });
+        btn.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          setActiveQuickPaletteSlot(idx, { applySelection: false });
+          openQuickPaletteTilePicker(idx);
+        });
+        mapQuickPaletteEl.appendChild(btn);
+      });
+    }
+
     function getNpcEntities() {
       return state.map.entities.filter(e => e && e.type === 'npc');
     }
@@ -1449,6 +2116,18 @@
 
     function findBlockTypeById(id) {
       return blockTypeById.get(String(id)) || null;
+    }
+
+    function findBlockKeyById(id) {
+      const entry = Object.entries(state.db.blocks).find(([, bt]) => String(bt.id) === String(id));
+      return entry ? entry[0] : null;
+    }
+
+    function getQuickPaletteColorByBlockId(id) {
+      const key = findBlockKeyById(id);
+      if (!key) return null;
+      const slot = (state.quickPaletteSlots || []).find((s) => s && s.blockKey === key && s.color);
+      return slot ? String(slot.color) : null;
     }
 
     function findItemTypeById(id) {
@@ -1674,6 +2353,42 @@
       setInventorySubtab(inventorySubtabSelectEl.value);
     });
 
+    if (mapToolbarColorCurrentEl && mapToolbarColorPickerEl) {
+      mapToolbarColorCurrentEl.addEventListener('click', () => {
+        const active = getActiveQuickPaletteSlot();
+        if (!active.slot) return;
+        openQuickPaletteTilePicker(active.idx);
+      });
+      mapToolbarColorCurrentEl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const active = getActiveQuickPaletteSlot();
+        if (!active.slot) return;
+        mapToolbarColorPickerEl.value = active.slot.color || '#88cc88';
+        mapToolbarColorPickerEl.click();
+      });
+      mapToolbarColorPickerEl.addEventListener('input', () => {
+        const active = getActiveQuickPaletteSlot();
+        if (!active.slot) return;
+        active.slot.color = String(mapToolbarColorPickerEl.value || '#88cc88');
+        updateToolbarPaletteSwatches(active.slot.color, active.slot.blockKey || '');
+        persistQuickPaletteConfig();
+        markMapDirty();
+        renderQuickPaletteEditor();
+      });
+    }
+
+    if (mapTilePickerSearchEl) {
+      mapTilePickerSearchEl.addEventListener('input', renderQuickPaletteTilePickerList);
+    }
+    if (mapTilePickerCloseEl) {
+      mapTilePickerCloseEl.addEventListener('click', closeQuickPaletteTilePicker);
+    }
+    if (mapTilePickerEl) {
+      mapTilePickerEl.addEventListener('click', (e) => {
+        if (e.target === mapTilePickerEl) closeQuickPaletteTilePicker();
+      });
+    }
+
     function recalcBounds() {
       let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
       for (const b of state.map.blocks) {
@@ -1721,37 +2436,38 @@
       return state.map.blocks.find((b) => b.x === x && b.y === y && b.z === z) || null;
     }
 
-    function upsertBlock(x, y, z, typeId, isFloor) {
+    function upsertBlock(x, y, z, typeId) {
       const existing = findBlockAt(x, y, z);
       if (existing) {
         existing.typeId = typeId;
-        existing.isFloor = !!isFloor;
         return;
       }
-      state.map.blocks.push({ x, y, z, typeId, isFloor: !!isFloor });
+      state.map.blocks.push({ x, y, z, typeId });
     }
 
     function eraseAtCell(x, z, options = {}) {
-      const { skipInventoryRefresh = false } = options;
+      const { skipInventoryRefresh = false, eraseMode = state.mapEditMode } = options;
       const blockY = state.layerY + 0.5;
-      const floorY = -0.5;
-      state.map.blocks = state.map.blocks.filter((b) => !(b.x === x && b.z === z && (b.y === blockY || b.y === floorY)));
 
       const cx = x + 0.5;
       const cz = z + 0.5;
       const targetLayer = state.layerY;
 
-      state.map.entities = state.map.entities.filter((e) => !(
-        Math.abs((e.x ?? 0) - cx) < 0.51 &&
-        Math.abs((e.z ?? 0) - cz) < 0.51 &&
-        layerFromWorldY(e.y) === targetLayer
-      ));
-
-      state.map.items = state.map.items.filter((it) => !(
-        Math.abs((it.x ?? 0) - cx) < 0.51 &&
-        Math.abs((it.z ?? 0) - cz) < 0.51 &&
-        layerFromWorldY(it.y) === targetLayer
-      ));
+      if (eraseMode === 'block') {
+        state.map.blocks = state.map.blocks.filter((b) => !(b.x === x && b.z === z && b.y === blockY));
+      } else if (eraseMode === 'npc') {
+        state.map.entities = state.map.entities.filter((e) => !(
+          Math.abs((e.x ?? 0) - cx) < 0.51 &&
+          Math.abs((e.z ?? 0) - cz) < 0.51 &&
+          layerFromWorldY(e.y) === targetLayer
+        ));
+      } else if (eraseMode === 'item') {
+        state.map.items = state.map.items.filter((it) => !(
+          Math.abs((it.x ?? 0) - cx) < 0.51 &&
+          Math.abs((it.z ?? 0) - cz) < 0.51 &&
+          layerFromWorldY(it.y) === targetLayer
+        ));
+      }
       if (!skipInventoryRefresh) {
         renderInventoryTargets();
         renderInventoryList();
@@ -1762,41 +2478,44 @@
       const width = (maxX - minX + 1);
       const height = (maxZ - minZ + 1);
       if (width <= 0 || height <= 0) return;
+      const activeMode = state.toolMode === 'erase' ? state.mapEditMode : state.toolMode;
 
       if (erase || state.toolMode === 'erase') {
         const keySet = new Set();
         for (let z = minZ; z <= maxZ; z++) {
           for (let x = minX; x <= maxX; x++) keySet.add(`${x},${z}`);
         }
-        const blockY = state.layerY + 0.5;
-        const floorY = -0.5;
-        state.map.blocks = state.map.blocks.filter((b) => {
-          if (b.y !== blockY && b.y !== floorY) return true;
-          return !keySet.has(`${b.x},${b.z}`);
-        });
-        state.map.entities = state.map.entities.filter((e) => {
-          if (layerFromWorldY(e.y) !== state.layerY) return true;
-          return !keySet.has(`${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`);
-        });
-        state.map.items = state.map.items.filter((it) => {
-          if (layerFromWorldY(it.y) !== state.layerY) return true;
-          return !keySet.has(`${Math.floor(it.x ?? 0)},${Math.floor(it.z ?? 0)}`);
-        });
+        if (state.mapEditMode === 'block') {
+          const blockY = state.layerY + 0.5;
+          state.map.blocks = state.map.blocks.filter((b) => {
+            if (b.y !== blockY) return true;
+            return !keySet.has(`${b.x},${b.z}`);
+          });
+        } else if (state.mapEditMode === 'npc') {
+          state.map.entities = state.map.entities.filter((e) => {
+            if (layerFromWorldY(e.y) !== state.layerY) return true;
+            return !keySet.has(`${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`);
+          });
+        } else if (state.mapEditMode === 'item') {
+          state.map.items = state.map.items.filter((it) => {
+            if (layerFromWorldY(it.y) !== state.layerY) return true;
+            return !keySet.has(`${Math.floor(it.x ?? 0)},${Math.floor(it.z ?? 0)}`);
+          });
+        }
         renderInventoryTargets();
         renderInventoryList();
         markMapDirty();
-        setStatus(`Apagado retângulo: (${minX},${minZ}) → (${maxX},${maxZ}) em Y=${state.layerY}`);
+        setStatus(`Apagado (${state.mapEditMode}) retângulo: (${minX},${minZ}) → (${maxX},${maxZ}) em Y=${state.layerY}`);
         draw();
         return;
       }
 
       if (!state.selected) return;
 
-      if (state.toolMode === 'block') {
+      if (activeMode === 'block') {
         const bt = state.selected.bt;
         if (!bt) return;
-        const isFloor = !!bt.isFloor;
-        const targetY = isFloor ? -0.5 : (state.layerY + 0.5);
+        const targetY = state.layerY + 0.5;
         const existing = new Map();
         for (const b of state.map.blocks) {
           if (b.y === targetY) existing.set(`${b.x},${b.z}`, b);
@@ -1807,9 +2526,8 @@
             const block = existing.get(key);
             if (block) {
               block.typeId = bt.id;
-              block.isFloor = isFloor;
             } else {
-              const entry = { x, y: targetY, z, typeId: bt.id, isFloor };
+              const entry = { x, y: targetY, z, typeId: bt.id };
               state.map.blocks.push(entry);
               existing.set(key, entry);
             }
@@ -1821,7 +2539,7 @@
         return;
       }
 
-      if (state.toolMode === 'npc') {
+      if (activeMode === 'npc') {
         const npc = state.selected.npc;
         if (!npc) return;
         const keySet = new Set();
@@ -1860,7 +2578,7 @@
         return;
       }
 
-      if (state.toolMode === 'item') {
+      if (activeMode === 'item') {
         const it = state.selected.it;
         if (!it) return;
         const keySet = new Set();
@@ -1932,7 +2650,6 @@
       }
 
       const blockLayerY = state.layerY + 0.5;
-      const floorLayerY = -0.5;
       const activeEntityLayer = state.layerY;
 
       function drawBlockCell(b, alpha = 1) {
@@ -1950,16 +2667,18 @@
         if (img && img.complete && img.naturalWidth) {
           ctx.drawImage(img, px, pz, cell, cell);
         } else {
-          ctx.fillStyle = 'rgba(180,180,180,0.55)';
+          const quickColor = getQuickPaletteColorByBlockId(b.typeId);
+          if (quickColor) {
+            ctx.fillStyle = quickColor;
+            ctx.globalAlpha = Math.max(0, Math.min(1, alpha * 0.8));
+          } else {
+            ctx.fillStyle = 'rgba(180,180,180,0.55)';
+          }
           ctx.fillRect(px, pz, cell, cell);
         }
         ctx.strokeStyle = 'rgba(0,0,0,0.16)';
         ctx.strokeRect(px + 0.5, pz + 0.5, cell - 1, cell - 1);
         ctx.restore();
-      }
-
-      for (const b of state.map.blocks) {
-        if (b.isFloor || b.y === floorLayerY) drawBlockCell(b, 0.35);
       }
 
       for (let i = 1; i <= onionDepth; i++) {
@@ -2055,32 +2774,42 @@
         }
       }
 
-      if (state.paintShape === 'rect' && state.rectStart && state.rectEnd) {
+      if ((state.paintShape === 'rect' || state.paintShape === 'line') && state.rectStart && state.rectEnd) {
         const a = state.rectStart;
         const b = state.rectEnd;
-        const minX = Math.min(a.x, b.x);
-        const maxX = Math.max(a.x, b.x);
-        const minZ = Math.min(a.z, b.z);
-        const maxZ = Math.max(a.z, b.z);
+        if (state.paintShape === 'rect') {
+          const minX = Math.min(a.x, b.x);
+          const maxX = Math.max(a.x, b.x);
+          const minZ = Math.min(a.z, b.z);
+          const maxZ = Math.max(a.z, b.z);
 
-        const gx0 = minX - state.view.minX;
-        const gz0 = minZ - state.view.minZ;
-        const gx1 = maxX - state.view.minX;
-        const gz1 = maxZ - state.view.minZ;
+          const gx0 = minX - state.view.minX;
+          const gz0 = minZ - state.view.minZ;
+          const gx1 = maxX - state.view.minX;
+          const gz1 = maxZ - state.view.minZ;
 
-        const px0 = ox + gx0 * cell;
-        const pz0 = oz + gz0 * cell;
-        const px1 = ox + (gx1 + 1) * cell;
-        const pz1 = oz + (gz1 + 1) * cell;
+          const px0 = ox + gx0 * cell;
+          const pz0 = oz + gz0 * cell;
+          const px1 = ox + (gx1 + 1) * cell;
+          const pz1 = oz + (gz1 + 1) * cell;
 
-        ctx.fillStyle = state.rectErase ? 'rgba(251, 113, 133, 0.16)' : 'rgba(52, 211, 153, 0.12)';
-        ctx.fillRect(px0, pz0, px1 - px0, pz1 - pz0);
-        ctx.strokeStyle = state.rectErase ? 'rgba(251, 113, 133, 0.85)' : 'rgba(52, 211, 153, 0.75)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(px0 + 1, pz0 + 1, px1 - px0 - 2, pz1 - pz0 - 2);
+          ctx.fillStyle = state.rectErase ? 'rgba(251, 113, 133, 0.16)' : 'rgba(52, 211, 153, 0.12)';
+          ctx.fillRect(px0, pz0, px1 - px0, pz1 - pz0);
+          ctx.strokeStyle = state.rectErase ? 'rgba(251, 113, 133, 0.85)' : 'rgba(52, 211, 153, 0.75)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px0 + 1, pz0 + 1, px1 - px0 - 2, pz1 - pz0 - 2);
+        } else {
+          ctx.strokeStyle = state.rectErase ? 'rgba(251, 113, 133, 0.85)' : 'rgba(52, 211, 153, 0.9)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(ox + (a.x - state.view.minX + 0.5) * cell, oz + (a.z - state.view.minZ + 0.5) * cell);
+          ctx.lineTo(ox + (b.x - state.view.minX + 0.5) * cell, oz + (b.z - state.view.minZ + 0.5) * cell);
+          ctx.stroke();
+        }
       }
 
-      overlayEl.textContent = `Modo: ${state.toolMode}${state.settingPlayerSpawn ? ' (set player pos)' : ''}
+      overlayEl.textContent = `Modo: ${state.mapEditMode}${state.toolMode === 'erase' ? ' (apagando)' : ''}${state.settingPlayerSpawn ? ' (set player pos)' : ''}
+Ferramenta: ${state.paintShape}
 Andar (camada Y): ${state.layerY}
 Zoom: ${cell}px
 Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens: ${state.map.items.length}`;
@@ -2105,35 +2834,95 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       return { x: state.view.minX + gx, z: state.view.minZ + gz };
     }
 
+    function findNpcAtCell(x, z, layer) {
+      return state.map.entities.find((e) =>
+        e && e.type === 'npc' &&
+        layerFromWorldY(e.y) === layer &&
+        Math.floor(e.x ?? 0) === x &&
+        Math.floor(e.z ?? 0) === z
+      ) || null;
+    }
+
+    function findItemAtCell(x, z, layer) {
+      return state.map.items.find((it) =>
+        it && it.kind === 'item' &&
+        layerFromWorldY(it.y) === layer &&
+        Math.floor(it.x ?? 0) === x &&
+        Math.floor(it.z ?? 0) === z
+      ) || null;
+    }
+
+    function moveEntityAtCell(cellPos) {
+      if (!state.moveDrag || !cellPos) return;
+      const { kind, entity } = state.moveDrag;
+      if (!entity) return;
+      if (kind === 'npc') {
+        entity.x = cellPos.x + 0.5;
+        entity.y = state.layerY;
+        entity.z = cellPos.z + 0.5;
+      } else if (kind === 'item') {
+        entity.x = cellPos.x + 0.5;
+        entity.y = state.layerY + 0.2;
+        entity.z = cellPos.z + 0.5;
+      }
+      markMapDirty();
+    }
+
+    function applyLineOperation(start, end, erase) {
+      if (!start || !end) return;
+      let x0 = start.x;
+      let z0 = start.z;
+      const x1 = end.x;
+      const z1 = end.z;
+      const dx = Math.abs(x1 - x0);
+      const dz = Math.abs(z1 - z0);
+      const sx = x0 < x1 ? 1 : -1;
+      const sz = z0 < z1 ? 1 : -1;
+      let err = dx - dz;
+      let count = 0;
+      while (true) {
+        applyAtCell({ x: x0, z: z0 }, erase, { skipDraw: true, skipStatus: true, skipInventoryRefresh: true });
+        count += 1;
+        if (x0 === x1 && z0 === z1) break;
+        const e2 = 2 * err;
+        if (e2 > -dz) { err -= dz; x0 += sx; }
+        if (e2 < dx) { err += dx; z0 += sz; }
+      }
+      renderInventoryTargets();
+      renderInventoryList();
+      draw();
+      setStatus(`${erase || state.toolMode === 'erase' ? 'Apagado' : 'Aplicado'} em linha (${count} células).`);
+    }
+
     function applyAtCell(cellPos, isErase, options = {}) {
       const { skipDraw = false, skipStatus = false, skipInventoryRefresh = false } = options;
       if (!cellPos) return;
       const { x, z } = cellPos;
       const mode = state.toolMode;
+      const activeMode = mode === 'erase' ? state.mapEditMode : mode;
 
       if (isErase || mode === 'erase') {
-        eraseAtCell(x, z, { skipInventoryRefresh });
+        eraseAtCell(x, z, { skipInventoryRefresh, eraseMode: state.mapEditMode });
         markMapDirty();
-        if (!skipStatus) setStatus(`Apagado em (${x}, layer=${state.layerY}, ${z}).`);
+        if (!skipStatus) setStatus(`Apagado (${state.mapEditMode}) em (${x}, layer=${state.layerY}, ${z}).`);
         if (!skipDraw) draw();
         return;
       }
 
       if (!state.selected) return;
 
-      if (mode === 'block') {
+      if (activeMode === 'block') {
         const bt = state.selected.bt;
         if (!bt) return;
-        const isFloor = !!bt.isFloor;
-        const y = isFloor ? -0.5 : state.layerY + 0.5;
-        upsertBlock(x, y, z, bt.id, isFloor);
+        const y = state.layerY + 0.5;
+        upsertBlock(x, y, z, bt.id);
         markMapDirty();
         if (!skipStatus) setStatus(`Bloco: ${bt.name} em (${x}, ${y}, ${z})`);
         if (!skipDraw) draw();
         return;
       }
 
-      if (mode === 'npc') {
+      if (activeMode === 'npc') {
         const npc = state.selected.npc;
         if (!npc) return;
         const entry = {
@@ -2168,7 +2957,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         return;
       }
 
-      if (mode === 'item') {
+      if (activeMode === 'item') {
         const it = state.selected.it;
         if (!it) return;
         const entry = { kind: 'item', itemId: it.id, amount: 1, x: x + 0.5, y: state.layerY + 0.2, z: z + 0.5 };
@@ -2182,6 +2971,148 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         if (!skipStatus) setStatus(`Item/Arma: ${it.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
         if (!skipDraw) draw();
       }
+    }
+
+    function findLayerBlockAtCell(x, z, y) {
+      return state.map.blocks.find((b) => b.x === x && b.z === z && b.y === y) || null;
+    }
+
+    function pickBlockTypeAtCell(cellPos) {
+      if (!cellPos) return null;
+      const byLayer = findLayerBlockAtCell(cellPos.x, cellPos.z, state.layerY + 0.5);
+      const block = byLayer;
+      if (!block) return null;
+      return Object.entries(state.db.blocks).find(([, bt]) => String(bt.id) === String(block.typeId)) || null;
+    }
+
+    function applyEyedropper(cellPos) {
+      if (!cellPos) return;
+      if (state.mapEditMode === 'npc') {
+        const npc = findNpcAtCell(cellPos.x, cellPos.z, state.layerY);
+        if (!npc) {
+          setStatus('Conta-gotas: nenhuma criatura nessa célula.');
+          return;
+        }
+        const def = findNpcTypeById(npc.npcTypeId);
+        if (!def) return;
+        state.selected = { kind: 'npc', id: def.id, label: def.name, npc: def, thumbKey: def.texture || 'npc' };
+        renderPalette();
+        setStatus(`Conta-gotas: ${def.name}.`);
+        draw();
+        return;
+      }
+      if (state.mapEditMode === 'item') {
+        const it = findItemAtCell(cellPos.x, cellPos.z, state.layerY);
+        if (!it) {
+          setStatus('Conta-gotas: nenhum item nessa célula.');
+          return;
+        }
+        const def = findItemTypeById(it.itemId);
+        if (!def) return;
+        state.selected = { kind: 'item', id: def.id, label: def.name, it: def, thumbKey: def.uiTextureKey || def.textureKey || null };
+        renderPalette();
+        setStatus(`Conta-gotas: ${def.name}.`);
+        draw();
+        return;
+      }
+
+      const pair = pickBlockTypeAtCell(cellPos);
+      if (!pair) {
+        setStatus('Conta-gotas: nenhum bloco nessa célula.');
+        return;
+      }
+      const [key, bt] = pair;
+      selectBlockByKey(key);
+      setStatus(`Conta-gotas: ${bt.name}.`);
+      draw();
+    }
+
+    function applyFloodFill(cellPos, erase) {
+      if (!cellPos) return;
+      if (state.mapEditMode !== 'block') {
+        setStatus('Balde: disponível apenas no modo Blocos.');
+        return;
+      }
+      const paintBlock = state.selected && state.selected.bt ? state.selected.bt : null;
+      const targetY = state.layerY + 0.5;
+
+      const layerMap = new Map();
+      for (const b of state.map.blocks) {
+        if (b.y !== targetY) continue;
+        layerMap.set(`${b.x},${b.z}`, b);
+      }
+
+      const startKey = `${cellPos.x},${cellPos.z}`;
+      const startBlock = layerMap.get(startKey) || null;
+      const targetTypeId = startBlock ? startBlock.typeId : null;
+
+      if (!erase && paintBlock && targetTypeId !== null && String(targetTypeId) === String(paintBlock.id)) {
+        setStatus('Balde: região já está com esse bloco.');
+        return;
+      }
+      if (erase && targetTypeId === null) {
+        setStatus('Balde: nada para apagar nessa região.');
+        return;
+      }
+
+      const minX = state.view.minX;
+      const maxX = state.view.maxX;
+      const minZ = state.view.minZ;
+      const maxZ = state.view.maxZ;
+      const queue = [cellPos];
+      const visited = new Set();
+      const removeKeys = new Set();
+      let changed = 0;
+      const MAX_NODES = 50000;
+
+      while (queue.length && visited.size < MAX_NODES) {
+        const cur = queue.shift();
+        const k = `${cur.x},${cur.z}`;
+        if (visited.has(k)) continue;
+        visited.add(k);
+        if (cur.x < minX || cur.x > maxX || cur.z < minZ || cur.z > maxZ) continue;
+
+        const current = layerMap.get(k) || null;
+        const currentType = current ? current.typeId : null;
+        if (String(currentType) !== String(targetTypeId)) continue;
+
+        if (erase) {
+          if (current) {
+            removeKeys.add(k);
+            changed += 1;
+          }
+        } else if (paintBlock) {
+          if (current) {
+            current.typeId = paintBlock.id;
+          } else {
+            state.map.blocks.push({
+              x: cur.x,
+              y: targetY,
+              z: cur.z,
+              typeId: paintBlock.id
+            });
+          }
+          changed += 1;
+        }
+
+        queue.push(
+          { x: cur.x + 1, z: cur.z },
+          { x: cur.x - 1, z: cur.z },
+          { x: cur.x, z: cur.z + 1 },
+          { x: cur.x, z: cur.z - 1 }
+        );
+      }
+
+      if (erase && removeKeys.size) {
+        state.map.blocks = state.map.blocks.filter((b) => !(b.y === targetY && removeKeys.has(`${b.x},${b.z}`)));
+        renderInventoryTargets();
+        renderInventoryList();
+      }
+
+      markMapDirty();
+      draw();
+      if (erase) setStatus(`Balde: apagadas ${changed} células.`);
+      else setStatus(`Balde: preenchidas ${changed} células.`);
     }
 
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -2206,8 +3137,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         player.y = state.layerY + 1;
         player.yaw = 0;
         player.pitch = 0;
-        state.settingPlayerSpawn = false;
-        mapSetPlayerPosEl.classList.remove('primary');
+        togglePlayerSpawnPicking(false, { silentStatus: true });
         updatePlayerSpawnStatus();
         markMapDirty();
         draw();
@@ -2220,7 +3150,47 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       state.lastPaintKey = null;
       const erase = getEraseFlag(e);
 
+      if (state.paintShape === 'eyedropper') {
+        if (e.button === 0) applyEyedropper(cellPos);
+        state.isPointerDown = false;
+        return;
+      }
+
+      if (state.paintShape === 'fill') {
+        applyFloodFill(cellPos, erase);
+        state.isPointerDown = false;
+        return;
+      }
+
+      if (state.paintShape === 'move') {
+        if (e.button !== 0 || !cellPos) {
+          state.isPointerDown = false;
+          return;
+        }
+        const activeMode = state.toolMode === 'erase' ? state.mapEditMode : state.toolMode;
+        if (activeMode === 'npc') {
+          const foundNpc = findNpcAtCell(cellPos.x, cellPos.z, state.layerY);
+          state.moveDrag = foundNpc ? { kind: 'npc', entity: foundNpc } : null;
+        } else if (activeMode === 'item') {
+          const foundItem = findItemAtCell(cellPos.x, cellPos.z, state.layerY);
+          state.moveDrag = foundItem ? { kind: 'item', entity: foundItem } : null;
+        } else {
+          state.moveDrag = null;
+          setStatus('Mover: disponível apenas nos modos Criaturas e Itens.');
+        }
+        draw();
+        return;
+      }
+
       if (state.paintShape === 'rect') {
+        state.rectStart = cellPos;
+        state.rectEnd = cellPos;
+        state.rectErase = erase;
+        draw();
+        return;
+      }
+
+      if (state.paintShape === 'line') {
         state.rectStart = cellPos;
         state.rectEnd = cellPos;
         state.rectErase = erase;
@@ -2246,6 +3216,20 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         draw();
         return;
       }
+      if (state.paintShape === 'line') {
+        state.rectEnd = cellPos;
+        draw();
+        return;
+      }
+      if (state.paintShape === 'move') {
+        moveEntityAtCell(cellPos);
+        draw();
+        return;
+      }
+      if (state.paintShape === 'fill' || state.paintShape === 'eyedropper') {
+        draw();
+        return;
+      }
 
       const k = cellKey(cellPos);
       if (k === state.lastPaintKey) return;
@@ -2268,6 +3252,18 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         applyRectOperation(minX, maxX, minZ, maxZ, erase);
         state.rectStart = null;
         state.rectEnd = null;
+      } else if (state.paintShape === 'line' && state.rectStart && state.rectEnd) {
+        applyLineOperation(state.rectStart, state.rectEnd, !!state.rectErase);
+        state.rectStart = null;
+        state.rectEnd = null;
+      } else if (state.paintShape === 'move' && state.moveDrag) {
+        markMapDirty();
+        renderInventoryTargets();
+        renderInventoryList();
+        const modeLabel = state.moveDrag.kind === 'npc' ? 'Criatura' : 'Item';
+        setStatus(`${modeLabel} movido.`);
+        state.moveDrag = null;
+        draw();
       }
     });
 
@@ -2275,6 +3271,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       state.isPointerDown = false;
       state.rectStart = null;
       state.rectEnd = null;
+      state.moveDrag = null;
       draw();
     });
 
@@ -2296,9 +3293,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       draw();
     }, { passive: false });
 
+    if (editorModeEl) {
+      editorModeEl.addEventListener('change', () => setEditorMode(editorModeEl.value));
+    }
     toolEl.addEventListener('change', () => {
-      state.toolMode = toolEl.value;
-      renderPalette();
+      if (toolEl.value === 'erase') setToolMode('erase');
+      else setEditorMode(toolEl.value);
     });
 
     layerEl.addEventListener('change', () => {
@@ -2313,12 +3313,22 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       draw();
     });
 
-    paintShapeEl.addEventListener('change', () => {
-      state.paintShape = String(paintShapeEl.value || 'brush');
-      state.rectStart = null;
-      state.rectEnd = null;
-      draw();
-    });
+    paintShapeEl.addEventListener('change', () => setPaintShape(paintShapeEl.value));
+
+    if (mapToolbarEl) {
+      mapToolbarEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const tool = btn.getAttribute('data-tool-mode');
+        if (tool) {
+          if (tool === 'erase') setToolMode('erase');
+          else setEditorMode(tool);
+          return;
+        }
+        const shape = btn.getAttribute('data-paint-shape');
+        if (shape) setPaintShape(shape);
+      });
+    }
 
     searchEl.addEventListener('input', renderPalette);
 
@@ -2383,15 +3393,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       setStatus(`Mapa excluído: ${current}`);
     });
 
-    mapSetPlayerPosEl.addEventListener('click', () => {
-      state.settingPlayerSpawn = !state.settingPlayerSpawn;
-      mapSetPlayerPosEl.classList.toggle('primary', state.settingPlayerSpawn);
-      if (state.settingPlayerSpawn) {
-        setStatus('Clique no mapa para definir o spawn do player.');
-      } else {
-        setStatus('Definição de spawn cancelada.');
-      }
-    });
+    mapSetPlayerPosEl.addEventListener('click', () => togglePlayerSpawnPicking(null));
 
     playerImageKeyEl.addEventListener('input', () => {
       state.db.ui.playerPortraitTextureKey = sanitizeTextureKey(playerImageKeyEl.value || 'ui_player_face');
@@ -2423,7 +3425,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         sourceLayer: layer,
         blocks: state.map.blocks
           .filter((b) => b.y === blockY)
-          .map((b) => ({ x: b.x, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor })),
+          .map((b) => ({ x: b.x, z: b.z, typeId: b.typeId })),
         entities: state.map.entities
           .filter((e) => layerFromWorldY(e.y) === layer)
           .map((e) => ({ ...e })),
@@ -2449,7 +3451,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         return !blockKeys.has(`${b.x},${b.z}`);
       });
       for (const b of state.layerClipboard.blocks) {
-        state.map.blocks.push({ x: b.x, y: targetBlockY, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor });
+        state.map.blocks.push({ x: b.x, y: targetBlockY, z: b.z, typeId: b.typeId });
       }
 
       const entityKeys = new Set(state.layerClipboard.entities.map((e) => `${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`));
@@ -2494,6 +3496,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     layerCopyEl.addEventListener('click', copyCurrentLayer);
     layerPasteEl.addEventListener('click', pasteToCurrentLayer);
     layerClearEl.addEventListener('click', clearCurrentLayer);
+    if (mapToolbarCopyLayerEl) mapToolbarCopyLayerEl.addEventListener('click', copyCurrentLayer);
+    if (mapToolbarPasteLayerEl) mapToolbarPasteLayerEl.addEventListener('click', pasteToCurrentLayer);
+    if (mapToolbarClearLayerEl) mapToolbarClearLayerEl.addEventListener('click', clearCurrentLayer);
+    if (mapToolbarSetSpawnEl) mapToolbarSetSpawnEl.addEventListener('click', () => togglePlayerSpawnPicking(null));
 
     const mapFileInput = document.createElement('input');
     mapFileInput.type = 'file';
@@ -2507,15 +3513,14 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     });
 
     function applyMapPayload(payload, options = {}) {
-      state.settingPlayerSpawn = false;
-      mapSetPlayerPosEl.classList.remove('primary');
+      togglePlayerSpawnPicking(false, { silentStatus: true });
       state.map = {
         version: payload.version || 1,
         player: payload.player || { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, name: state.db.ui.playerName || 'A.S.S', inventory: {}, itemInventory: {} },
-        blocks: (payload.blocks || []).map((b) => {
-          const isFloor = !!b.isFloor || b.y === -0.5;
-          return { ...b, isFloor, y: isFloor ? -0.5 : b.y };
-        }),
+        blocks: (payload.blocks || []).map((b) => ({
+          ...b,
+          y: (typeof b.y === 'number' && b.y === -0.5) ? 0.5 : b.y
+        })),
         items: (payload.items || []).map((i) => ({ ...i })),
         entities: (payload.entities || []).map((e) => ({ ...e }))
       };
@@ -2603,7 +3608,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           inventory: player.inventory || {},
           itemInventory: player.itemInventory || {}
         },
-        blocks: state.map.blocks.map((b) => ({ x: b.x, y: b.y, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor })),
+        blocks: state.map.blocks.map((b) => ({ x: b.x, y: b.y, z: b.z, typeId: b.typeId })),
         items: state.map.items.map((i) => ({
           kind: i.kind,
           blockTypeId: i.blockTypeId || null,
@@ -2790,6 +3795,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     function updateItemPreview() {
       const key = sanitizeTextureKey($('item-texture-key').value || '');
       setPreviewBox($('item-preview'), key);
+      const handKey = sanitizeTextureKey($('item-hand-texture-key').value || key || '');
+      setPreviewBox($('item-hand-preview'), handKey);
       const projectileKey = sanitizeTextureKey($('item-proj-texture-key').value || key || '');
       setPreviewBox($('item-proj-preview'), projectileKey);
     }
@@ -2802,7 +3809,9 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     function refreshAllForCatalogChanges() {
       rebuildTextureMap();
       rebuildTypeIndexes();
+      ensureQuickPaletteState();
       renderPalette();
+      renderQuickPaletteEditor();
       renderInventoryOptions();
       renderInventoryList();
       renderInventoryPresetOptions();
@@ -2823,8 +3832,15 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function renderBlocksTab() {
       const listEl = $('block-list');
-      const entries = getBlockEntries();
+      const entries = getFilteredBlockEntries();
+      blockSearchEl.value = String(state.filters.blocks.search || '');
+      blockSortEl.value = String(state.filters.blocks.sort || 'name');
+      blockFilterRenderEl.value = String(state.filters.blocks.render || 'all');
       if (!state.selectedBlockKey && entries.length) state.selectedBlockKey = entries[0].key;
+      if (state.selectedBlockKey && !state.db.blocks[state.selectedBlockKey]) state.selectedBlockKey = entries[0] ? entries[0].key : '';
+      if (state.selectedBlockKey && entries.length && !entries.find((e) => e.key === state.selectedBlockKey)) {
+        state.selectedBlockKey = entries[0].key;
+      }
       const selected = state.db.blocks[state.selectedBlockKey] || null;
 
       renderSimpleList(
@@ -2847,6 +3863,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('block-solid').value = selected ? String(!!selected.solid) : 'true';
       $('block-floor').value = selected ? String(!!selected.isFloor) : 'false';
       $('block-droppable').value = selected ? String(selected.droppable !== false) : 'true';
+      $('block-render').value = selected && String(selected.render || '').toLowerCase() === 'cross' ? 'cross' : 'box';
       $('block-texture-key').value = selected ? String(getBlockThumbKey(selected) || '') : '';
       const presetId = detectBlockScriptPreset(selected?.onUse);
       if (!selected?.onUse) {
@@ -2882,6 +3899,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('block-solid').value = 'true';
       $('block-floor').value = 'false';
       $('block-droppable').value = 'true';
+      $('block-render').value = 'box';
       $('block-texture-key').value = '';
       $('block-image').value = '';
       $('block-script-mode').value = 'none';
@@ -2930,6 +3948,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         isFloor: asBool($('block-floor').value),
         opacity: Number($('block-opacity').value || 1),
         droppable: asBool($('block-droppable').value),
+        render: String($('block-render').value || 'box').toLowerCase() === 'cross' ? 'cross' : 'box',
         textures: { all: textureKey }
       };
       if (scriptFn) state.db.blocks[key].onUse = scriptFn;
@@ -2943,6 +3962,28 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     $('block-script-mode').addEventListener('change', updateBlockScriptUi);
     $('block-texture-key').addEventListener('input', updateBlockPreview);
     $('block-image').addEventListener('change', updateBlockPreview);
+    blockSearchEl.addEventListener('input', () => {
+      state.filters.blocks.search = blockSearchEl.value || '';
+      renderBlocksTab();
+    });
+    blockSortEl.addEventListener('change', () => {
+      state.filters.blocks.sort = blockSortEl.value || 'name';
+      renderBlocksTab();
+    });
+    blockFilterRenderEl.addEventListener('change', () => {
+      state.filters.blocks.render = blockFilterRenderEl.value || 'all';
+      renderBlocksTab();
+    });
+    $('block-preset-bush').addEventListener('click', () => {
+      $('block-render').value = 'cross';
+      $('block-solid').value = 'false';
+      $('block-floor').value = 'false';
+      $('block-droppable').value = 'true';
+      $('block-opacity').value = '1';
+      if (!$('block-hp').value) $('block-hp').value = '25';
+      if (!$('block-break').value) $('block-break').value = '1';
+      setDbStatus('Preset bush aplicado. Defina textura com transparência e salve o bloco.');
+    });
 
     $('block-delete').addEventListener('click', () => {
       const key = sanitizeConstKey($('block-key').value || state.selectedBlockKey || '');
@@ -2955,8 +3996,15 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function renderItemsTab() {
       const listEl = $('item-list');
-      const entries = getItemEntries();
+      const entries = getFilteredItemEntries();
+      itemSearchEl.value = String(state.filters.items.search || '');
+      itemSortEl.value = String(state.filters.items.sort || 'name');
+      itemFilterKindEl.value = String(state.filters.items.kind || 'all');
       if (!state.selectedItemKey && entries.length) state.selectedItemKey = entries[0].key;
+      if (state.selectedItemKey && !state.db.items[state.selectedItemKey]) state.selectedItemKey = entries[0] ? entries[0].key : '';
+      if (state.selectedItemKey && entries.length && !entries.find((e) => e.key === state.selectedItemKey)) {
+        state.selectedItemKey = entries[0].key;
+      }
       const selected = state.db.items[state.selectedItemKey] || null;
 
       renderSimpleList(
@@ -2984,6 +4032,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('item-proj-gravity').value = selected ? String(selected.projectileGravityScale ?? 0.1) : '0.1';
       $('item-proj-drag').value = selected ? String(selected.projectileDrag ?? 0.99) : '0.99';
       $('item-texture-key').value = selected ? String(selected.textureKey || selected.uiTextureKey || '') : '';
+      $('item-hand-texture-key').value = selected ? String(selected.handTextureKey || selected.textureKey || selected.uiTextureKey || '') : '';
       $('item-proj-texture-key').value = selected ? String(selected.projectileTextureKey || selected.textureKey || '') : '';
       updateItemPreview();
     }
@@ -3003,15 +4052,31 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('item-proj-gravity').value = '0.1';
       $('item-proj-drag').value = '0.99';
       $('item-texture-key').value = '';
+      $('item-hand-texture-key').value = '';
       $('item-proj-texture-key').value = '';
       $('item-image').value = '';
+      $('item-hand-image').value = '';
       $('item-proj-image').value = '';
       updateItemPreview();
     });
     $('item-texture-key').addEventListener('input', updateItemPreview);
+    $('item-hand-texture-key').addEventListener('input', updateItemPreview);
     $('item-proj-texture-key').addEventListener('input', updateItemPreview);
     $('item-image').addEventListener('change', updateItemPreview);
+    $('item-hand-image').addEventListener('change', updateItemPreview);
     $('item-proj-image').addEventListener('change', updateItemPreview);
+    itemSearchEl.addEventListener('input', () => {
+      state.filters.items.search = itemSearchEl.value || '';
+      renderItemsTab();
+    });
+    itemSortEl.addEventListener('change', () => {
+      state.filters.items.sort = itemSortEl.value || 'name';
+      renderItemsTab();
+    });
+    itemFilterKindEl.addEventListener('change', () => {
+      state.filters.items.kind = itemFilterKindEl.value || 'all';
+      renderItemsTab();
+    });
 
     $('item-save').addEventListener('click', async () => {
       const key = sanitizeConstKey($('item-key').value || state.selectedItemKey || 'NEW_ITEM', 'NEW_ITEM');
@@ -3021,12 +4086,18 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         return;
       }
       const textureKey = sanitizeTextureKey($('item-texture-key').value || `item-${id}`);
+      const handTextureInput = String($('item-hand-texture-key').value || '').trim();
+      const hasHandUpload = Boolean($('item-hand-image').files && $('item-hand-image').files[0]);
+      let handTextureKey = handTextureInput ? sanitizeTextureKey(handTextureInput) : '';
+      if (!handTextureKey && hasHandUpload) handTextureKey = sanitizeTextureKey(`${textureKey}-hand`);
+      if (!handTextureKey) handTextureKey = textureKey;
       const projectileTextureInput = String($('item-proj-texture-key').value || '').trim();
       const hasProjectileUpload = Boolean($('item-proj-image').files && $('item-proj-image').files[0]);
       let projectileTextureKey = projectileTextureInput ? sanitizeTextureKey(projectileTextureInput) : '';
       if (!projectileTextureKey && hasProjectileUpload) projectileTextureKey = sanitizeTextureKey(`${textureKey}-proj`);
       if (!projectileTextureKey) projectileTextureKey = textureKey;
       await applyUploadedTexture($('item-image'), textureKey);
+      await applyUploadedTexture($('item-hand-image'), handTextureKey);
       await applyUploadedTexture($('item-proj-image'), projectileTextureKey);
 
       const isWeapon = asBool($('item-weapon').value);
@@ -3047,7 +4118,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         textureKey,
         uiTextureKey: textureKey,
         dropTextureKey: textureKey,
-        handTextureKey: textureKey,
+        handTextureKey,
         isConsumable,
         healValue
       };
@@ -3091,8 +4162,15 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function renderCreaturesTab() {
       const listEl = $('creature-list');
-      const entries = getNpcEntries();
+      const entries = getFilteredNpcEntries();
+      creatureSearchEl.value = String(state.filters.creatures.search || '');
+      creatureSortEl.value = String(state.filters.creatures.sort || 'name');
+      creatureFilterHostileEl.value = String(state.filters.creatures.hostile || 'all');
       if (!state.selectedCreatureKey && entries.length) state.selectedCreatureKey = entries[0].key;
+      if (state.selectedCreatureKey && !state.db.npcs[state.selectedCreatureKey]) state.selectedCreatureKey = entries[0] ? entries[0].key : '';
+      if (state.selectedCreatureKey && entries.length && !entries.find((e) => e.key === state.selectedCreatureKey)) {
+        state.selectedCreatureKey = entries[0].key;
+      }
       const selected = state.db.npcs[state.selectedCreatureKey] || null;
 
       renderSimpleList(
@@ -3139,6 +4217,18 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     });
     $('creature-texture-key').addEventListener('input', updateCreaturePreview);
     $('creature-image').addEventListener('change', updateCreaturePreview);
+    creatureSearchEl.addEventListener('input', () => {
+      state.filters.creatures.search = creatureSearchEl.value || '';
+      renderCreaturesTab();
+    });
+    creatureSortEl.addEventListener('change', () => {
+      state.filters.creatures.sort = creatureSortEl.value || 'name';
+      renderCreaturesTab();
+    });
+    creatureFilterHostileEl.addEventListener('change', () => {
+      state.filters.creatures.hostile = creatureFilterHostileEl.value || 'all';
+      renderCreaturesTab();
+    });
 
     $('creature-save').addEventListener('click', async () => {
       const key = sanitizeConstKey($('creature-key').value || state.selectedCreatureKey || 'NEW_CREATURE', 'NEW_CREATURE');
@@ -3343,8 +4433,15 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function renderTexturesTab() {
       const listEl = $('texture-list');
-      const entries = state.db.textures.slice().sort((a, b) => String(a.key || '').localeCompare(String(b.key || '')));
+      const entries = getFilteredTextureEntries();
+      textureSearchEl.value = String(state.filters.textures.search || '');
+      textureSortEl.value = String(state.filters.textures.sort || 'key');
+      textureFilterSourceEl.value = String(state.filters.textures.source || 'all');
       if (!state.selectedTextureKey && entries.length) state.selectedTextureKey = entries[0].key;
+      if (state.selectedTextureKey && !state.db.textures.find((t) => t.key === state.selectedTextureKey)) state.selectedTextureKey = entries[0] ? entries[0].key : '';
+      if (state.selectedTextureKey && entries.length && !entries.find((e) => e.key === state.selectedTextureKey)) {
+        state.selectedTextureKey = entries[0].key;
+      }
       const selected = entries.find((e) => e.key === state.selectedTextureKey) || null;
 
       renderSimpleList(
@@ -3366,6 +4463,18 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     $('texture-key').addEventListener('input', updateTexturePreview);
     $('texture-url').addEventListener('input', updateTexturePreview);
+    textureSearchEl.addEventListener('input', () => {
+      state.filters.textures.search = textureSearchEl.value || '';
+      renderTexturesTab();
+    });
+    textureSortEl.addEventListener('change', () => {
+      state.filters.textures.sort = textureSortEl.value || 'key';
+      renderTexturesTab();
+    });
+    textureFilterSourceEl.addEventListener('change', () => {
+      state.filters.textures.source = textureFilterSourceEl.value || 'all';
+      renderTexturesTab();
+    });
     $('texture-image').addEventListener('change', async () => {
       const key = sanitizeTextureKey($('texture-key').value || state.selectedTextureKey || 'new_texture');
       if (!key) return;
@@ -4395,7 +5504,6 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       creatures: 'tab-creatures',
       factions: 'tab-factions',
       textures: 'tab-textures',
-      player: 'tab-player',
       menus: 'tab-menus',
       config: 'tab-config',
       audio: 'tab-audio'
@@ -4411,7 +5519,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function setActiveSection(section) {
       const requestedRaw = String(section || 'world');
-      const validSections = new Set(['world', 'inventory', 'rom', 'blocks', 'items', 'creatures', 'factions', 'textures', 'player', 'menus', 'config', 'audio']);
+      const validSections = new Set(['world', 'inventory', 'rom', 'blocks', 'items', 'creatures', 'factions', 'textures', 'menus', 'config', 'audio']);
       const requested = validSections.has(requestedRaw) ? requestedRaw : 'world';
       const contentTabId = CONTENT_TAB_BY_SECTION[requested] || null;
       const sectionForPane = contentTabId ? 'content' : requested;
@@ -4985,9 +6093,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     async function boot() {
       rebuildTextureMap();
       rebuildTypeIndexes();
-      state.toolMode = toolEl.value;
+      initWorldPanelLayout();
+      setEditorMode(editorModeEl ? editorModeEl.value : 'block');
+      setPaintShape(paintShapeEl.value);
       state.layerY = Math.trunc(Number(layerEl.value || 0));
       state.zoom = Math.trunc(Number(zoomEl.value || 26));
+      ensureQuickPaletteState();
       ensurePlayer();
       state.maps = { [state.currentMapName]: cloneMapPayload(state.map) };
       renderMapManager();
@@ -4995,6 +6106,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       playerNameEl.value = state.db.ui.playerName || 'A.S.S';
       updatePlayerImagePreview();
       renderPalette();
+      renderQuickPaletteEditor();
       renderInventoryTargets();
       inventoryState.targetKey = invTargetEl.value || 'player';
       inventoryState.category = invCategoryEl.value || 'item';
