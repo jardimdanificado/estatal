@@ -298,6 +298,7 @@
           <button id="map-new">Novo mapa</button>
           <button id="map-rename">Renomear</button>
           <button class="bad" id="map-delete">Excluir mapa</button>
+          <button id="map-set-player-pos">Set player pos</button>
         </div>
         <label>Texture ID da imagem do jogador (HUD)</label>
         <div class="row">
@@ -792,6 +793,7 @@
       selectedTextureKey: null,
       selectedPresetKey: null,
       selectedUiAliasKey: null,
+      settingPlayerSpawn: false,
       layerClipboard: null,
       importedZip: null,
       db: {
@@ -1033,6 +1035,7 @@
     const mapNewEl = $('map-new');
     const mapRenameEl = $('map-rename');
     const mapDeleteEl = $('map-delete');
+    const mapSetPlayerPosEl = $('map-set-player-pos');
 
     const invTargetEl = $('inv-target');
     const invCategoryEl = $('inv-category');
@@ -1679,6 +1682,26 @@
         ctx.fillText('ITEM', px + 4, pz + cell - 4);
       }
 
+      const player = ensurePlayer();
+      if (player) {
+        const cx = Math.floor(player.x ?? 0);
+        const cz = Math.floor(player.z ?? 0);
+        const gx = cx - state.view.minX;
+        const gz = cz - state.view.minZ;
+        if (gx >= 0 && gz >= 0 && gx < spanX && gz < spanZ) {
+          const px = ox + gx * cell;
+          const pz = oz + gz * cell;
+          ctx.strokeStyle = '#d97706';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px + 2, pz + 2, cell - 4, cell - 4);
+          ctx.fillStyle = 'rgba(217, 119, 6, 0.12)';
+          ctx.fillRect(px + 2, pz + 2, cell - 4, cell - 4);
+          ctx.fillStyle = '#111';
+          ctx.font = '11px ui-monospace, monospace';
+          ctx.fillText('P', px + 4, pz + 13);
+        }
+      }
+
       if (state.hover) {
         const hx = state.hover.x - state.view.minX;
         const hz = state.hover.z - state.view.minZ;
@@ -1716,7 +1739,7 @@
         ctx.strokeRect(px0 + 1, pz0 + 1, px1 - px0 - 2, pz1 - pz0 - 2);
       }
 
-      overlayEl.textContent = `Modo: ${state.toolMode}
+      overlayEl.textContent = `Modo: ${state.toolMode}${state.settingPlayerSpawn ? ' (set player pos)' : ''}
 Andar (camada Y): ${state.layerY}
 Zoom: ${cell}px
 Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens: ${state.map.items.length}`;
@@ -1832,13 +1855,27 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     }
 
     canvas.addEventListener('pointerdown', (e) => {
+      const cellPos = screenToCell(e.clientX, e.clientY);
+      state.hover = cellPos;
+      if (state.settingPlayerSpawn) {
+        if (e.button !== 0 || !cellPos) return;
+        const player = ensurePlayer();
+        player.x = cellPos.x + 0.5;
+        player.z = cellPos.z + 0.5;
+        player.y = state.layerY + 1;
+        player.yaw = 0;
+        player.pitch = 0;
+        state.settingPlayerSpawn = false;
+        mapSetPlayerPosEl.classList.remove('primary');
+        markMapDirty();
+        draw();
+        setStatus(`Spawn do player definido em (${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}).`);
+        return;
+      }
       canvas.setPointerCapture(e.pointerId);
       state.isPointerDown = true;
       state.dragButton = e.button;
       state.lastPaintKey = null;
-
-      const cellPos = screenToCell(e.clientX, e.clientY);
-      state.hover = cellPos;
       const erase = getEraseFlag(e);
 
       if (state.paintShape === 'rect') {
@@ -2004,6 +2041,16 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       setStatus(`Mapa excluído: ${current}`);
     });
 
+    mapSetPlayerPosEl.addEventListener('click', () => {
+      state.settingPlayerSpawn = !state.settingPlayerSpawn;
+      mapSetPlayerPosEl.classList.toggle('primary', state.settingPlayerSpawn);
+      if (state.settingPlayerSpawn) {
+        setStatus('Clique no mapa para definir o spawn do player.');
+      } else {
+        setStatus('Definição de spawn cancelada.');
+      }
+    });
+
     playerImageKeyEl.addEventListener('input', () => {
       state.db.ui.playerPortraitTextureKey = sanitizeTextureKey(playerImageKeyEl.value || 'ui_player_face');
       updatePlayerImagePreview();
@@ -2118,6 +2165,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     });
 
     function applyMapPayload(payload, options = {}) {
+      state.settingPlayerSpawn = false;
+      mapSetPlayerPosEl.classList.remove('primary');
       state.map = {
         version: payload.version || 1,
         player: payload.player || { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, name: state.db.ui.playerName || 'A.S.S', inventory: {}, itemInventory: {} },

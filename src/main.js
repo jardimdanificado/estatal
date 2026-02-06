@@ -448,6 +448,38 @@ async function maybeLoadRomAtBoot() {
 
 let loadingOverlay = null;
 
+function getConfiguredGameName() {
+    const candidates = [
+        CONFIG && CONFIG.GAME_NAME,
+        CONFIG && CONFIG.GAME_TITLE,
+        CONFIG && CONFIG.NAME,
+        CONFIG && CONFIG.TITLE
+    ];
+    for (const value of candidates) {
+        const text = String(value || '').trim();
+        if (text) return text;
+    }
+    return '';
+}
+
+function getRomDisplayName() {
+    const raw = String(ROM_RUNTIME.name || '').trim();
+    if (!raw) return '';
+    return raw.replace(/\.(rom\.)?zip$/i, '').replace(/\.zip$/i, '').trim();
+}
+
+function updateDocumentTitleForMode(mode = 'game') {
+    if (mode === 'editor') return;
+    const gameName = getConfiguredGameName() || getRomDisplayName() || 'maquina estatal';
+    document.title = gameName;
+}
+
+function setRendererVisible(world, visible) {
+    const renderer = world && world._internal ? world._internal.renderer : null;
+    if (!renderer || !renderer.domElement) return;
+    renderer.domElement.style.display = visible ? 'block' : 'none';
+}
+
 function ensureLoadingOverlay() {
     if (loadingOverlay) return loadingOverlay;
     const overlay = document.createElement('div');
@@ -533,6 +565,7 @@ function ensureUniqueName(world, name) {
 }
 
 async function init() {
+    showLoadingOverlay('Carregando ROM...');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
     scene.fog = new THREE.Fog(0x87CEEB, 1, 50);
@@ -562,7 +595,9 @@ async function init() {
     const bootMode = getModeFromLocation();
     world._internal.integrated = bootMode === 'integrated';
     world.mode = bootMode === 'integrated' ? 'game' : bootMode;
+    setRendererVisible(world, false);
     document.body.dataset.mode = world.mode;
+    updateDocumentTitleForMode(world.mode);
     ensureItemLabel();
     ensureHud();
     ensureHandOverlay();
@@ -571,6 +606,7 @@ async function init() {
     setupMobileControls(world);
 
     await maybeLoadRomAtBoot();
+    updateDocumentTitleForMode(world.mode);
     
     initAudioOnFirstGesture();
     
@@ -650,7 +686,10 @@ function loadTextures(world) {
     if (total === 0) {
         world._internal.texturesLoaded = true;
         showLoadingOverlay('Gerando terreno…');
-        initWorld(world).then(() => hideLoadingOverlay());
+        initWorld(world).then(() => {
+            setRendererVisible(world, true);
+            hideLoadingOverlay();
+        });
         return;
     }
     
@@ -660,6 +699,7 @@ function loadTextures(world) {
             world._internal.texturesLoaded = true;
             showLoadingOverlay('Gerando terreno…');
             initWorld(world).then(() => {
+                setRendererVisible(world, true);
                 hideLoadingOverlay();
             });
         }
@@ -733,7 +773,7 @@ async function initWorld(world) {
 
 function createPlayer(world) {
     const isEditor = world.mode === 'editor';
-    const spawnBlockType = getPreferredBlockType('PLAYER_SPAWN', 'GRASS', 'STONE');
+    const spawnBlockType = getPreferredBlockType('GRASS', 'STONE');
     const playerNpcData = {
         texture: 'npc',
         width: 0.8,
@@ -1073,7 +1113,7 @@ function setWorldMode(world, mode) {
                 player._savedEntitySpawners = Array.isArray(player.entitySpawners) ? [...player.entitySpawners] : [];
             }
             if (!player._editorInventory || player._editorInventoryVersion !== 2) {
-                const editorSpawnBlock = getPreferredBlockType('PLAYER_SPAWN', 'GRASS', 'STONE');
+                const editorSpawnBlock = getPreferredBlockType('GRASS', 'STONE');
                 const editorSpawnId = editorSpawnBlock && typeof editorSpawnBlock.id === 'number' ? editorSpawnBlock.id : 1;
                 player._editorInventory = {
                     [editorSpawnId]: 999
@@ -2269,10 +2309,8 @@ function updateEditorMovePreview(world) {
 function buildEditorDefaultMap() {
     const blocks = [];
     const size = 16;
-    const floorType = getPreferredBlockType('GRASS', 'STONE', 'PLAYER_SPAWN');
-    const spawnType = getPreferredBlockType('PLAYER_SPAWN', 'GRASS', 'STONE');
+    const floorType = getPreferredBlockType('GRASS', 'STONE');
     const floorTypeId = floorType && typeof floorType.id === 'number' ? floorType.id : 1;
-    const spawnTypeId = spawnType && typeof spawnType.id === 'number' ? spawnType.id : floorTypeId;
     for (let z = 0; z < size; z++) {
         for (let x = 0; x < size; x++) {
             blocks.push({
@@ -2284,13 +2322,6 @@ function buildEditorDefaultMap() {
             });
         }
     }
-    blocks.push({
-        x: Math.floor(size / 2),
-        y: 0.5,
-        z: Math.floor(size / 2),
-        typeId: spawnTypeId,
-        isFloor: false
-    });
     return {
         version: 1,
         player: { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0 },
@@ -2504,31 +2535,27 @@ function applyMap(world, payload) {
         }
     }
     
-    const spawnType = getPreferredBlockType('PLAYER_SPAWN', 'GRASS', 'STONE');
-    const spawnTypeId = spawnType && typeof spawnType.id === 'number' ? spawnType.id : null;
-    let spawnBlock = spawnTypeId == null
-        ? null
-        : world.blocks.find((block) => block.type && block.type.id === spawnTypeId);
-    if (spawnBlock) {
-        world._internal.mapCenter = { x: spawnBlock.x, z: spawnBlock.z };
-    } else if (payload.player) {
+    if (payload.player && isFiniteNumber(payload.player.x) && isFiniteNumber(payload.player.z)) {
         world._internal.mapCenter = { x: payload.player.x, z: payload.player.z };
+    } else if (minX !== Infinity) {
+        world._internal.mapCenter = { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 };
     } else {
         world._internal.mapCenter = { x: 0, z: 0 };
     }
     const player = world.getPlayerEntity();
-    if (spawnBlock && player) {
-        player.x = spawnBlock.x;
-        player.y = spawnBlock.y + 1;
-        player.z = spawnBlock.z;
-        player.yaw = 0;
-        player.pitch = 0;
-    } else if (payload.player && player) {
+    if (payload.player && player && isFiniteNumber(payload.player.x) && isFiniteNumber(payload.player.y) && isFiniteNumber(payload.player.z)) {
         player.x = payload.player.x;
         player.y = payload.player.y;
         player.z = payload.player.z;
         player.yaw = payload.player.yaw || 0;
         player.pitch = payload.player.pitch || 0;
+    } else if (player) {
+        const center = world._internal.mapCenter || { x: 0, z: 0 };
+        player.x = Number(center.x) + 0.5;
+        player.y = 2;
+        player.z = Number(center.z) + 0.5;
+        player.yaw = 0;
+        player.pitch = 0;
     }
     if (payload.player && player) {
         if (payload.player.inventory && typeof payload.player.inventory === 'object') {
@@ -3246,6 +3273,68 @@ function onWindowResize(world) {
     world._internal.renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+function isPointInsideSolidBlock(world, x, y, z) {
+    const half = CONFIG.BLOCK_SIZE / 2;
+    const minBX = Math.floor(x - half);
+    const maxBX = Math.floor(x + half);
+    const minBY = Math.floor(y - half);
+    const maxBY = Math.floor(y + half);
+    const minBZ = Math.floor(z - half);
+    const maxBZ = Math.floor(z + half);
+    for (let bx = minBX; bx <= maxBX; bx++) {
+        for (let by = minBY; by <= maxBY; by++) {
+            for (let bz = minBZ; bz <= maxBZ; bz++) {
+                const block = world.getBlockAt(bx, by, bz);
+                if (!block || !block.solid) continue;
+                const blockMinX = block.x - half;
+                const blockMaxX = block.x + half;
+                const blockMinY = block.y - half;
+                const blockMaxY = block.y + half;
+                const blockMinZ = block.z - half;
+                const blockMaxZ = block.z + half;
+                if (x > blockMinX && x < blockMaxX &&
+                    y > blockMinY && y < blockMaxY &&
+                    z > blockMinZ && z < blockMaxZ) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function keepCameraOutsideWalls(world, camera, desiredPos) {
+    const safePos = world._internal.lastSafeCameraPos || null;
+    if (!isPointInsideSolidBlock(world, desiredPos.x, desiredPos.y, desiredPos.z)) {
+        world._internal.lastSafeCameraPos = desiredPos.clone();
+        return;
+    }
+    const back = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
+    back.y = 0;
+    if (back.lengthSq() < 0.0001) {
+        back.set(Math.sin(camera.rotation.y), 0, Math.cos(camera.rotation.y));
+    } else {
+        back.normalize();
+    }
+    const downOffsets = [0, 0.08, 0.16, 0.24, 0.32];
+    for (const down of downOffsets) {
+        for (let i = 1; i <= 12; i++) {
+            const candidate = desiredPos.clone().addScaledVector(back, i * 0.08);
+            candidate.y -= down;
+            if (!isPointInsideSolidBlock(world, candidate.x, candidate.y, candidate.z)) {
+                camera.position.copy(candidate);
+                world._internal.lastSafeCameraPos = candidate.clone();
+                return;
+            }
+        }
+    }
+    if (safePos && !isPointInsideSolidBlock(world, safePos.x, safePos.y, safePos.z)) {
+        camera.position.copy(safePos);
+        return;
+    }
+    camera.position.copy(desiredPos);
+}
+
 // ============================================================
 // LOOP DE ANIMAÇÃO
 // ============================================================
@@ -3278,8 +3367,12 @@ function animate(world) {
             const eyeHeight = player.isCrouching
                 ? CONFIG.ENTITY_HEIGHT_CROUCHED * 0.8
                 : CONFIG.ENTITY_HEIGHT * 0.8;
-            camera.position.set(player.x, player.y + eyeHeight, player.z);
+            const desiredCameraPos = new THREE.Vector3(player.x, player.y + eyeHeight, player.z);
+            camera.position.copy(desiredCameraPos);
             camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+            if (world.mode === 'game') {
+                keepCameraOutsideWalls(world, camera, desiredCameraPos);
+            }
             camera.updateMatrixWorld(); // IMPORTANTE: atualiza a matriz antes de pegar vetores
             
             // Pega vetores de direção atualizados

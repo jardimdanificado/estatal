@@ -1,4 +1,4 @@
-import { loadFactionsFromRom } from './_rom_loader.js';
+import { loadFactionsFromRom } from './rom_loader.js';
 
 const fallback = {
   FACTIONS: { neutral: { id: 'neutral', name: 'Neutral' }, PLAYER: { id: 'player', name: 'Player' } },

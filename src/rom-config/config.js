@@ -1,4 +1,4 @@
-import { loadDefaultExportFromRom } from './_rom_loader.js';
+import { loadDefaultExportFromRom } from './rom_loader.js';
 
 const fallback = {
   PLAYER_SPEED: 0.08,
