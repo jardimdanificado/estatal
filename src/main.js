@@ -573,7 +573,7 @@ async function init() {
     const camera = new THREE.PerspectiveCamera(
         75,
         window.innerWidth / window.innerHeight,
-        0.1,
+        0.03,
         1000
     );
     
@@ -595,6 +595,7 @@ async function init() {
     const bootMode = getModeFromLocation();
     world._internal.integrated = bootMode === 'integrated';
     world.mode = bootMode === 'integrated' ? 'game' : bootMode;
+    world._internal.simulationPaused = true;
     setRendererVisible(world, false);
     document.body.dataset.mode = world.mode;
     updateDocumentTitleForMode(world.mode);
@@ -687,6 +688,12 @@ function loadTextures(world) {
         world._internal.texturesLoaded = true;
         showLoadingOverlay('Gerando terreno…');
         initWorld(world).then(() => {
+            world._internal.simulationPaused = false;
+            setRendererVisible(world, true);
+            hideLoadingOverlay();
+        }).catch((err) => {
+            world._internal.simulationPaused = false;
+            console.error(err);
             setRendererVisible(world, true);
             hideLoadingOverlay();
         });
@@ -699,6 +706,12 @@ function loadTextures(world) {
             world._internal.texturesLoaded = true;
             showLoadingOverlay('Gerando terreno…');
             initWorld(world).then(() => {
+                world._internal.simulationPaused = false;
+                setRendererVisible(world, true);
+                hideLoadingOverlay();
+            }).catch((err) => {
+                world._internal.simulationPaused = false;
+                console.error(err);
                 setRendererVisible(world, true);
                 hideLoadingOverlay();
             });
@@ -3273,68 +3286,6 @@ function onWindowResize(world) {
     world._internal.renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function isPointInsideSolidBlock(world, x, y, z) {
-    const half = CONFIG.BLOCK_SIZE / 2;
-    const minBX = Math.floor(x - half);
-    const maxBX = Math.floor(x + half);
-    const minBY = Math.floor(y - half);
-    const maxBY = Math.floor(y + half);
-    const minBZ = Math.floor(z - half);
-    const maxBZ = Math.floor(z + half);
-    for (let bx = minBX; bx <= maxBX; bx++) {
-        for (let by = minBY; by <= maxBY; by++) {
-            for (let bz = minBZ; bz <= maxBZ; bz++) {
-                const block = world.getBlockAt(bx, by, bz);
-                if (!block || !block.solid) continue;
-                const blockMinX = block.x - half;
-                const blockMaxX = block.x + half;
-                const blockMinY = block.y - half;
-                const blockMaxY = block.y + half;
-                const blockMinZ = block.z - half;
-                const blockMaxZ = block.z + half;
-                if (x > blockMinX && x < blockMaxX &&
-                    y > blockMinY && y < blockMaxY &&
-                    z > blockMinZ && z < blockMaxZ) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
-function keepCameraOutsideWalls(world, camera, desiredPos) {
-    const safePos = world._internal.lastSafeCameraPos || null;
-    if (!isPointInsideSolidBlock(world, desiredPos.x, desiredPos.y, desiredPos.z)) {
-        world._internal.lastSafeCameraPos = desiredPos.clone();
-        return;
-    }
-    const back = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
-    back.y = 0;
-    if (back.lengthSq() < 0.0001) {
-        back.set(Math.sin(camera.rotation.y), 0, Math.cos(camera.rotation.y));
-    } else {
-        back.normalize();
-    }
-    const downOffsets = [0, 0.08, 0.16, 0.24, 0.32];
-    for (const down of downOffsets) {
-        for (let i = 1; i <= 12; i++) {
-            const candidate = desiredPos.clone().addScaledVector(back, i * 0.08);
-            candidate.y -= down;
-            if (!isPointInsideSolidBlock(world, candidate.x, candidate.y, candidate.z)) {
-                camera.position.copy(candidate);
-                world._internal.lastSafeCameraPos = candidate.clone();
-                return;
-            }
-        }
-    }
-    if (safePos && !isPointInsideSolidBlock(world, safePos.x, safePos.y, safePos.z)) {
-        camera.position.copy(safePos);
-        return;
-    }
-    camera.position.copy(desiredPos);
-}
-
 // ============================================================
 // LOOP DE ANIMAÇÃO
 // ============================================================
@@ -3347,46 +3298,44 @@ function animate(world) {
     requestAnimationFrame(() => animate(world));
     
     if (world._internal.texturesLoaded) {
-        // Atualiza entidades
-        world.entities.forEach(entity => updateEntity(world, entity));
-        updateProjectiles(world);
-        updateItems(world);
-        updateMessages(world);
-        checkInteractionTarget(world);
-        updateEditorMovePreview(world);
-        updateCurrentItemLabel(world);
-        updateHud(world);
-        updateEditorCoords(world);
-        
-        // Atualiza câmera e listener de áudio
-        const player = world.getPlayerEntity();
-        if (player) {
-            const camera = world._internal.camera;
+        if (!world._internal.simulationPaused) {
+            // Atualiza entidades
+            world.entities.forEach(entity => updateEntity(world, entity));
+            updateProjectiles(world);
+            updateItems(world);
+            updateMessages(world);
+            checkInteractionTarget(world);
+            updateEditorMovePreview(world);
+            updateCurrentItemLabel(world);
+            updateHud(world);
+            updateEditorCoords(world);
             
-            // Atualiza posição da câmera
-            const eyeHeight = player.isCrouching
-                ? CONFIG.ENTITY_HEIGHT_CROUCHED * 0.8
-                : CONFIG.ENTITY_HEIGHT * 0.8;
-            const desiredCameraPos = new THREE.Vector3(player.x, player.y + eyeHeight, player.z);
-            camera.position.copy(desiredCameraPos);
-            camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
-            if (world.mode === 'game') {
-                keepCameraOutsideWalls(world, camera, desiredCameraPos);
+            // Atualiza câmera e listener de áudio
+            const player = world.getPlayerEntity();
+            if (player) {
+                const camera = world._internal.camera;
+                
+                // Atualiza posição da câmera
+                const eyeHeight = player.isCrouching
+                    ? CONFIG.ENTITY_HEIGHT_CROUCHED * 0.8
+                    : CONFIG.ENTITY_HEIGHT * 0.8;
+                camera.position.set(player.x, player.y + eyeHeight, player.z);
+                camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+                camera.updateMatrixWorld(); // IMPORTANTE: atualiza a matriz antes de pegar vetores
+                
+                // Pega vetores de direção atualizados
+                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+                
+                // ============================================================
+                // ATUALIZA LISTENER DO FMOD (automático a cada frame)
+                // ============================================================
+                audioSystem.setListenerPosition(
+                    { x: player.x, y: player.y + eyeHeight, z: player.z },
+                    { x: forward.x, y: forward.y, z: forward.z },
+                    { x: up.x, y: up.y, z: up.z }
+                );
             }
-            camera.updateMatrixWorld(); // IMPORTANTE: atualiza a matriz antes de pegar vetores
-            
-            // Pega vetores de direção atualizados
-            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-            const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-            
-            // ============================================================
-            // ATUALIZA LISTENER DO FMOD (automático a cada frame)
-            // ============================================================
-            audioSystem.setListenerPosition(
-                { x: player.x, y: player.y + eyeHeight, z: player.z },
-                { x: forward.x, y: forward.y, z: forward.z },
-                { x: up.x, y: up.y, z: up.z }
-            );
         }
     }
     

@@ -1,6 +1,6 @@
 import CONFIG from './rom-config/config.js';
 import BLOCK_TYPES from './rom-config/blocks.js';
-import { checkCollision, getGroundLevel } from './collision.js';
+import { checkCollision, checkPointCollision, getGroundLevel } from './collision.js';
 import { getFactionRelation } from './rom-config/factions.js';
 import { alertEntitiesFromShot } from './bullet.js';
 import ITEMS from './rom-config/items.js';
@@ -703,21 +703,43 @@ export function updatePlayerControlled(world, entity) {
         moveZ += right.z * speed;
     }
     
+    const eyeHeight = entity.isCrouching 
+        ? CONFIG.ENTITY_HEIGHT_CROUCHED * 0.8 
+        : CONFIG.ENTITY_HEIGHT * 0.8;
+    const canMoveTo = (nx, nz) => {
+        if (checkCollision(world, nx, entity.y, nz, entity).collides) return false;
+        const eyeY = entity.y + eyeHeight;
+        const eyeRadius = 0.16;
+        const ring = eyeRadius * 0.95;
+        const probes = [
+            [0, 0],
+            [ring, 0],
+            [-ring, 0],
+            [0, ring],
+            [0, -ring],
+            [ring, ring],
+            [ring, -ring],
+            [-ring, ring],
+            [-ring, -ring]
+        ];
+        for (const [ox, oz] of probes) {
+            if (checkPointCollision(world, nx + ox, eyeY, nz + oz, eyeRadius).collides) return false;
+        }
+        return true;
+    };
+
     let newX = entity.x + moveX;
-    if (!checkCollision(world, newX, entity.y, entity.z, entity).collides) {
+    if (canMoveTo(newX, entity.z)) {
         entity.x = newX;
     }
     
     let newZ = entity.z + moveZ;
-    if (!checkCollision(world, entity.x, entity.y, newZ, entity).collides) {
+    if (canMoveTo(entity.x, newZ)) {
         entity.z = newZ;
     }
     
     // Atualiza câmera
     const camera = world._internal.camera;
-    const eyeHeight = entity.isCrouching 
-        ? CONFIG.ENTITY_HEIGHT_CROUCHED * 0.8 
-        : CONFIG.ENTITY_HEIGHT * 0.8;
     camera.position.set(entity.x, entity.y + eyeHeight, entity.z);
     camera.rotation.order = 'YXZ';
     camera.rotation.y = entity.yaw;
