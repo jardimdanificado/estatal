@@ -506,6 +506,8 @@ function tryMeleeHit(world, attacker) {
             });
         }
         world.removeBlock(block);
+    } else if (world._internal.useTerrainMesh && block.solid && block.type.render !== 'cross') {
+        world.markChunkDirty(block.x, block.y, block.z);
     }
     return true;
 }
@@ -831,6 +833,8 @@ export function updateProjectiles(world) {
                                 });
                             }
                             world.removeBlock(block);
+                        } else if (world._internal.useTerrainMesh && block.solid && block.type.render !== 'cross') {
+                            world.markChunkDirty(block.x, block.y, block.z);
                         }
                     }
                     world._internal.scene.remove(proj.mesh);
@@ -853,12 +857,12 @@ export function updateProjectiles(world) {
             if (distance < 0.5) {
                 block.hp -= proj.damage;
                 applyBlockHitEffects(world, block, proj.blockType || null);
-                
+
                 console.log(`${block.type.name} HP: ${block.hp}/${block.maxHP}`);
-                
+
                 if (block.hp <= 0) {
                     console.log(`${block.type.name} destruído!`);
-                    
+
                     if (world.mode === 'game' && block.type.droppable) {
                         spawnBlockDrop(world, block.type, 1, {
                             x: block.x,
@@ -866,10 +870,12 @@ export function updateProjectiles(world) {
                             z: block.z
                         });
                     }
-                    
+
                     world.removeBlock(block);
+                } else if (world._internal.useTerrainMesh && block.solid && block.type.render !== 'cross') {
+                    world.markChunkDirty(block.x, block.y, block.z);
                 }
-                
+
                 world._internal.scene.remove(proj.mesh);
                 world.projectiles.splice(i, 1);
                 hitSomething = true;

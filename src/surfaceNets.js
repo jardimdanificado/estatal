@@ -96,6 +96,8 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
   const dilation = typeof options.dilation === 'number' ? options.dilation : 0;
   const subdivisions = Math.max(1, Math.floor(options.subdivisions || 1));
   const fillInset = Math.max(0, Number(options.fillInset || 0));
+  const clipMin = options.clipMin || null;
+  const clipMax = options.clipMax || null;
 
   if (!blocks || !blocks.length) return null;
 
@@ -111,7 +113,7 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
     const key = `${vx},${vy},${vz}`;
     if (voxelSet.has(key)) continue;
     voxelSet.add(key);
-    voxelList.push({ vx, vy, vz });
+    voxelList.push({ vx, vy, vz, dmg: block.dmg || 0 });
     if (vx < minX) minX = vx;
     if (vy < minY) minY = vy;
     if (vz < minZ) minZ = vz;
@@ -144,12 +146,13 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
   }
 
   for (const voxel of voxelList) {
-    const startX = Math.max(gridMinX, Math.ceil(voxel.vx + fillInset - dilation));
-    const endX = Math.min(gridMaxX, Math.floor(voxel.vx + subdivisions - fillInset + dilation));
-    const startY = Math.max(gridMinY, Math.ceil(voxel.vy + fillInset - dilation));
-    const endY = Math.min(gridMaxY, Math.floor(voxel.vy + subdivisions - fillInset + dilation));
-    const startZ = Math.max(gridMinZ, Math.ceil(voxel.vz + fillInset - dilation));
-    const endZ = Math.min(gridMaxZ, Math.floor(voxel.vz + subdivisions - fillInset + dilation));
+    const totalInset = fillInset + voxel.dmg * subdivisions * 0.45;
+    const startX = Math.max(gridMinX, Math.ceil(voxel.vx + totalInset - dilation));
+    const endX = Math.min(gridMaxX, Math.floor(voxel.vx + subdivisions - totalInset + dilation));
+    const startY = Math.max(gridMinY, Math.ceil(voxel.vy + totalInset - dilation));
+    const endY = Math.min(gridMaxY, Math.floor(voxel.vy + subdivisions - totalInset + dilation));
+    const startZ = Math.max(gridMinZ, Math.ceil(voxel.vz + totalInset - dilation));
+    const endZ = Math.min(gridMaxZ, Math.floor(voxel.vz + subdivisions - totalInset + dilation));
 
     if (startX > endX || startY > endY || startZ > endZ) continue;
 
@@ -174,17 +177,22 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
     return x + cellNx * (y + cellNy * z);
   }
 
+  const cornerValues = new Float64Array(8);
+  const cpx = new Float64Array(8);
+  const cpy = new Float64Array(8);
+  const cpz = new Float64Array(8);
+
   for (let z = 0; z < cellNz; z++) {
     for (let y = 0; y < cellNy; y++) {
       for (let x = 0; x < cellNx; x++) {
-        const cornerValues = new Array(8);
-        const cornerPositions = new Array(8);
         for (let i = 0; i < 8; i++) {
-          const cx = x + CORNERS[i][0] + gridMinX;
-          const cy = y + CORNERS[i][1] + gridMinY;
-          const cz = z + CORNERS[i][2] + gridMinZ;
-          cornerValues[i] = field[idx(cx, cy, cz)];
-          cornerPositions[i] = [cx * scale, cy * scale, cz * scale];
+          const gx = x + CORNERS[i][0] + gridMinX;
+          const gy = y + CORNERS[i][1] + gridMinY;
+          const gz = z + CORNERS[i][2] + gridMinZ;
+          cornerValues[i] = field[idx(gx, gy, gz)];
+          cpx[i] = gx * scale;
+          cpy[i] = gy * scale;
+          cpz[i] = gz * scale;
         }
 
         let mask = 0;
@@ -196,14 +204,20 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
         let count = 0;
         let sx = 0, sy = 0, sz = 0;
         for (let e = 0; e < 12; e++) {
-          const [a, b] = EDGE_CONNECTION[e];
-          const v1 = cornerValues[a];
-          const v2 = cornerValues[b];
+          const ea = EDGE_CONNECTION[e][0];
+          const eb = EDGE_CONNECTION[e][1];
+          const v1 = cornerValues[ea];
+          const v2 = cornerValues[eb];
           if ((v1 > isoLevel) === (v2 > isoLevel)) continue;
-          const p = interpolate(isoLevel, cornerPositions[a], cornerPositions[b], v1, v2);
-          sx += p[0];
-          sy += p[1];
-          sz += p[2];
+          const denom = v2 - v1;
+          if (Math.abs(denom) < 1e-6) {
+            sx += cpx[ea]; sy += cpy[ea]; sz += cpz[ea];
+          } else {
+            const t = (isoLevel - v1) / denom;
+            sx += cpx[ea] + (cpx[eb] - cpx[ea]) * t;
+            sy += cpy[ea] + (cpy[eb] - cpy[ea]) * t;
+            sz += cpz[ea] + (cpz[eb] - cpz[ea]) * t;
+          }
           count++;
         }
         if (!count) continue;
@@ -231,6 +245,13 @@ export function buildSurfaceNetGeometryData(blocks, options = {}) {
     const [bx, by, bz] = getPos(b);
     const [cx, cy, cz] = getPos(c);
     const [dx, dy, dz] = getPos(d);
+    if (clipMin) {
+      const qx = (ax + bx + cx + dx) * 0.25;
+      const qy = (ay + by + cy + dy) * 0.25;
+      const qz = (az + bz + cz + dz) * 0.25;
+      if (qx < clipMin[0] || qy < clipMin[1] || qz < clipMin[2] ||
+          qx >= clipMax[0] || qy >= clipMax[1] || qz >= clipMax[2]) return;
+    }
     if (flip) {
       emitTriangle(out, ax, ay, az, cx, cy, cz, bx, by, bz, uvScaleTop, uvScaleSideU, uvScaleSideV);
       emitTriangle(out, ax, ay, az, dx, dy, dz, cx, cy, cz, uvScaleTop, uvScaleSideU, uvScaleSideV);
