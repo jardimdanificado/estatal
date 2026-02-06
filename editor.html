@@ -4063,6 +4063,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         node.style.overflow = 'hidden';
         node.style.padding = '4px';
         applyInlineStyleObject(node, el.style);
+        // In editor mode every element must remain selectable, even if runtime style sets pointerEvents:none.
+        node.style.pointerEvents = 'auto';
         if (el.spriteKey) {
           const spriteUrl = getTextureUrl(el.spriteKey);
           if (spriteUrl) {
@@ -4181,8 +4183,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const dx = ev.clientX - menuEditorState.startMouseX;
       const dy = ev.clientY - menuEditorState.startMouseY;
       if (menuEditorState.mode === 'move') {
-        el.x = Math.round(menuEditorState.baseX + dx);
-        el.y = Math.round(menuEditorState.baseY + dy);
+        const ax = String(el.anchorX || 'left');
+        const ay = String(el.anchorY || 'top');
+        el.x = Math.round(menuEditorState.baseX + (ax === 'right' ? -dx : dx));
+        el.y = Math.round(menuEditorState.baseY + (ay === 'bottom' ? -dy : dy));
       } else if (menuEditorState.mode === 'resize') {
         el.width = Math.max(12, Math.round(menuEditorState.baseW + dx));
         el.height = Math.max(12, Math.round(menuEditorState.baseH + dy));
