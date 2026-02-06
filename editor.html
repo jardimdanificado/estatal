@@ -186,8 +186,7 @@
     .tab-btn.active { border-color: var(--accent); background: #e9f1ff; }
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
-    .primary-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px 0; }
-    .primary-tab-btn.active { border-color: var(--accent); background: #e9f1ff; }
+    .primary-tabs { margin: 0 0 10px 0; }
     .section-pane { display: none; }
     .section-pane.active { display: block; }
 
@@ -264,12 +263,22 @@
 <body>
   <div id="app">
     <aside id="sidebar">
-      <h1>Editor 2D Completo</h1>
+      <h1>estatal editor</h1>
       <div class="primary-tabs">
-        <button class="primary-tab-btn active" data-section="world">Mapa</button>
-        <button class="primary-tab-btn" data-section="inventory">Inventário</button>
-        <button class="primary-tab-btn" data-section="content">Conteúdo</button>
-        <button class="primary-tab-btn" data-section="rom">ROM</button>
+        <label for="primary-section-select" style="margin:0 0 6px 0;">Editor</label>
+        <select id="primary-section-select">
+          <option value="world">Mapa</option>
+          <option value="inventory">Inventário</option>
+          <option value="blocks">Blocos</option>
+          <option value="items">Itens/Armas</option>
+          <option value="creatures">Criaturas</option>
+          <option value="factions">Facções</option>
+          <option value="textures">Texturas</option>
+          <option value="ui">UI</option>
+          <option value="config">Config</option>
+          <option value="presets">Presets Inv.</option>
+          <option value="rom">ROM</option>
+        </select>
       </div>
 
       <div class="card section-pane" data-section="rom">
@@ -407,16 +416,6 @@
 
       <div class="card section-pane" data-section="content">
         <h2>Editor de Conteúdo</h2>
-        <div class="tabs">
-          <button class="tab-btn content-tab-btn active" data-tab="tab-blocks">Blocos</button>
-          <button class="tab-btn content-tab-btn" data-tab="tab-items">Itens/Armas</button>
-          <button class="tab-btn content-tab-btn" data-tab="tab-creatures">Criaturas</button>
-          <button class="tab-btn content-tab-btn" data-tab="tab-factions">Facções</button>
-          <button class="tab-btn content-tab-btn" data-tab="tab-textures">Texturas</button>
-          <button class="tab-btn content-tab-btn" data-tab="tab-ui">UI</button>
-          <button class="tab-btn content-tab-btn" data-tab="tab-config">Config</button>
-          <button class="tab-btn content-tab-btn" data-tab="tab-presets">Presets Inv.</button>
-        </div>
 
         <div id="tab-blocks" class="tab-pane content-tab-pane active">
           <div class="split">
@@ -528,10 +527,30 @@
                   <input type="number" id="item-proj-dmg" value="0" />
                 </div>
               </div>
+              <div class="row3">
+                <div>
+                  <label>Tamanho proj.</label>
+                  <input type="number" id="item-proj-size" step="0.01" value="0.22" />
+                </div>
+                <div>
+                  <label>Gravidade proj.</label>
+                  <input type="number" id="item-proj-gravity" step="0.01" value="0.10" />
+                </div>
+                <div>
+                  <label>Arrasto proj.</label>
+                  <input type="number" id="item-proj-drag" step="0.01" value="0.99" />
+                </div>
+              </div>
               <label>Texture key base</label>
               <input type="text" id="item-texture-key" placeholder="EX: item-machado" />
               <label>Upload imagem (usa como texture/ui/drop)</label>
               <input type="file" id="item-image" accept="image/*" />
+              <label>Texture key do projétil</label>
+              <input type="text" id="item-proj-texture-key" placeholder="EX: bullet_machado" />
+              <label>Upload imagem do projétil</label>
+              <input type="file" id="item-proj-image" accept="image/*" />
+              <label>Preview do projétil</label>
+              <div id="item-proj-preview" class="thumb" style="width:80px;height:80px;"></div>
               <label>Preview da textura</label>
               <div id="item-preview" class="thumb" style="width:80px;height:80px;"></div>
               <div class="btnbar" style="margin-top:8px;">
@@ -2446,6 +2465,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     function updateItemPreview() {
       const key = sanitizeTextureKey($('item-texture-key').value || '');
       setPreviewBox($('item-preview'), key);
+      const projectileKey = sanitizeTextureKey($('item-proj-texture-key').value || key || '');
+      setPreviewBox($('item-proj-preview'), projectileKey);
     }
 
     function updateCreaturePreview() {
@@ -2632,7 +2653,11 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('item-damage').value = selected ? String(selected.damage || 0) : '0';
       $('item-speed').value = selected ? String(selected.projectileSpeed || 0) : '0';
       $('item-proj-dmg').value = selected ? String(selected.projectileDamage || 0) : '0';
+      $('item-proj-size').value = selected ? String(selected.projectileSize ?? 0.22) : '0.22';
+      $('item-proj-gravity').value = selected ? String(selected.projectileGravityScale ?? 0.1) : '0.1';
+      $('item-proj-drag').value = selected ? String(selected.projectileDrag ?? 0.99) : '0.99';
       $('item-texture-key').value = selected ? String(selected.textureKey || selected.uiTextureKey || '') : '';
+      $('item-proj-texture-key').value = selected ? String(selected.projectileTextureKey || selected.textureKey || '') : '';
       updateItemPreview();
     }
 
@@ -2647,12 +2672,19 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('item-damage').value = '0';
       $('item-speed').value = '0';
       $('item-proj-dmg').value = '0';
+      $('item-proj-size').value = '0.22';
+      $('item-proj-gravity').value = '0.1';
+      $('item-proj-drag').value = '0.99';
       $('item-texture-key').value = '';
+      $('item-proj-texture-key').value = '';
       $('item-image').value = '';
+      $('item-proj-image').value = '';
       updateItemPreview();
     });
     $('item-texture-key').addEventListener('input', updateItemPreview);
+    $('item-proj-texture-key').addEventListener('input', updateItemPreview);
     $('item-image').addEventListener('change', updateItemPreview);
+    $('item-proj-image').addEventListener('change', updateItemPreview);
 
     $('item-save').addEventListener('click', async () => {
       const key = sanitizeConstKey($('item-key').value || state.selectedItemKey || 'NEW_ITEM', 'NEW_ITEM');
@@ -2662,7 +2694,13 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         return;
       }
       const textureKey = sanitizeTextureKey($('item-texture-key').value || `item-${id}`);
+      const projectileTextureInput = String($('item-proj-texture-key').value || '').trim();
+      const hasProjectileUpload = Boolean($('item-proj-image').files && $('item-proj-image').files[0]);
+      let projectileTextureKey = projectileTextureInput ? sanitizeTextureKey(projectileTextureInput) : '';
+      if (!projectileTextureKey && hasProjectileUpload) projectileTextureKey = sanitizeTextureKey(`${textureKey}-proj`);
+      if (!projectileTextureKey) projectileTextureKey = textureKey;
       await applyUploadedTexture($('item-image'), textureKey);
+      await applyUploadedTexture($('item-proj-image'), projectileTextureKey);
 
       const isWeapon = asBool($('item-weapon').value);
       const isConsumable = asBool($('item-consumable').value);
@@ -2670,6 +2708,9 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const damage = Number($('item-damage').value || 0);
       const projectileSpeed = Number($('item-speed').value || 0);
       const projectileDamage = Number($('item-proj-dmg').value || 0);
+      const projectileSize = Number($('item-proj-size').value || 0.22);
+      const projectileGravityScale = Number($('item-proj-gravity').value || 0.1);
+      const projectileDrag = Number($('item-proj-drag').value || 0.99);
 
       const base = {
         ...(state.db.items[key] || {}),
@@ -2688,10 +2729,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         base.damage = damage || projectileDamage || 10;
         base.projectileDamage = projectileDamage || damage || 10;
         base.projectileSpeed = projectileSpeed || 1;
-        base.projectileSize = Number(base.projectileSize || 0.2);
-        base.projectileGravityScale = Number(base.projectileGravityScale || 0.1);
-        base.projectileDrag = Number(base.projectileDrag || 0.99);
-        base.projectileTextureKey = base.projectileTextureKey || textureKey;
+        base.projectileSize = Number.isFinite(projectileSize) ? projectileSize : 0.22;
+        base.projectileGravityScale = Number.isFinite(projectileGravityScale) ? projectileGravityScale : 0.1;
+        base.projectileDrag = Number.isFinite(projectileDrag) ? projectileDrag : 0.99;
+        base.projectileTextureKey = projectileTextureKey || textureKey;
       }
 
       state.db.items[key] = base;
@@ -3306,28 +3347,44 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       setDbStatus('Config recarregada da memória.');
     });
 
-    document.querySelectorAll('.content-tab-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.content-tab-btn').forEach((b) => b.classList.remove('active'));
-        document.querySelectorAll('.content-tab-pane').forEach((p) => p.classList.remove('active'));
-        btn.classList.add('active');
-        const id = btn.getAttribute('data-tab');
-        if (id) $(id).classList.add('active');
-      });
-    });
+    const CONTENT_TAB_BY_SECTION = {
+      blocks: 'tab-blocks',
+      items: 'tab-items',
+      creatures: 'tab-creatures',
+      factions: 'tab-factions',
+      textures: 'tab-textures',
+      ui: 'tab-ui',
+      config: 'tab-config',
+      presets: 'tab-presets'
+    };
 
-    document.querySelectorAll('.primary-tab-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const section = btn.getAttribute('data-section');
-        state.activeSection = section || 'world';
-        document.querySelectorAll('.primary-tab-btn').forEach((b) => b.classList.remove('active'));
-        document.querySelectorAll('.section-pane').forEach((pane) => {
-          const ok = pane.getAttribute('data-section') === section;
-          pane.classList.toggle('active', ok);
-        });
-        btn.classList.add('active');
-        updateSectionLayout();
+    function setActiveContentTab(tabId) {
+      const fallbackId = 'tab-blocks';
+      const resolvedId = $(tabId) ? tabId : fallbackId;
+      document.querySelectorAll('.content-tab-pane').forEach((p) => p.classList.remove('active'));
+      const pane = $(resolvedId);
+      if (pane) pane.classList.add('active');
+    }
+
+    function setActiveSection(section) {
+      const requestedRaw = String(section || 'world');
+      const validSections = new Set(['world', 'inventory', 'rom', 'blocks', 'items', 'creatures', 'factions', 'textures', 'ui', 'config', 'presets']);
+      const requested = validSections.has(requestedRaw) ? requestedRaw : 'world';
+      const contentTabId = CONTENT_TAB_BY_SECTION[requested] || null;
+      const sectionForPane = contentTabId ? 'content' : requested;
+      state.activeSection = requested;
+      if (primarySectionSelectEl.value !== requested) primarySectionSelectEl.value = requested;
+      document.querySelectorAll('.section-pane').forEach((pane) => {
+        const ok = pane.getAttribute('data-section') === sectionForPane;
+        pane.classList.toggle('active', ok);
       });
+      if (contentTabId) setActiveContentTab(contentTabId);
+      updateSectionLayout();
+    }
+
+    const primarySectionSelectEl = $('primary-section-select');
+    primarySectionSelectEl.addEventListener('change', () => {
+      setActiveSection(primarySectionSelectEl.value);
     });
 
     function serializeJS(value, depth = 0) {
@@ -3842,7 +3899,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       renderUiTab();
       renderConfigTab();
       renderPresetsTab();
-      updateSectionLayout();
+      primarySectionSelectEl.value = state.activeSection;
+      setActiveSection(state.activeSection);
       resizeCanvas();
       draw();
       const romLoaded = await maybeAutoLoadRomFromQuery();

@@ -2982,7 +2982,7 @@ function handleUseAction(world) {
 function onKeyDown(world, e) {
     world._internal.keys[e.code] = true;
     const player = world.getPlayerEntity();
-    if (e.code === 'Tab') {
+    if (e.code === 'F8') {
         e.preventDefault();
         const nextMode = world.mode === 'editor' ? 'game' : 'editor';
         setWorldMode(world, nextMode);
