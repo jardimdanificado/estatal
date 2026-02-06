@@ -304,10 +304,10 @@
           <option value="creatures">Criaturas</option>
           <option value="factions">Facções</option>
           <option value="textures">Texturas</option>
-          <option value="ui">UI</option>
+          <option value="player">Player</option>
           <option value="config">Config</option>
+          <option value="audio">Audio</option>
           <option value="menus">Menus</option>
-          <option value="presets">Presets Inv.</option>
           <option value="rom">ROM</option>
         </select>
       </div>
@@ -338,16 +338,7 @@
           <button id="map-new">Novo mapa</button>
           <button id="map-rename">Renomear</button>
           <button class="bad" id="map-delete">Excluir mapa</button>
-          <button id="map-set-player-pos">Set player pos</button>
         </div>
-        <label>Texture ID da imagem do jogador (HUD)</label>
-        <div class="row">
-          <input id="player-image-key" type="text" placeholder="ui_player_face" />
-          <input id="player-image" type="file" accept="image/*" />
-        </div>
-        <label>Nome do jogador (HUD)</label>
-        <input id="player-name" type="text" placeholder="A.S.S" />
-        <div id="player-image-preview" class="thumb" style="width:80px;height:80px;margin-top:8px;"></div>
         <div class="status" id="status">Pronto.</div>
       </div>
 
@@ -410,37 +401,79 @@
 
       <div class="card section-pane" data-section="inventory">
         <h2>Inventário</h2>
-        <div class="split">
-          <div>
-            <label>Entidade</label>
-            <select id="inv-target"></select>
+        <label>Subaba</label>
+        <select id="inventory-subtab-select">
+          <option value="manager">Inventário da entidade</option>
+          <option value="presets">Presets de inventário</option>
+        </select>
 
-            <label>Categoria</label>
-            <select id="inv-category">
-              <option value="block">Blocos</option>
-              <option value="item">Itens/Armas</option>
-            </select>
+        <div id="inventory-pane-manager" class="tab-pane active" style="margin-top:8px;">
+          <div class="split">
+            <div>
+              <label>Entidade</label>
+              <select id="inv-target"></select>
 
-            <div class="row" style="margin-top: 6px;">
-              <select id="inv-item"></select>
-              <input id="inv-qty" type="number" value="1" min="1" />
+              <label>Categoria</label>
+              <select id="inv-category">
+                <option value="block">Blocos</option>
+                <option value="item">Itens/Armas</option>
+              </select>
+
+              <div class="row" style="margin-top: 6px;">
+                <select id="inv-item"></select>
+                <input id="inv-qty" type="number" value="1" min="1" />
+              </div>
+              <div class="btnbar" style="margin-top: 8px;">
+                <button class="good" id="inv-add">Adicionar</button>
+                <button class="bad" id="inv-remove">Remover</button>
+                <button id="inv-clear">Limpar</button>
+              </div>
+
+              <label>Preset</label>
+              <div class="row">
+                <select id="inv-preset"></select>
+                <button id="inv-apply-preset">Aplicar preset</button>
+              </div>
             </div>
-            <div class="btnbar" style="margin-top: 8px;">
-              <button class="good" id="inv-add">Adicionar</button>
-              <button class="bad" id="inv-remove">Remover</button>
-              <button id="inv-clear">Limpar</button>
-            </div>
-
-            <label>Preset</label>
-            <div class="row">
-              <select id="inv-preset"></select>
-              <button id="inv-apply-preset">Aplicar preset</button>
+            <div>
+              <label>Inventário atual</label>
+              <div class="status" id="inv-status">Selecione uma entidade.</div>
+              <div id="inv-list" class="listbox" style="margin-top: 8px;"></div>
             </div>
           </div>
-          <div>
-            <label>Inventário atual</label>
-            <div class="status" id="inv-status">Selecione uma entidade.</div>
-            <div id="inv-list" class="listbox" style="margin-top: 8px;"></div>
+        </div>
+
+        <div id="inventory-pane-presets" class="tab-pane" style="margin-top:8px;">
+          <div class="split">
+            <div>
+              <label>Lista de presets</label>
+              <div id="preset-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Nome do preset</label>
+              <input type="text" id="preset-key" placeholder="starter_guard" />
+              <label>Categoria</label>
+              <select id="preset-category">
+                <option value="block">Blocos</option>
+                <option value="item">Itens/Armas</option>
+              </select>
+              <div class="row" style="margin-top: 6px;">
+                <select id="preset-item"></select>
+                <input id="preset-qty" type="number" value="1" min="1" />
+              </div>
+              <div class="btnbar" style="margin-top: 8px;">
+                <button class="good" id="preset-add">Adicionar</button>
+                <button class="bad" id="preset-remove">Remover</button>
+                <button id="preset-clear">Limpar</button>
+              </div>
+              <label>Conteúdo do preset</label>
+              <div id="preset-list-content" class="listbox"></div>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="preset-save">Salvar preset</button>
+                <button id="preset-new">Novo</button>
+                <button class="bad" id="preset-delete">Excluir</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -698,57 +731,28 @@
           </div>
         </div>
 
-        <div id="tab-presets" class="tab-pane content-tab-pane">
+        <div id="tab-player" class="tab-pane content-tab-pane">
           <div class="split">
             <div>
-              <label>Lista de presets</label>
-              <div id="preset-list" class="listbox"></div>
+              <label>Player / Spawn</label>
+              <div class="btnbar">
+                <button id="map-set-player-pos">Set player pos (click no mapa)</button>
+              </div>
+              <label>Nome do jogador</label>
+              <input id="player-name" type="text" placeholder="A.S.S" />
+              <label>Texture ID da imagem do jogador (HUD)</label>
+              <input id="player-image-key" type="text" placeholder="ui_player_face" />
+              <label>Upload imagem do jogador (opcional)</label>
+              <input id="player-image" type="file" accept="image/*" />
+              <label>Preview da imagem</label>
+              <div id="player-image-preview" class="thumb" style="width:80px;height:80px;"></div>
             </div>
             <div>
-              <label>Nome do preset</label>
-              <input type="text" id="preset-key" placeholder="starter_guard" />
-              <label>Categoria</label>
-              <select id="preset-category">
-                <option value="block">Blocos</option>
-                <option value="item">Itens/Armas</option>
-              </select>
-              <div class="row" style="margin-top: 6px;">
-                <select id="preset-item"></select>
-                <input id="preset-qty" type="number" value="1" min="1" />
-              </div>
-              <div class="btnbar" style="margin-top: 8px;">
-                <button class="good" id="preset-add">Adicionar</button>
-                <button class="bad" id="preset-remove">Remover</button>
-                <button id="preset-clear">Limpar</button>
-              </div>
-              <label>Conteúdo do preset</label>
-              <div id="preset-list-content" class="listbox"></div>
-              <div class="btnbar" style="margin-top:8px;">
-                <button class="good" id="preset-save">Salvar preset</button>
-                <button id="preset-new">Novo</button>
-                <button class="bad" id="preset-delete">Excluir</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div id="tab-ui" class="tab-pane content-tab-pane">
-          <div class="split">
-            <div>
-              <label>Aliases UI</label>
-              <div id="ui-alias-list" class="listbox"></div>
-            </div>
-            <div>
-              <label>Alias</label>
-              <input type="text" id="ui-alias-key" readonly />
-              <label>Texture ID (origem)</label>
-              <input type="text" id="ui-alias-value" placeholder="texture_key" />
-              <label>Upload imagem (opcional)</label>
-              <input type="file" id="ui-alias-image" accept="image/*" />
-              <label>Preview</label>
-              <div id="ui-alias-preview" class="thumb" style="width:80px;height:80px;"></div>
-              <div class="btnbar" style="margin-top:8px;">
-                <button class="good" id="ui-alias-save">Salvar UI alias</button>
+              <label>Posição atual de spawn</label>
+              <div class="status" id="player-spawn-status">x=- y=- z=-</div>
+              <div class="hint">
+                O botão <b>Set player pos</b> usa o mapa para escolher o spawn.<br/>
+                Abra a aba <b>Mapa</b>, clique no ponto desejado e volte quando quiser.
               </div>
             </div>
           </div>
@@ -758,6 +762,11 @@
           <div class="split">
             <div>
               <label>Menus</label>
+              <select id="menu-scope" style="margin-bottom:8px;">
+                <option value="menus">Menus Exclusivos</option>
+                <option value="hud">HUD Layer</option>
+                <option value="mobile">Mobile Layer</option>
+              </select>
               <div id="menu-list" class="listbox"></div>
               <div class="row" style="margin-top:8px;">
                 <input type="text" id="menu-id" placeholder="menu_id" />
@@ -782,6 +791,7 @@
                   <option value="button">Button</option>
                   <option value="input">Text Input</option>
                   <option value="text">Text Output</option>
+                  <option value="image">Image</option>
                 </select>
                 <button id="menu-element-add">Adicionar</button>
               </div>
@@ -796,6 +806,16 @@
                 <div><label>X</label><input type="number" id="menu-el-x" step="1" /></div>
                 <div><label>Y</label><input type="number" id="menu-el-y" step="1" /></div>
                 <div><label>Rotação</label><input type="number" id="menu-el-rotation" step="1" /></div>
+              </div>
+              <div class="row">
+                <div>
+                  <label>Anchor X</label>
+                  <select id="menu-el-anchor-x"><option value="left">left</option><option value="right">right</option></select>
+                </div>
+                <div>
+                  <label>Anchor Y</label>
+                  <select id="menu-el-anchor-y"><option value="top">top</option><option value="bottom">bottom</option></select>
+                </div>
               </div>
               <div class="row3">
                 <div><label>Largura</label><input type="number" id="menu-el-w" step="1" /></div>
@@ -832,6 +852,20 @@
                   <input type="number" id="menu-el-font" step="1" value="16" />
                 </div>
               </div>
+              <div class="row">
+                <div>
+                  <label>Sprite fit</label>
+                  <select id="menu-el-sprite-fit">
+                    <option value="cover">cover</option>
+                    <option value="contain">contain</option>
+                    <option value="stretch">stretch</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Opacity</label>
+                  <input type="number" id="menu-el-opacity" step="0.05" min="0" max="1" value="1" />
+                </div>
+              </div>
               <label>Ação do botão</label>
               <select id="menu-el-action">
                 <option value="none">none</option>
@@ -839,11 +873,28 @@
                 <option value="back_menu">back_menu</option>
                 <option value="open_menu">open_menu</option>
                 <option value="script">script</option>
+                <option value="key_hold">key_hold</option>
+                <option value="primary_action">primary_action</option>
+                <option value="secondary_action">secondary_action</option>
+                <option value="jump">jump</option>
+                <option value="down_hold">down_hold</option>
+                <option value="drop_selected">drop_selected</option>
+                <option value="step_prev">step_prev</option>
+                <option value="step_next">step_next</option>
+                <option value="toggle_mode">toggle_mode</option>
+                <option value="export_map">export_map</option>
+                <option value="import_map">import_map</option>
+                <option value="open_editor_menu">open_editor_menu</option>
+                <option value="look_drag">look_drag</option>
               </select>
+              <label>Key code (action=key_hold)</label>
+              <input type="text" id="menu-el-keycode" placeholder="KeyW" />
               <label>Menu alvo (open_menu)</label>
               <input type="text" id="menu-el-target" placeholder="save" />
               <label>Script do botão (action=script)</label>
               <textarea id="menu-el-script" placeholder="api.openMenu('save');"></textarea>
+              <label>Estilo extra (JSON opcional)</label>
+              <textarea id="menu-el-style" placeholder='{"border":"1px solid rgba(255,255,255,0.3)","borderRadius":"8px"}'></textarea>
               <div class="btnbar" style="margin-top:8px;">
                 <button class="good" id="menu-el-save">Salvar elemento</button>
               </div>
@@ -857,6 +908,49 @@
           <div class="btnbar" style="margin-top:8px;">
             <button class="good" id="config-save">Salvar config</button>
             <button id="config-reset">Recarregar</button>
+          </div>
+        </div>
+
+        <div id="tab-audio" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Bancos FMOD</label>
+              <div id="audio-bank-list" class="listbox"></div>
+              <label>ID</label>
+              <input type="text" id="audio-bank-id" placeholder="master" />
+              <label>Path no ROM</label>
+              <input type="text" id="audio-bank-path" placeholder="data/audio/Master.bank" />
+              <div class="row">
+                <div>
+                  <label>Auto-load</label>
+                  <select id="audio-bank-autoload"><option value="true">true</option><option value="false">false</option></select>
+                </div>
+                <div>
+                  <label>Load samples</label>
+                  <select id="audio-bank-loadsamples"><option value="true">true</option><option value="false">false</option></select>
+                </div>
+              </div>
+              <label>Upload banco</label>
+              <input type="file" id="audio-bank-file" />
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="audio-bank-save">Salvar banco</button>
+                <button id="audio-bank-new">Novo</button>
+                <button class="bad" id="audio-bank-delete">Excluir</button>
+              </div>
+            </div>
+            <div>
+              <label>Eventos (alias -> event path)</label>
+              <div id="audio-event-list" class="listbox"></div>
+              <label>Alias</label>
+              <input type="text" id="audio-event-id" placeholder="npcTalk" />
+              <label>Event path</label>
+              <input type="text" id="audio-event-path" placeholder="event:/teste" />
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="audio-event-save">Salvar evento</button>
+                <button id="audio-event-new">Novo</button>
+                <button class="bad" id="audio-event-delete">Excluir</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -894,6 +988,7 @@
       { default: ITEMS },
       { default: texturesToLoad },
       { default: MENU_CONFIG },
+      { default: UI_LAYOUT_CONFIG },
       factionsModule,
     ] = await Promise.all([
       importWithFallback(['./src/rom-config/config.js', './src/config.js']),
@@ -902,6 +997,7 @@
       importWithFallback(['./src/rom-config/items.js', './src/items.js']),
       importWithFallback(['./src/rom-config/textures.js', './src/textures.js']),
       importWithFallback(['./src/rom-config/menus.js', './src/menus.js']),
+      importWithFallback(['./src/rom-config/ui-layout.js', './src/ui-layout.js']),
       importWithFallback(['./src/rom-config/factions.js', './src/factions.js'])
     ]);
 
@@ -953,9 +1049,11 @@
       selectedFactionKey: null,
       selectedTextureKey: null,
       selectedPresetKey: null,
-      selectedUiAliasKey: null,
+      selectedAudioBankId: null,
+      selectedAudioEventId: null,
       selectedMenuKey: null,
       selectedMenuElementId: null,
+      inventorySubtab: 'manager',
       settingPlayerSpawn: false,
       layerClipboard: null,
       importedZip: null,
@@ -976,8 +1074,19 @@
           aliases: {}
         },
         menus: deepCloneWithFns(MENU_CONFIG || {}),
+        uiLayout: deepCloneWithFns(UI_LAYOUT_CONFIG || {}),
+        audio: {
+          banks: [
+            { id: 'master', path: 'data/audio/Master.bank', autoLoad: true, loadSamples: true },
+            { id: 'master_strings', path: 'data/audio/Master.strings.bank', autoLoad: true, loadSamples: false }
+          ],
+          events: {
+            npcTalk: 'event:/teste'
+          }
+        },
         config: deepCloneWithFns(CONFIG),
-        embeddedImages: {}
+        embeddedImages: {},
+        embeddedAudio: {}
       },
       map: {
         version: 1,
@@ -1204,6 +1313,7 @@
     const mapRenameEl = $('map-rename');
     const mapDeleteEl = $('map-delete');
     const mapSetPlayerPosEl = $('map-set-player-pos');
+    const playerSpawnStatusEl = $('player-spawn-status');
 
     const invTargetEl = $('inv-target');
     const invCategoryEl = $('inv-category');
@@ -1216,18 +1326,17 @@
     const invListEl = $('inv-list');
     const invPresetEl = $('inv-preset');
     const invApplyPresetEl = $('inv-apply-preset');
+    const inventorySubtabSelectEl = $('inventory-subtab-select');
+    const inventoryPaneManagerEl = $('inventory-pane-manager');
+    const inventoryPanePresetsEl = $('inventory-pane-presets');
     const presetListEl = $('preset-list');
     const presetKeyEl = $('preset-key');
     const presetCategoryEl = $('preset-category');
     const presetItemEl = $('preset-item');
     const presetQtyEl = $('preset-qty');
     const presetListContentEl = $('preset-list-content');
-    const uiAliasListEl = $('ui-alias-list');
-    const uiAliasKeyEl = $('ui-alias-key');
-    const uiAliasValueEl = $('ui-alias-value');
-    const uiAliasImageEl = $('ui-alias-image');
-    const uiAliasPreviewEl = $('ui-alias-preview');
     const menuListEl = $('menu-list');
+    const menuScopeEl = $('menu-scope');
     const menuIdEl = $('menu-id');
     const menuTitleEl = $('menu-title');
     const menuBgEl = $('menu-bg');
@@ -1241,6 +1350,8 @@
     const menuElW = $('menu-el-w');
     const menuElH = $('menu-el-h');
     const menuElRotation = $('menu-el-rotation');
+    const menuElAnchorX = $('menu-el-anchor-x');
+    const menuElAnchorY = $('menu-el-anchor-y');
     const menuElFlipX = $('menu-el-flipx');
     const menuElFlipY = $('menu-el-flipy');
     const menuElText = $('menu-el-text');
@@ -1249,9 +1360,22 @@
     const menuElColor = $('menu-el-color');
     const menuElSprite = $('menu-el-sprite');
     const menuElFont = $('menu-el-font');
+    const menuElSpriteFit = $('menu-el-sprite-fit');
+    const menuElOpacity = $('menu-el-opacity');
     const menuElAction = $('menu-el-action');
+    const menuElKeycode = $('menu-el-keycode');
     const menuElTarget = $('menu-el-target');
     const menuElScript = $('menu-el-script');
+    const menuElStyle = $('menu-el-style');
+    const audioBankListEl = $('audio-bank-list');
+    const audioBankIdEl = $('audio-bank-id');
+    const audioBankPathEl = $('audio-bank-path');
+    const audioBankAutoloadEl = $('audio-bank-autoload');
+    const audioBankLoadSamplesEl = $('audio-bank-loadsamples');
+    const audioBankFileEl = $('audio-bank-file');
+    const audioEventListEl = $('audio-event-list');
+    const audioEventIdEl = $('audio-event-id');
+    const audioEventPathEl = $('audio-event-path');
     const configJsonEl = $('config-json');
 
     const inventoryState = { targetKey: 'player', category: 'item' };
@@ -1529,6 +1653,18 @@
       target.entity.itemInventory = { ...(preset.itemInventory || {}) };
       renderInventoryList();
       setStatus(`Preset aplicado: ${key}`);
+    });
+
+    function setInventorySubtab(tab) {
+      const next = tab === 'presets' ? 'presets' : 'manager';
+      state.inventorySubtab = next;
+      if (inventorySubtabSelectEl.value !== next) inventorySubtabSelectEl.value = next;
+      inventoryPaneManagerEl.classList.toggle('active', next === 'manager');
+      inventoryPanePresetsEl.classList.toggle('active', next === 'presets');
+    }
+
+    inventorySubtabSelectEl.addEventListener('change', () => {
+      setInventorySubtab(inventorySubtabSelectEl.value);
     });
 
     function recalcBounds() {
@@ -2065,6 +2201,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         player.pitch = 0;
         state.settingPlayerSpawn = false;
         mapSetPlayerPosEl.classList.remove('primary');
+        updatePlayerSpawnStatus();
         markMapDirty();
         draw();
         setStatus(`Spawn do player definido em (${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}).`);
@@ -2389,6 +2526,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       playerImageKeyEl.value = state.db.ui.playerPortraitTextureKey || 'ui_player_face';
       playerNameEl.value = state.db.ui.playerName || 'A.S.S';
       updatePlayerImagePreview();
+      updatePlayerSpawnStatus();
       markMapDirty();
       if (!options.skipCollectionSync && state.currentMapName) {
         state.maps[state.currentMapName] = cloneMapPayload(state.map);
@@ -2594,6 +2732,18 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       }
     }
 
+    function applyInlineStyleObject(node, styleObj) {
+      if (!node || !styleObj || typeof styleObj !== 'object') return;
+      for (const [k, v] of Object.entries(styleObj)) {
+        if (v == null) continue;
+        try {
+          node.style[k] = String(v);
+        } catch {
+          // ignore invalid style names
+        }
+      }
+    }
+
     function setPreviewBox(el, key) {
       el.innerHTML = '';
       const url = getTextureUrl(key);
@@ -2614,6 +2764,15 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       img.src = getTextureUrl(key) || state.db.embeddedImages.ui_player_face || createSolidPngDataUrl('#808080', 64);
       img.alt = '';
       playerImagePreviewEl.appendChild(img);
+    }
+
+    function updatePlayerSpawnStatus() {
+      if (!playerSpawnStatusEl) return;
+      const p = ensurePlayer();
+      const fx = Number(p.x || 0).toFixed(2);
+      const fy = Number(p.y || 0).toFixed(2);
+      const fz = Number(p.z || 0).toFixed(2);
+      playerSpawnStatusEl.textContent = `x=${fx} y=${fy} z=${fz}`;
     }
 
     function updateBlockPreview() {
@@ -2645,10 +2804,11 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       renderCreaturesTab();
       renderFactionsTab();
       renderTexturesTab();
-      renderUiTab();
+      renderPlayerTab();
       renderMenusTab();
       renderConfigTab();
       renderPresetsTab();
+      renderAudioTab();
       updatePlayerImagePreview();
       markMapDirty();
       draw();
@@ -3432,6 +3592,181 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       renderPresetInventoryList();
     });
 
+    function normalizeAudioDb() {
+      if (!state.db.audio || typeof state.db.audio !== 'object') state.db.audio = {};
+      if (!Array.isArray(state.db.audio.banks)) state.db.audio.banks = [];
+      if (!state.db.audio.events || typeof state.db.audio.events !== 'object' || Array.isArray(state.db.audio.events)) {
+        state.db.audio.events = {};
+      }
+      state.db.audio.banks = state.db.audio.banks.map((bank, i) => ({
+        id: String((bank && bank.id) || `bank_${i + 1}`),
+        path: canonicalizeRomPath(String((bank && bank.path) || 'data/audio/').trim()) || `data/audio/bank_${i + 1}.bank`,
+        autoLoad: bank && bank.autoLoad !== false,
+        loadSamples: bank && bank.loadSamples !== false
+      })).filter((bank) => bank.path);
+      if (!state.db.embeddedAudio || typeof state.db.embeddedAudio !== 'object') state.db.embeddedAudio = {};
+    }
+
+    function renderAudioTab() {
+      normalizeAudioDb();
+      const banks = [...state.db.audio.banks].sort((a, b) => a.id.localeCompare(b.id));
+      if (!state.selectedAudioBankId && banks.length) state.selectedAudioBankId = banks[0].id;
+      if (state.selectedAudioBankId && !banks.find((b) => b.id === state.selectedAudioBankId)) {
+        state.selectedAudioBankId = banks[0] ? banks[0].id : null;
+      }
+      const selectedBank = banks.find((b) => b.id === state.selectedAudioBankId) || null;
+      renderSimpleList(
+        audioBankListEl,
+        banks,
+        (b) => b.id === state.selectedAudioBankId,
+        (b) => `${b.id} -> ${b.path}`,
+        (b) => {
+          state.selectedAudioBankId = b.id;
+          renderAudioTab();
+        }
+      );
+      audioBankIdEl.value = selectedBank ? selectedBank.id : '';
+      audioBankPathEl.value = selectedBank ? selectedBank.path : 'data/audio/';
+      audioBankAutoloadEl.value = String(selectedBank ? selectedBank.autoLoad !== false : true);
+      audioBankLoadSamplesEl.value = String(selectedBank ? selectedBank.loadSamples !== false : true);
+
+      const eventEntries = Object.entries(state.db.audio.events).sort((a, b) => a[0].localeCompare(b[0]));
+      if (!state.selectedAudioEventId && eventEntries.length) state.selectedAudioEventId = eventEntries[0][0];
+      if (state.selectedAudioEventId && !state.db.audio.events[state.selectedAudioEventId]) {
+        state.selectedAudioEventId = eventEntries[0] ? eventEntries[0][0] : null;
+      }
+      renderSimpleList(
+        audioEventListEl,
+        eventEntries.map(([id, path]) => ({ id, path })),
+        (e) => e.id === state.selectedAudioEventId,
+        (e) => `${e.id} -> ${e.path}`,
+        (e) => {
+          state.selectedAudioEventId = e.id;
+          renderAudioTab();
+        }
+      );
+      audioEventIdEl.value = state.selectedAudioEventId || '';
+      audioEventPathEl.value = state.selectedAudioEventId ? String(state.db.audio.events[state.selectedAudioEventId] || '') : '';
+    }
+
+    $('audio-bank-new').addEventListener('click', () => {
+      normalizeAudioDb();
+      let i = 1;
+      let id = 'bank_new';
+      while (state.db.audio.banks.find((b) => b.id === id)) {
+        i += 1;
+        id = `bank_new_${i}`;
+      }
+      state.db.audio.banks.push({ id, path: `data/audio/${id}.bank`, autoLoad: true, loadSamples: true });
+      state.selectedAudioBankId = id;
+      renderAudioTab();
+      setDbStatus(`Banco criado: ${id}`);
+    });
+
+    $('audio-bank-save').addEventListener('click', async () => {
+      normalizeAudioDb();
+      let id = String(audioBankIdEl.value || '').trim();
+      if (!id) {
+        setDbStatus('ID do banco é obrigatório.');
+        return;
+      }
+      id = id.replace(/[^A-Za-z0-9_-]/g, '_');
+      const pathRaw = String(audioBankPathEl.value || '').trim();
+      const path = canonicalizeRomPath(pathRaw || `data/audio/${id}.bank`);
+      const autoLoad = String(audioBankAutoloadEl.value) !== 'false';
+      const loadSamples = String(audioBankLoadSamplesEl.value) !== 'false';
+      const existingIndex = state.db.audio.banks.findIndex((b) => b.id === state.selectedAudioBankId);
+      const byIdIndex = state.db.audio.banks.findIndex((b) => b.id === id);
+      const payload = { id, path, autoLoad, loadSamples };
+      if (existingIndex >= 0) {
+        if (byIdIndex >= 0 && byIdIndex !== existingIndex) {
+          state.db.audio.banks.splice(byIdIndex, 1);
+        }
+        state.db.audio.banks[existingIndex] = payload;
+      } else if (byIdIndex >= 0) {
+        state.db.audio.banks[byIdIndex] = payload;
+      } else {
+        state.db.audio.banks.push(payload);
+      }
+      const file = audioBankFileEl.files && audioBankFileEl.files[0];
+      if (file) {
+        const dataUrl = await fileToDataUrl(file);
+        state.db.embeddedAudio[path] = dataUrl;
+        audioBankFileEl.value = '';
+      }
+      state.selectedAudioBankId = id;
+      renderAudioTab();
+      markMapDirty();
+      setDbStatus(`Banco salvo: ${id}`);
+    });
+
+    $('audio-bank-delete').addEventListener('click', () => {
+      normalizeAudioDb();
+      const id = String(state.selectedAudioBankId || '').trim();
+      if (!id) return;
+      const idx = state.db.audio.banks.findIndex((b) => b.id === id);
+      if (idx < 0) return;
+      const removed = state.db.audio.banks[idx];
+      state.db.audio.banks.splice(idx, 1);
+      if (removed && removed.path) delete state.db.embeddedAudio[removed.path];
+      state.selectedAudioBankId = state.db.audio.banks[0] ? state.db.audio.banks[0].id : null;
+      renderAudioTab();
+      markMapDirty();
+      setDbStatus(`Banco removido: ${id}`);
+    });
+
+    $('audio-event-new').addEventListener('click', () => {
+      normalizeAudioDb();
+      let i = 1;
+      let id = 'event_new';
+      while (state.db.audio.events[id]) {
+        i += 1;
+        id = `event_new_${i}`;
+      }
+      state.db.audio.events[id] = 'event:/';
+      state.selectedAudioEventId = id;
+      renderAudioTab();
+      setDbStatus(`Evento criado: ${id}`);
+    });
+
+    $('audio-event-save').addEventListener('click', () => {
+      normalizeAudioDb();
+      let id = String(audioEventIdEl.value || '').trim();
+      const path = String(audioEventPathEl.value || '').trim();
+      if (!id || !path) {
+        setDbStatus('Alias e event path são obrigatórios.');
+        return;
+      }
+      id = id.replace(/[^A-Za-z0-9_-]/g, '_');
+      const prev = String(state.selectedAudioEventId || '').trim();
+      if (prev && prev !== id && state.db.audio.events[prev]) delete state.db.audio.events[prev];
+      state.db.audio.events[id] = path;
+      state.selectedAudioEventId = id;
+      renderAudioTab();
+      markMapDirty();
+      setDbStatus(`Evento salvo: ${id}`);
+    });
+
+    $('audio-event-delete').addEventListener('click', () => {
+      normalizeAudioDb();
+      const id = String(state.selectedAudioEventId || '').trim();
+      if (!id || !state.db.audio.events[id]) return;
+      delete state.db.audio.events[id];
+      state.selectedAudioEventId = Object.keys(state.db.audio.events)[0] || null;
+      renderAudioTab();
+      markMapDirty();
+      setDbStatus(`Evento removido: ${id}`);
+    });
+
+    audioBankFileEl.addEventListener('change', () => {
+      const file = audioBankFileEl.files && audioBankFileEl.files[0];
+      if (!file) return;
+      const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+      if (!String(audioBankPathEl.value || '').trim()) {
+        audioBankPathEl.value = `data/audio/${safeName}`;
+      }
+    });
+
     function normalizeMenusDb() {
       if (!state.db.menus || typeof state.db.menus !== 'object') state.db.menus = {};
       if (!state.db.menus.menus || typeof state.db.menus.menus !== 'object') state.db.menus.menus = {};
@@ -3448,9 +3783,11 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         if (!Array.isArray(menu.elements)) menu.elements = [];
         menu.elements = menu.elements.map((el, i) => ({
           id: String(el.id || `el_${i}`),
-          type: ['button', 'input', 'text'].includes(String(el.type || 'button')) ? String(el.type) : 'button',
+          type: ['button', 'input', 'text', 'image'].includes(String(el.type || 'button')) ? String(el.type) : 'button',
           x: Number(el.x || 20),
           y: Number(el.y || 20),
+          anchorX: String(el.anchorX || 'left') === 'right' ? 'right' : 'left',
+          anchorY: String(el.anchorY || 'top') === 'bottom' ? 'bottom' : 'top',
           width: Math.max(12, Number(el.width || 160)),
           height: Math.max(12, Number(el.height || 40)),
           rotation: Number(el.rotation || 0),
@@ -3462,7 +3799,11 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           flatColor: String(el.flatColor || '#333333'),
           textColor: String(el.textColor || '#ffffff'),
           spriteKey: String(el.spriteKey || ''),
+          spriteFit: ['cover', 'contain', 'stretch'].includes(String(el.spriteFit || '').toLowerCase()) ? String(el.spriteFit).toLowerCase() : 'cover',
+          opacity: Math.max(0, Math.min(1, Number(el.opacity == null ? 1 : el.opacity))),
+          style: (el.style && typeof el.style === 'object' && !Array.isArray(el.style)) ? { ...el.style } : {},
           action: String(el.action || 'none'),
+          keyCode: String(el.keyCode || ''),
           targetMenu: String(el.targetMenu || ''),
           script: String(el.script || ''),
           fontSize: Math.max(8, Number(el.fontSize || 16))
@@ -3470,15 +3811,75 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       }
     }
 
+    function normalizeUiLayoutDb() {
+      if (!state.db.uiLayout || typeof state.db.uiLayout !== 'object') state.db.uiLayout = {};
+      if (typeof state.db.uiLayout.enabled !== 'boolean') state.db.uiLayout.enabled = true;
+      if (!state.db.uiLayout.layers || typeof state.db.uiLayout.layers !== 'object') state.db.uiLayout.layers = {};
+      if (!state.db.uiLayout.layers.hud) state.db.uiLayout.layers.hud = { id: 'hud', elements: [] };
+      if (!state.db.uiLayout.layers.mobile) state.db.uiLayout.layers.mobile = { id: 'mobile', elements: [] };
+      for (const key of ['hud', 'mobile']) {
+        const layer = state.db.uiLayout.layers[key];
+        if (!Array.isArray(layer.elements)) layer.elements = [];
+        layer.id = key;
+        layer.title = layer.title || key.toUpperCase();
+        layer.backgroundColor = String(layer.backgroundColor || '#000000');
+        layer.elements = layer.elements.map((el, i) => ({
+          id: String(el.id || `el_${i}`),
+          type: ['button', 'input', 'text', 'image'].includes(String(el.type || 'button')) ? String(el.type) : 'button',
+          x: Number(el.x || 20),
+          y: Number(el.y || 20),
+          anchorX: String(el.anchorX || 'left') === 'right' ? 'right' : 'left',
+          anchorY: String(el.anchorY || 'top') === 'bottom' ? 'bottom' : 'top',
+          width: Math.max(12, Number(el.width || 160)),
+          height: Math.max(12, Number(el.height || 40)),
+          rotation: Number(el.rotation || 0),
+          flipX: !!el.flipX,
+          flipY: !!el.flipY,
+          text: String(el.text || ''),
+          placeholder: String(el.placeholder || ''),
+          bind: String(el.bind || ''),
+          flatColor: String(el.flatColor || '#333333'),
+          textColor: String(el.textColor || '#ffffff'),
+          spriteKey: String(el.spriteKey || ''),
+          spriteFit: ['cover', 'contain', 'stretch'].includes(String(el.spriteFit || '').toLowerCase()) ? String(el.spriteFit).toLowerCase() : 'cover',
+          opacity: Math.max(0, Math.min(1, Number(el.opacity == null ? 1 : el.opacity))),
+          style: (el.style && typeof el.style === 'object' && !Array.isArray(el.style)) ? { ...el.style } : {},
+          action: String(el.action || 'none'),
+          keyCode: String(el.keyCode || ''),
+          targetMenu: String(el.targetMenu || ''),
+          script: String(el.script || ''),
+          fontSize: Math.max(8, Number(el.fontSize || 16))
+        }));
+      }
+    }
+
+    function getMenuEditorScope() {
+      return String(menuScopeEl.value || 'menus');
+    }
+
+    function getMenuStoreByScope(scope) {
+      if (scope === 'menus') return state.db.menus.menus;
+      normalizeUiLayoutDb();
+      if (scope === 'hud') return { hud: state.db.uiLayout.layers.hud };
+      if (scope === 'mobile') return { mobile: state.db.uiLayout.layers.mobile };
+      return state.db.menus.menus;
+    }
+
     function getMenuEntries() {
       normalizeMenusDb();
-      return Object.values(state.db.menus.menus).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
+      const scope = getMenuEditorScope();
+      const store = getMenuStoreByScope(scope);
+      return Object.values(store).sort((a, b) => String(a.id || '').localeCompare(String(b.id || '')));
     }
 
     function getSelectedMenu() {
       normalizeMenusDb();
+      const scope = getMenuEditorScope();
+      const store = getMenuStoreByScope(scope);
+      if (scope === 'hud') return store.hud || null;
+      if (scope === 'mobile') return store.mobile || null;
       const key = state.selectedMenuKey;
-      return key ? state.db.menus.menus[key] || null : null;
+      return key ? store[key] || null : null;
     }
 
     function getSelectedMenuElement() {
@@ -3493,18 +3894,24 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         type,
         x: 24,
         y: 24,
-        width: type === 'text' ? 220 : 180,
-        height: type === 'text' ? 34 : 44,
+        anchorX: 'left',
+        anchorY: 'top',
+        width: type === 'text' ? 220 : (type === 'image' ? 128 : 180),
+        height: type === 'text' ? 34 : (type === 'image' ? 128 : 44),
         rotation: 0,
         flipX: false,
         flipY: false,
         text: type === 'button' ? 'Button' : (type === 'text' ? 'Text output' : ''),
         placeholder: type === 'input' ? 'text...' : '',
         bind: type === 'input' ? 'inputValue' : '',
-        flatColor: '#2a2a2a',
+        flatColor: type === 'image' ? 'transparent' : '#2a2a2a',
         textColor: '#ffffff',
         spriteKey: '',
+        spriteFit: 'cover',
+        opacity: 1,
+        style: {},
         action: type === 'button' ? 'none' : 'none',
+        keyCode: '',
         targetMenu: '',
         script: '',
         fontSize: 16
@@ -3515,7 +3922,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const el = getSelectedMenuElement();
       const menu = getSelectedMenu();
       const hasEl = !!el;
-      for (const inputEl of [menuElX, menuElY, menuElW, menuElH, menuElRotation, menuElText, menuElBind, menuElBg, menuElColor, menuElSprite, menuElFont, menuElAction, menuElTarget, menuElScript, menuElFlipX, menuElFlipY]) {
+      for (const inputEl of [menuElX, menuElY, menuElW, menuElH, menuElRotation, menuElAnchorX, menuElAnchorY, menuElText, menuElBind, menuElBg, menuElColor, menuElSprite, menuElFont, menuElSpriteFit, menuElOpacity, menuElAction, menuElKeycode, menuElTarget, menuElScript, menuElStyle, menuElFlipX, menuElFlipY]) {
         if (inputEl) inputEl.disabled = !hasEl;
       }
       if (!el) {
@@ -3524,15 +3931,21 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         menuElW.value = '';
         menuElH.value = '';
         menuElRotation.value = '';
+        menuElAnchorX.value = 'left';
+        menuElAnchorY.value = 'top';
         menuElText.value = '';
         menuElBind.value = '';
         menuElBg.value = '';
         menuElColor.value = '';
         menuElSprite.value = '';
         menuElFont.value = '16';
+        menuElSpriteFit.value = 'cover';
+        menuElOpacity.value = '1';
         menuElAction.value = 'none';
+        menuElKeycode.value = '';
         menuElTarget.value = '';
         menuElScript.value = '';
+        menuElStyle.value = '{}';
         menuElFlipX.value = 'false';
         menuElFlipY.value = 'false';
       } else {
@@ -3541,21 +3954,35 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         menuElW.value = String(Math.round(el.width));
         menuElH.value = String(Math.round(el.height));
         menuElRotation.value = String(Math.round(el.rotation || 0));
+        menuElAnchorX.value = String(el.anchorX || 'left');
+        menuElAnchorY.value = String(el.anchorY || 'top');
         menuElText.value = el.type === 'input' ? (el.placeholder || '') : (el.text || '');
         menuElBind.value = String(el.bind || '');
         menuElBg.value = String(el.flatColor || '');
         menuElColor.value = String(el.textColor || '#ffffff');
         menuElSprite.value = String(el.spriteKey || '');
         menuElFont.value = String(el.fontSize || 16);
+        menuElSpriteFit.value = String(el.spriteFit || 'cover');
+        menuElOpacity.value = String(el.opacity == null ? 1 : el.opacity);
         menuElAction.value = String(el.action || 'none');
+        menuElKeycode.value = String(el.keyCode || '');
         menuElTarget.value = String(el.targetMenu || '');
         menuElScript.value = String(el.script || '');
+        menuElStyle.value = JSON.stringify(el.style || {}, null, 2);
         menuElFlipX.value = String(!!el.flipX);
         menuElFlipY.value = String(!!el.flipY);
       }
-      menuElAction.disabled = !(hasEl && el.type === 'button');
-      menuElTarget.disabled = !(hasEl && el.type === 'button');
-      menuElScript.disabled = !(hasEl && el.type === 'button');
+      const isButton = hasEl && el.type === 'button';
+      const isInput = hasEl && el.type === 'input';
+      const isImage = hasEl && el.type === 'image';
+      menuElAction.disabled = !isButton;
+      menuElKeycode.disabled = !isButton;
+      menuElTarget.disabled = !isButton;
+      menuElScript.disabled = !isButton;
+      menuElBind.disabled = !(isInput || isImage || (hasEl && el.type === 'text'));
+      menuElText.disabled = isImage;
+      menuElFont.disabled = isImage;
+      menuElColor.disabled = isImage;
       menuElementTypeEl.disabled = !menu;
     }
 
@@ -3568,8 +3995,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         const node = document.createElement('div');
         node.className = 'menu-node' + (el.id === state.selectedMenuElementId ? ' active' : '');
         node.dataset.menuElementId = el.id;
-        node.style.left = `${el.x}px`;
-        node.style.top = `${el.y}px`;
+        node.style.left = el.anchorX === 'right' ? 'auto' : `${el.x}px`;
+        node.style.right = el.anchorX === 'right' ? `${el.x}px` : 'auto';
+        node.style.top = el.anchorY === 'bottom' ? 'auto' : `${el.y}px`;
+        node.style.bottom = el.anchorY === 'bottom' ? `${el.y}px` : 'auto';
         node.style.width = `${el.width}px`;
         node.style.height = `${el.height}px`;
         node.style.transformOrigin = 'center center';
@@ -3577,20 +4006,26 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         node.style.background = el.flatColor || '#2a2a2a';
         node.style.color = el.textColor || '#fff';
         node.style.fontSize = `${Math.max(8, Number(el.fontSize || 16))}px`;
+        node.style.opacity = String(Math.max(0, Math.min(1, Number(el.opacity == null ? 1 : el.opacity))));
         node.style.display = 'flex';
         node.style.alignItems = 'center';
         node.style.justifyContent = 'center';
         node.style.overflow = 'hidden';
         node.style.padding = '4px';
+        applyInlineStyleObject(node, el.style);
         if (el.spriteKey) {
           const spriteUrl = getTextureUrl(el.spriteKey);
           if (spriteUrl) {
             node.style.backgroundImage = `url("${spriteUrl}")`;
-            node.style.backgroundSize = 'cover';
+            node.style.backgroundSize = el.spriteFit === 'contain' ? 'contain' : (el.spriteFit === 'stretch' ? '100% 100%' : 'cover');
             node.style.backgroundPosition = 'center';
+            node.style.backgroundRepeat = 'no-repeat';
           }
         }
-        if (el.type === 'input') {
+        if (el.type === 'image') {
+          node.textContent = '';
+          node.style.border = '1px dashed rgba(255,255,255,0.2)';
+        } else if (el.type === 'input') {
           node.textContent = el.placeholder || 'input';
         } else {
           node.textContent = el.text || (el.type === 'button' ? 'button' : 'text');
@@ -3617,9 +4052,16 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function renderMenusTab() {
       normalizeMenusDb();
+      normalizeUiLayoutDb();
+      const scope = getMenuEditorScope();
+      const menuStore = getMenuStoreByScope(scope);
       const menus = getMenuEntries();
-      if (!state.selectedMenuKey && menus.length) state.selectedMenuKey = menus[0].id;
-      if (state.selectedMenuKey && !state.db.menus.menus[state.selectedMenuKey]) state.selectedMenuKey = menus[0] ? menus[0].id : null;
+      if (scope === 'menus') {
+        if (!state.selectedMenuKey && menus.length) state.selectedMenuKey = menus[0].id;
+        if (state.selectedMenuKey && !menuStore[state.selectedMenuKey]) state.selectedMenuKey = menus[0] ? menus[0].id : null;
+      } else {
+        state.selectedMenuKey = scope;
+      }
       const menu = getSelectedMenu();
       if (menu && (!state.selectedMenuElementId || !menu.elements.find((e) => e.id === state.selectedMenuElementId))) {
         state.selectedMenuElementId = menu.elements[0] ? menu.elements[0].id : null;
@@ -3638,6 +4080,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       menuIdEl.value = menu ? String(menu.id || '') : '';
       menuTitleEl.value = menu ? String(menu.title || '') : '';
       menuBgEl.value = menu ? String(menu.backgroundColor || '#000000') : '#000000';
+      const isExclusiveMenusScope = scope === 'menus';
+      menuIdEl.disabled = !isExclusiveMenusScope;
+      menuDefaultEscEl.disabled = !isExclusiveMenusScope;
+      menuStartMenuEl.disabled = !isExclusiveMenusScope;
+      $('menu-new').disabled = !isExclusiveMenusScope;
+      $('menu-delete').disabled = !isExclusiveMenusScope;
 
       menuDefaultEscEl.innerHTML = '';
       menuStartMenuEl.innerHTML = '';
@@ -3708,6 +4156,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     }, { passive: false });
 
     $('menu-new').addEventListener('click', () => {
+      if (getMenuEditorScope() !== 'menus') return;
       normalizeMenusDb();
       let i = 1;
       let id = 'menu_new';
@@ -3724,8 +4173,23 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     $('menu-save').addEventListener('click', () => {
       normalizeMenusDb();
+      normalizeUiLayoutDb();
       const current = getSelectedMenu();
       if (!current) return;
+      const scope = getMenuEditorScope();
+      if (scope !== 'menus') {
+        const key = scope === 'hud' ? 'hud' : 'mobile';
+        state.db.uiLayout.layers[key] = {
+          ...current,
+          id: key,
+          title: String(menuTitleEl.value || key.toUpperCase()).trim() || key.toUpperCase(),
+          backgroundColor: String(menuBgEl.value || '#000000').trim() || '#000000'
+        };
+        renderMenusTab();
+        markMapDirty();
+        setDbStatus(`UI layer salva: ${key}`);
+        return;
+      }
       const oldId = current.id;
       const newId = String(menuIdEl.value || oldId).trim().replace(/[^A-Za-z0-9_-]/g, '_') || oldId;
       const nextMenu = {
@@ -3747,6 +4211,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     });
 
     $('menu-delete').addEventListener('click', () => {
+      if (getMenuEditorScope() !== 'menus') return;
       const menu = getSelectedMenu();
       if (!menu) return;
       delete state.db.menus.menus[menu.id];
@@ -3760,14 +4225,20 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     });
 
     menuDefaultEscEl.addEventListener('change', () => {
+      if (getMenuEditorScope() !== 'menus') return;
       normalizeMenusDb();
       state.db.menus.defaultEscapeMenu = String(menuDefaultEscEl.value || '').trim();
       markMapDirty();
     });
     menuStartMenuEl.addEventListener('change', () => {
+      if (getMenuEditorScope() !== 'menus') return;
       normalizeMenusDb();
       state.db.menus.startMenu = String(menuStartMenuEl.value || '').trim() || null;
       markMapDirty();
+    });
+    menuScopeEl.addEventListener('change', () => {
+      state.selectedMenuElementId = null;
+      renderMenusTab();
     });
 
     $('menu-element-add').addEventListener('click', () => {
@@ -3795,6 +4266,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       if (!el) return;
       el.x = Math.round(Number(menuElX.value || el.x || 0));
       el.y = Math.round(Number(menuElY.value || el.y || 0));
+      el.anchorX = String(menuElAnchorX.value || 'left') === 'right' ? 'right' : 'left';
+      el.anchorY = String(menuElAnchorY.value || 'top') === 'bottom' ? 'bottom' : 'top';
       el.width = Math.max(12, Math.round(Number(menuElW.value || el.width || 12)));
       el.height = Math.max(12, Math.round(Number(menuElH.value || el.height || 12)));
       el.rotation = Number(menuElRotation.value || 0);
@@ -3807,12 +4280,24 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       el.textColor = String(menuElColor.value || '#ffffff').trim();
       el.spriteKey = sanitizeTextureKey(menuElSprite.value || '');
       el.fontSize = Math.max(8, Number(menuElFont.value || 16));
+      el.spriteFit = String(menuElSpriteFit.value || 'cover').trim();
+      if (!['cover', 'contain', 'stretch'].includes(el.spriteFit)) el.spriteFit = 'cover';
+      el.opacity = Math.max(0, Math.min(1, Number(menuElOpacity.value == null || menuElOpacity.value === '' ? 1 : menuElOpacity.value)));
+      try {
+        const parsedStyle = JSON.parse(String(menuElStyle.value || '{}'));
+        el.style = (parsedStyle && typeof parsedStyle === 'object' && !Array.isArray(parsedStyle)) ? parsedStyle : {};
+      } catch (err) {
+        setDbStatus(`Estilo JSON inválido: ${err.message}`);
+        return;
+      }
       if (el.type === 'button') {
         el.action = String(menuElAction.value || 'none').trim();
+        el.keyCode = String(menuElKeycode.value || '').trim();
         el.targetMenu = String(menuElTarget.value || '').trim();
         el.script = String(menuElScript.value || '');
       } else {
         el.action = 'none';
+        el.keyCode = '';
         el.targetMenu = '';
         el.script = '';
       }
@@ -3821,64 +4306,17 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       setDbStatus(`Elemento salvo: ${el.id}`);
     });
 
-    function renderUiTab() {
+    function renderPlayerTab() {
       ensureMandatoryUiTextures();
-      const keys = Object.keys(state.db.ui.aliases || {}).sort((a, b) => a.localeCompare(b));
-      if (!state.selectedUiAliasKey && keys.length) state.selectedUiAliasKey = keys[0];
-      renderSimpleList(
-        uiAliasListEl,
-        keys.map((k) => ({ key: k })),
-        (e) => e.key === state.selectedUiAliasKey,
-        (e) => `${e.key} -> ${state.db.ui.aliases[e.key] || e.key}`,
-        (e) => {
-          state.selectedUiAliasKey = e.key;
-          renderUiTab();
-        }
-      );
-      const sel = state.selectedUiAliasKey || '';
-      uiAliasKeyEl.value = sel;
-      uiAliasValueEl.value = sel ? String(state.db.ui.aliases[sel] || '') : '';
-      uiAliasImageEl.value = '';
-      uiAliasPreviewEl.innerHTML = '';
-      if (sel) {
-        const img = document.createElement('img');
-        img.src = getTextureUrl(sel) || '';
-        img.alt = '';
-        uiAliasPreviewEl.appendChild(img);
-      }
+      playerImageKeyEl.value = state.db.ui.playerPortraitTextureKey || 'ui_player_face';
+      playerNameEl.value = state.db.ui.playerName || 'A.S.S';
+      updatePlayerImagePreview();
+      updatePlayerSpawnStatus();
     }
 
     function renderConfigTab() {
       configJsonEl.value = JSON.stringify(state.db.config || {}, null, 2);
     }
-
-    uiAliasValueEl.addEventListener('input', () => {
-      const alias = uiAliasKeyEl.value;
-      if (!alias) return;
-      state.db.ui.aliases[alias] = sanitizeTextureKey(uiAliasValueEl.value || alias);
-      applyUiAliasMappings();
-      rebuildTextureMap();
-      renderUiTab();
-    });
-
-    uiAliasImageEl.addEventListener('change', async () => {
-      const alias = uiAliasKeyEl.value;
-      if (!alias) return;
-      await applyUploadedTexture(uiAliasImageEl, alias);
-      state.db.ui.aliases[alias] = alias;
-      applyUiAliasMappings();
-      rebuildTextureMap();
-      renderUiTab();
-    });
-
-    $('ui-alias-save').addEventListener('click', () => {
-      applyUiAliasMappings();
-      rebuildTextureMap();
-      setDbStatus(`UI alias salvo: ${uiAliasKeyEl.value || '-'}`);
-      renderUiTab();
-      renderPalette();
-      draw();
-    });
 
     $('config-save').addEventListener('click', () => {
       try {
@@ -3902,10 +4340,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       creatures: 'tab-creatures',
       factions: 'tab-factions',
       textures: 'tab-textures',
-      ui: 'tab-ui',
+      player: 'tab-player',
       menus: 'tab-menus',
       config: 'tab-config',
-      presets: 'tab-presets'
+      audio: 'tab-audio'
     };
 
     function setActiveContentTab(tabId) {
@@ -3918,7 +4356,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function setActiveSection(section) {
       const requestedRaw = String(section || 'world');
-      const validSections = new Set(['world', 'inventory', 'rom', 'blocks', 'items', 'creatures', 'factions', 'textures', 'ui', 'menus', 'config', 'presets']);
+      const validSections = new Set(['world', 'inventory', 'rom', 'blocks', 'items', 'creatures', 'factions', 'textures', 'player', 'menus', 'config', 'audio']);
       const requested = validSections.has(requestedRaw) ? requestedRaw : 'world';
       const contentTabId = CONTENT_TAB_BY_SECTION[requested] || null;
       const sectionForPane = contentTabId ? 'content' : requested;
@@ -3929,6 +4367,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         pane.classList.toggle('active', ok);
       });
       if (contentTabId) setActiveContentTab(contentTabId);
+      if (requested === 'inventory') setInventorySubtab(state.inventorySubtab);
       updateSectionLayout();
     }
 
@@ -3998,6 +4437,15 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function buildMenusJS() {
       return `export default ${serializeJS(state.db.menus || {})};\n`;
+    }
+
+    function buildUILayoutJS() {
+      return `export default ${serializeJS(state.db.uiLayout || {})};\n`;
+    }
+
+    function buildAudioJSON() {
+      normalizeAudioDb();
+      return JSON.stringify(state.db.audio || { banks: [], events: {} }, null, 2);
     }
 
     function normalizeZipPath(path) {
@@ -4080,6 +4528,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const out = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
       return out;
+    }
+
+    function uint8ArrayToDataUrl(bytes, mime = 'application/octet-stream') {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return `data:${mime};base64,${btoa(binary)}`;
     }
 
     function createSolidPngDataUrl(color, size = 16) {
@@ -4168,6 +4622,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const factionsFile = pickZipFile(zip, ['data/config/factions.js', './data/config/factions.js', 'config/factions.js']);
       const configFile = pickZipFile(zip, ['data/config/config.js', './data/config/config.js', 'config/config.js']);
       const menusFile = pickZipFile(zip, ['data/config/menus.js', './data/config/menus.js', 'config/menus.js']);
+      const uiLayoutFile = pickZipFile(zip, ['data/config/ui-layout.js', './data/config/ui-layout.js', 'config/ui-layout.js']);
+      const audioConfigFile = pickZipFile(zip, ['data/config/audio.json', './data/config/audio.json', 'config/audio.json']);
       const presetsFile = pickZipFile(zip, ['data/config/inventory-presets.json', './data/config/inventory-presets.json', 'config/inventory-presets.json']);
       const uiFile = pickZipFile(zip, ['data/config/ui.json', './data/config/ui.json', 'config/ui.json']);
       const mapFile = pickZipFile(zip, ['data/maps/default.json', './data/maps/default.json', 'maps/default.json', 'map.json']);
@@ -4178,6 +4634,16 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       if (texturesFile) state.db.textures = deepCloneWithFns(parseDefaultExportModule(await texturesFile.async('string')) || state.db.textures);
       if (configFile) state.db.config = deepCloneWithFns(parseDefaultExportModule(await configFile.async('string')) || state.db.config);
       if (menusFile) state.db.menus = deepCloneWithFns(parseDefaultExportModule(await menusFile.async('string')) || state.db.menus);
+      if (uiLayoutFile) state.db.uiLayout = deepCloneWithFns(parseDefaultExportModule(await uiLayoutFile.async('string')) || state.db.uiLayout);
+      if (audioConfigFile) {
+        try {
+          const parsedAudio = JSON.parse(await audioConfigFile.async('string'));
+          state.db.audio = {
+            banks: Array.isArray(parsedAudio && parsedAudio.banks) ? parsedAudio.banks : [],
+            events: parsedAudio && parsedAudio.events && typeof parsedAudio.events === 'object' ? parsedAudio.events : {}
+          };
+        } catch {}
+      }
 
       if (factionsFile) {
         const parsed = parseFactionsModule(await factionsFile.async('string'));
@@ -4228,6 +4694,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       renderMapManager();
 
       state.db.embeddedImages = {};
+      state.db.embeddedAudio = {};
       rebuildTextureMap();
 
       for (const t of state.db.textures) {
@@ -4236,10 +4703,27 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         const fileInZip = findZipEntryByPath(zip, normalizedPath);
         if (!fileInZip) continue;
         const bytes = await fileInZip.async('uint8array');
-        let binary = '';
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const dataUrl = `data:${mimeFromPath(normalizedPath)};base64,${btoa(binary)}`;
+        const dataUrl = uint8ArrayToDataUrl(bytes, mimeFromPath(normalizedPath));
         state.db.embeddedImages[t.key] = dataUrl;
+      }
+
+      const audioFiles = Object.values(zip.files).filter((f) => !f.dir && /(?:^|\/)(?:data\/)?audio\/.+/i.test(normalizeZipPath(f.name)));
+      for (const af of audioFiles) {
+        const bytes = await af.async('uint8array');
+        const path = canonicalizeRomPath(af.name);
+        state.db.embeddedAudio[path] = uint8ArrayToDataUrl(bytes, 'application/octet-stream');
+      }
+      normalizeAudioDb();
+      if (!state.db.audio.banks.length && Object.keys(state.db.embeddedAudio).length) {
+        state.db.audio.banks = Object.keys(state.db.embeddedAudio)
+          .filter((path) => /\.bank$/i.test(path))
+          .sort((a, b) => a.localeCompare(b))
+          .map((path, i) => ({
+            id: i === 0 ? 'master' : `bank_${i + 1}`,
+            path,
+            autoLoad: true,
+            loadSamples: !/\.strings\.bank$/i.test(path)
+          }));
       }
 
       ensureMandatoryUiTextures();
@@ -4337,6 +4821,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
             path === 'data/config/npcs.js' ||
             path === 'data/config/config.js' ||
             path === 'data/config/menus.js' ||
+            path === 'data/config/ui-layout.js' ||
+            path === 'data/config/audio.json' ||
             path === 'data/config/textures.js' ||
             path === 'data/config/factions.js' ||
             path === 'data/config/inventory-presets.json' ||
@@ -4355,6 +4841,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       out.file('data/config/npcs.js', buildNpcsJS());
       out.file('data/config/config.js', buildConfigJS());
       out.file('data/config/menus.js', buildMenusJS());
+      out.file('data/config/ui-layout.js', buildUILayoutJS());
+      out.file('data/config/audio.json', buildAudioJSON());
       out.file('data/config/textures.js', buildTexturesJS());
       out.file('data/config/factions.js', buildFactionsJS());
       out.file('data/config/inventory-presets.json', JSON.stringify(state.db.inventoryPresets || {}, null, 2));
@@ -4376,6 +4864,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         out.file(targetPath, dataUrlToUint8Array(dataUrl));
       }
 
+      for (const [audioPathRaw, dataUrl] of Object.entries(state.db.embeddedAudio || {})) {
+        const targetPath = canonicalizeRomPath(audioPathRaw);
+        if (!targetPath) continue;
+        out.file(targetPath, dataUrlToUint8Array(dataUrl));
+      }
+
       out.file('editor-manifest.json', JSON.stringify({
         generatedAt: new Date().toISOString(),
         counts: {
@@ -4384,6 +4878,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           npcs: Object.keys(state.db.npcs).length,
           factions: Object.keys(state.db.factions.list).length,
           menus: Object.keys((state.db.menus && state.db.menus.menus) || {}).length,
+          uiLayers: Object.keys((state.db.uiLayout && state.db.uiLayout.layers) || {}).length,
+          audioBanks: Array.isArray(state.db.audio && state.db.audio.banks) ? state.db.audio.banks.length : 0,
           textures: state.db.textures.length,
           mapBlocks: state.map.blocks.length
         }
@@ -4455,10 +4951,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       renderCreaturesTab();
       renderFactionsTab();
       renderTexturesTab();
-      renderUiTab();
+      renderPlayerTab();
       renderMenusTab();
       renderConfigTab();
       renderPresetsTab();
+      renderAudioTab();
+      setInventorySubtab(state.inventorySubtab);
       primarySectionSelectEl.value = state.activeSection;
       setActiveSection(state.activeSection);
       resizeCanvas();

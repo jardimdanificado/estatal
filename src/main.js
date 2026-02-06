@@ -7,6 +7,7 @@ import BLOCK_TYPES from "./rom-config/blocks.js"
 import ITEMS from "./rom-config/items.js"
 import texturesToLoad from "./rom-config/textures.js"
 import MENUS from "./rom-config/menus.js"
+import UI_LAYOUT from "./rom-config/ui-layout.js"
 import { vocabulario } from "../lib/vocabulario.js"
 import { FACTIONS, FACTION_RELATIONS, FACTION_ORDER } from "./rom-config/factions.js"
 import world from "./world.js"
@@ -35,6 +36,10 @@ let TEXTURE_PREVIEW_MAP = {};
 let INVENTORY_ITEM_OPTIONS = [];
 let INVENTORY_BLOCK_OPTIONS = [];
 const GENERATED_UI_TEXTURE_CACHE = new Map();
+let ROM_AUDIO_CONFIG = {
+    banks: [],
+    events: {}
+};
 
 function replaceObjectContents(target, source) {
     for (const key of Object.keys(target)) delete target[key];
@@ -254,6 +259,8 @@ async function loadRomFromZipFile(file) {
     const npcsFile = pickZipFile(zip, ['data/config/npcs.js', 'config/npcs.js']);
     const texturesFile = pickZipFile(zip, ['data/config/textures.js', 'config/textures.js']);
     const factionsFile = pickZipFile(zip, ['data/config/factions.js', 'config/factions.js']);
+    const uiLayoutFile = pickZipFile(zip, ['data/config/ui-layout.js', 'config/ui-layout.js']);
+    const audioConfigFile = pickZipFile(zip, ['data/config/audio.json', 'config/audio.json']);
     const mapFile = pickZipFile(zip, ['data/maps/default.json', 'maps/default.json', 'map.json']);
 
     if (blocksFile) replaceObjectContents(BLOCK_TYPES, parseDefaultExportModule(await blocksFile.async('string')));
@@ -269,6 +276,31 @@ async function loadRomFromZipFile(file) {
         replaceObjectContents(FACTIONS, parsedFactions.FACTIONS || {});
         replaceObjectContents(FACTION_RELATIONS, parsedFactions.FACTION_RELATIONS || {});
         replaceArrayContents(FACTION_ORDER, parsedFactions.FACTION_ORDER || []);
+    }
+    if (uiLayoutFile) {
+        const parsedLayout = parseDefaultExportModule(await uiLayoutFile.async('string'));
+        replaceObjectContents(UI_LAYOUT, parsedLayout && typeof parsedLayout === 'object' ? parsedLayout : UI_LAYOUT);
+    }
+    ROM_AUDIO_CONFIG = { banks: [], events: {} };
+    if (audioConfigFile) {
+        try {
+            const parsedAudio = JSON.parse(await audioConfigFile.async('string'));
+            const banks = Array.isArray(parsedAudio && parsedAudio.banks) ? parsedAudio.banks : [];
+            const events = (parsedAudio && parsedAudio.events && typeof parsedAudio.events === 'object')
+                ? parsedAudio.events
+                : {};
+            ROM_AUDIO_CONFIG = {
+                banks: banks.map((b) => ({
+                    id: String((b && b.id) || ''),
+                    path: String((b && b.path) || ''),
+                    autoLoad: b && b.autoLoad !== false,
+                    loadSamples: b && b.loadSamples !== false
+                })).filter((b) => b.path),
+                events: { ...events }
+            };
+        } catch {
+            ROM_AUDIO_CONFIG = { banks: [], events: {} };
+        }
     }
 
     revokeRomTextureUrls();
@@ -327,20 +359,23 @@ async function loadRomFromZipFile(file) {
     }
     ROM_RUNTIME.mapPayload = ROM_RUNTIME.mapByName['default.json'] || Object.values(ROM_RUNTIME.mapByName)[0] || null;
 
-    const audioMaster = pickZipFile(zip, ['data/audio/Master.bank', 'audio/Master.bank']);
-    const audioStrings = pickZipFile(zip, ['data/audio/Master.strings.bank', 'audio/Master.strings.bank']);
-    if (audioMaster) {
-        const blob = await audioMaster.async('blob');
+    const audioFiles = Object.values(zip.files).filter((f) => !f.dir && /(?:^|\/)(?:data\/)?audio\/.+/i.test(normalizeRomPath(f.name)));
+    for (const af of audioFiles) {
+        const blob = await af.async('blob');
         const url = URL.createObjectURL(blob);
-        ROM_RUNTIME.assetUrlByPath['audio/Master.bank'] = url;
+        const normalized = normalizeRomPath(af.name);
+        ROM_RUNTIME.assetUrlByPath[normalized] = url;
+        if (normalized.startsWith('data/')) {
+            ROM_RUNTIME.assetUrlByPath[normalized.slice(5)] = url;
+        } else {
+            ROM_RUNTIME.assetUrlByPath[`data/${normalized}`] = url;
+        }
         ROM_RUNTIME.objectUrls.push(url);
     }
-    if (audioStrings) {
-        const blob = await audioStrings.async('blob');
-        const url = URL.createObjectURL(blob);
-        ROM_RUNTIME.assetUrlByPath['audio/Master.strings.bank'] = url;
-        ROM_RUNTIME.objectUrls.push(url);
-    }
+    const masterUrl = ROM_RUNTIME.assetUrlByPath['audio/Master.bank'] || ROM_RUNTIME.assetUrlByPath['data/audio/Master.bank'];
+    const stringsUrl = ROM_RUNTIME.assetUrlByPath['audio/Master.strings.bank'] || ROM_RUNTIME.assetUrlByPath['data/audio/Master.strings.bank'];
+    if (masterUrl) ROM_RUNTIME.assetUrlByPath['audio/Master.bank'] = masterUrl;
+    if (stringsUrl) ROM_RUNTIME.assetUrlByPath['audio/Master.strings.bank'] = stringsUrl;
 
     ROM_RUNTIME.enabled = true;
     ROM_RUNTIME.name = file.name;
@@ -536,7 +571,7 @@ function hideLoadingOverlay() {
 }
 
 function setGameplayUiVisible(world, visible) {
-    const ids = ['crosshair', 'interaction', 'block-outline', 'current-item', 'hud', 'hand-item', 'mobile-controls'];
+    const ids = ['crosshair', 'interaction', 'block-outline', 'current-item', 'hud', 'hand-item', 'mobile-controls', 'ui-layout-root'];
     for (const id of ids) {
         const el = document.getElementById(id);
         if (!el) continue;
@@ -548,7 +583,7 @@ function normalizeMenuElement(el = {}, index = 0) {
     const type = String(el.type || 'button').toLowerCase();
     const out = {
         id: String(el.id || `element_${index}`),
-        type: (type === 'input' || type === 'text' || type === 'button') ? type : 'button',
+        type: (type === 'input' || type === 'text' || type === 'button' || type === 'image') ? type : 'button',
         x: Number(el.x || 0),
         y: Number(el.y || 0),
         width: Math.max(12, Number(el.width || 160)),
@@ -562,6 +597,8 @@ function normalizeMenuElement(el = {}, index = 0) {
         flatColor: String(el.flatColor || ''),
         textColor: String(el.textColor || '#ffffff'),
         spriteKey: String(el.spriteKey || ''),
+        spriteFit: ['cover', 'contain', 'stretch'].includes(String(el.spriteFit || '').toLowerCase()) ? String(el.spriteFit).toLowerCase() : 'cover',
+        opacity: Math.max(0, Math.min(1, Number(el.opacity == null ? 1 : el.opacity))),
         action: String(el.action || 'none'),
         targetMenu: String(el.targetMenu || ''),
         script: String(el.script || ''),
@@ -725,11 +762,12 @@ function renderExclusiveMenu(world) {
         base.style.padding = element.type === 'input' ? '0 8px' : '4px 8px';
         base.style.boxSizing = 'border-box';
         base.style.userSelect = 'none';
+        base.style.opacity = String(Math.max(0, Math.min(1, Number(element.opacity == null ? 1 : element.opacity))));
 
         const spriteUrl = element.spriteKey ? resolvePreviewTextureUrl(element.spriteKey) : null;
         if (spriteUrl) {
             base.style.backgroundImage = `url("${spriteUrl}")`;
-            base.style.backgroundSize = 'cover';
+            base.style.backgroundSize = element.spriteFit === 'contain' ? 'contain' : (element.spriteFit === 'stretch' ? '100% 100%' : 'cover');
             base.style.backgroundPosition = 'center';
             base.style.backgroundRepeat = 'no-repeat';
         }
@@ -757,6 +795,11 @@ function renderExclusiveMenu(world) {
                 base.style.pointerEvents = 'none';
                 base.style.border = 'none';
                 base.style.backgroundColor = element.flatColor || 'transparent';
+            } else if (element.type === 'image') {
+                base.textContent = '';
+                base.style.pointerEvents = 'none';
+                base.style.border = 'none';
+                if (!spriteUrl) base.style.backgroundColor = element.flatColor || 'transparent';
             }
         }
 
@@ -863,6 +906,449 @@ function handlePointerLockChangeForMenus(world) {
     showExclusiveMenu(world, sys.config.defaultEscapeMenu, false);
 }
 
+function normalizeUiLayoutElement(el = {}, index = 0) {
+    const type = String(el.type || 'text').toLowerCase();
+    return {
+        id: String(el.id || `ui_el_${index}`),
+        type: (type === 'button' || type === 'input' || type === 'text' || type === 'image') ? type : 'text',
+        x: Number(el.x || 0),
+        y: Number(el.y || 0),
+        anchorX: String(el.anchorX || 'left') === 'right' ? 'right' : 'left',
+        anchorY: String(el.anchorY || 'top') === 'bottom' ? 'bottom' : 'top',
+        width: Math.max(4, Number(el.width || 100)),
+        height: Math.max(4, Number(el.height || 28)),
+        rotation: Number(el.rotation || 0),
+        flipX: Boolean(el.flipX),
+        flipY: Boolean(el.flipY),
+        text: String(el.text || ''),
+        placeholder: String(el.placeholder || ''),
+        bind: String(el.bind || ''),
+        flatColor: String(el.flatColor || 'transparent'),
+        textColor: String(el.textColor || '#ffffff'),
+        spriteKey: String(el.spriteKey || ''),
+        spriteVar: String(el.spriteVar || ''),
+        spriteFit: ['cover', 'contain', 'stretch'].includes(String(el.spriteFit || '').toLowerCase()) ? String(el.spriteFit).toLowerCase() : 'cover',
+        opacity: Math.max(0, Math.min(1, Number(el.opacity == null ? 1 : el.opacity))),
+        style: (el.style && typeof el.style === 'object' && !Array.isArray(el.style)) ? { ...el.style } : {},
+        fontSize: Math.max(8, Number(el.fontSize || 14)),
+        align: String(el.align || 'center'),
+        action: String(el.action || 'none'),
+        keyCode: String(el.keyCode || ''),
+        targetMenu: String(el.targetMenu || ''),
+        script: String(el.script || '')
+    };
+}
+
+function applyInlineStyleObject(node, styleObj) {
+    if (!node || !styleObj || typeof styleObj !== 'object') return;
+    for (const [key, value] of Object.entries(styleObj)) {
+        if (value == null) continue;
+        try {
+            node.style[key] = String(value);
+        } catch {
+            // ignore invalid css prop names
+        }
+    }
+}
+
+function normalizeUiLayoutConfig(raw) {
+    const payload = raw && typeof raw === 'object' ? raw : {};
+    const layersRaw = payload.layers && typeof payload.layers === 'object' ? payload.layers : {};
+    const layers = {};
+    for (const [key, layer] of Object.entries(layersRaw)) {
+        if (!layer || typeof layer !== 'object') continue;
+        const id = String(layer.id || key);
+        const elements = Array.isArray(layer.elements) ? layer.elements.map((el, i) => normalizeUiLayoutElement(el, i)) : [];
+        layers[id] = { id, elements };
+    }
+    if (!layers.hud) layers.hud = { id: 'hud', elements: [] };
+    if (!layers.mobile) layers.mobile = { id: 'mobile', elements: [] };
+    return {
+        enabled: payload.enabled !== false,
+        layers
+    };
+}
+
+function ensureUiLayoutRoot() {
+    let root = document.getElementById('ui-layout-root');
+    if (root) return root;
+    root = document.createElement('div');
+    root.id = 'ui-layout-root';
+    root.style.position = 'fixed';
+    root.style.inset = '0';
+    root.style.pointerEvents = 'none';
+    root.style.zIndex = '25';
+    document.body.appendChild(root);
+    return root;
+}
+
+function buildUiLayoutText(world, template) {
+    const sys = world && world._internal ? world._internal.uiLayoutSystem : null;
+    const vars = sys && sys.vars ? sys.vars : {};
+    const text = String(template || '');
+    return text.replace(/\{\{\s*([A-Za-z0-9_.$-]+)\s*\}\}/g, (_, token) => String(vars[token] ?? ''));
+}
+
+function handleUiLayoutAction(world, element, phase, pointerEvent = null) {
+    if (!element) return;
+    const action = String(element.action || 'none');
+    const keyCode = String(element.keyCode || '');
+    if (action === 'key_hold' && keyCode) {
+        world._internal.keys[keyCode] = phase === 'down';
+        return;
+    }
+    if (action === 'down_hold') {
+        const downKey = world.mode === 'editor' ? 'ControlLeft' : 'KeyC';
+        world._internal.keys[downKey] = phase === 'down';
+        return;
+    }
+    if (phase !== 'down') return;
+    if (action === 'primary_action') {
+        primaryAction(world);
+        return;
+    }
+    if (action === 'secondary_action') {
+        secondaryAction(world);
+        return;
+    }
+    if (action === 'jump') {
+        const player = world.getPlayerEntity();
+        if (!player) return;
+        if (world.mode === 'editor') world._internal.keys['Space'] = true;
+        else if (player.onGround) {
+            player.velocityY = CONFIG.JUMP_FORCE;
+            player.onGround = false;
+        }
+        return;
+    }
+    if (action === 'drop_selected') {
+        dropSelectedBlock(world);
+        return;
+    }
+    if (action === 'step_prev') {
+        stepSelection(world, -1);
+        return;
+    }
+    if (action === 'step_next') {
+        stepSelection(world, 1);
+        return;
+    }
+    if (action === 'toggle_mode') {
+        const nextMode = world.mode === 'editor' ? 'game' : 'editor';
+        setWorldMode(world, nextMode);
+        return;
+    }
+    if (action === 'export_map') {
+        exportMap(world);
+        return;
+    }
+    if (action === 'import_map') {
+        requestMapImport(world);
+        return;
+    }
+    if (action === 'open_editor_menu') {
+        if (world.mode !== 'editor') return;
+        openEditorContextMenu(world, {
+            clientX: window.innerWidth / 2,
+            clientY: window.innerHeight / 2
+        });
+        return;
+    }
+    if (action === 'open_menu') {
+        if (element.targetMenu) showExclusiveMenu(world, element.targetMenu, false);
+        return;
+    }
+    if (action === 'script' && element.script) {
+        try {
+            const api = {
+                primaryAction: () => primaryAction(world),
+                secondaryAction: () => secondaryAction(world),
+                dropSelected: () => dropSelectedBlock(world),
+                stepPrev: () => stepSelection(world, -1),
+                stepNext: () => stepSelection(world, 1),
+                setKey: (k, v) => { world._internal.keys[String(k)] = !!v; },
+                openMenu: (id) => showExclusiveMenu(world, id, false),
+                closeMenu: () => closeExclusiveMenu(world),
+                mode: world.mode
+            };
+            const fn = new Function('api', 'world', 'element', 'event', String(element.script));
+            fn(api, world, element, pointerEvent);
+        } catch (err) {
+            console.error('ui-layout script error:', err);
+        }
+    }
+}
+
+function renderUiLayoutLayer(world, layerId) {
+    const sys = world && world._internal ? world._internal.uiLayoutSystem : null;
+    if (!sys || !sys.root) return;
+    const layer = sys.config.layers[layerId];
+    if (!layer) return;
+    const old = sys.layerNodes[layerId];
+    if (old && old.parentElement) old.parentElement.removeChild(old);
+    const host = document.createElement('div');
+    host.className = `ui-layout-layer ui-layout-layer-${layerId}`;
+    host.style.position = 'absolute';
+    host.style.inset = '0';
+    host.style.pointerEvents = 'none';
+    for (const element of layer.elements) {
+        const node = element.type === 'input' ? document.createElement('input') : (element.type === 'button' ? document.createElement('button') : document.createElement('div'));
+        node.dataset.uiElementId = element.id;
+        node.style.position = 'absolute';
+        node.style.left = element.anchorX === 'right' ? 'auto' : `${element.x}px`;
+        node.style.right = element.anchorX === 'right' ? `${element.x}px` : 'auto';
+        node.style.top = element.anchorY === 'bottom' ? 'auto' : `${element.y}px`;
+        node.style.bottom = element.anchorY === 'bottom' ? `${element.y}px` : 'auto';
+        node.style.width = `${element.width}px`;
+        node.style.height = `${element.height}px`;
+        node.style.transformOrigin = 'center center';
+        node.style.transform = `rotate(${element.rotation}deg) scale(${element.flipX ? -1 : 1}, ${element.flipY ? -1 : 1})`;
+        node.style.background = element.flatColor || 'transparent';
+        node.style.color = element.textColor || '#fff';
+        node.style.border = element.type === 'button' || element.type === 'input' ? '1px solid rgba(255,255,255,0.24)' : 'none';
+        node.style.fontFamily = '"Courier New", monospace';
+        node.style.fontSize = `${element.fontSize}px`;
+        node.style.display = 'flex';
+        node.style.alignItems = 'center';
+        node.style.justifyContent = element.align === 'left' ? 'flex-start' : (element.align === 'right' ? 'flex-end' : 'center');
+        node.style.whiteSpace = 'pre-wrap';
+        node.style.padding = '4px 8px';
+        node.style.boxSizing = 'border-box';
+        node.style.pointerEvents = (element.type === 'text' || element.type === 'image') ? 'none' : 'auto';
+        node.style.opacity = String(Math.max(0, Math.min(1, Number(element.opacity == null ? 1 : element.opacity))));
+        applyInlineStyleObject(node, element.style);
+
+        const spriteKey = element.spriteVar ? String(sys.vars[element.spriteVar] || '') : element.spriteKey;
+        const spriteUrl = spriteKey ? resolvePreviewTextureUrl(spriteKey) : null;
+        if (spriteUrl) {
+            node.style.backgroundImage = `url("${spriteUrl}")`;
+            node.style.backgroundSize = element.spriteFit === 'contain' ? 'contain' : (element.spriteFit === 'stretch' ? '100% 100%' : 'cover');
+            node.style.backgroundPosition = 'center';
+            node.style.backgroundRepeat = 'no-repeat';
+        }
+
+        if (element.type === 'input') {
+            node.type = 'text';
+            node.placeholder = element.placeholder || '';
+            if (element.bind) node.value = String(sys.vars[element.bind] || '');
+            node.addEventListener('input', () => {
+                if (element.bind) sys.vars[element.bind] = node.value;
+                updateUiLayoutRuntime(world);
+            });
+        } else if (element.type === 'image') {
+            node.textContent = '';
+        } else {
+            const tpl = element.type === 'text' ? element.text : (element.text || '');
+            node.textContent = buildUiLayoutText(world, tpl);
+            if (element.type === 'text') node.dataset.template = tpl;
+        }
+
+        if (element.type === 'button') {
+            node.addEventListener('pointerdown', (ev) => {
+                ev.preventDefault();
+                handleUiLayoutAction(world, element, 'down', ev);
+            });
+            node.addEventListener('pointerup', (ev) => {
+                ev.preventDefault();
+                handleUiLayoutAction(world, element, 'up', ev);
+            });
+            node.addEventListener('pointercancel', () => handleUiLayoutAction(world, element, 'up'));
+            node.addEventListener('pointerleave', () => handleUiLayoutAction(world, element, 'up'));
+        }
+
+        if (element.action === 'look_drag' && element.type === 'button') {
+            node.style.touchAction = 'none';
+            let activePointer = null;
+            let lastX = 0;
+            let lastY = 0;
+            node.addEventListener('pointerdown', (ev) => {
+                activePointer = ev.pointerId;
+                lastX = ev.clientX;
+                lastY = ev.clientY;
+                node.setPointerCapture(ev.pointerId);
+            });
+            node.addEventListener('pointermove', (ev) => {
+                if (activePointer !== ev.pointerId) return;
+                const player = world.getPlayerEntity();
+                if (!player) return;
+                const dx = ev.clientX - lastX;
+                const dy = ev.clientY - lastY;
+                lastX = ev.clientX;
+                lastY = ev.clientY;
+                player.yaw -= dx * CONFIG.LOOK_SPEED;
+                player.pitch -= dy * CONFIG.LOOK_SPEED;
+                player.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, player.pitch));
+            });
+            const end = (ev) => {
+                if (activePointer !== ev.pointerId) return;
+                activePointer = null;
+            };
+            node.addEventListener('pointerup', end);
+            node.addEventListener('pointercancel', end);
+        }
+
+        host.appendChild(node);
+    }
+    sys.root.appendChild(host);
+    sys.layerNodes[layerId] = host;
+}
+
+function initializeUiLayoutSystem(world) {
+    const config = normalizeUiLayoutConfig(UI_LAYOUT);
+    world._internal.uiLayoutSystem = {
+        enabled: config.enabled !== false,
+        config,
+        root: ensureUiLayoutRoot(),
+        layerNodes: {},
+        vars: {}
+    };
+    if (!world._internal.uiLayoutSystem.enabled) return;
+    renderUiLayoutLayer(world, 'hud');
+    if (isMobile()) renderUiLayoutLayer(world, 'mobile');
+}
+
+function refreshUiLayoutSystemFromConfig(world) {
+    const sys = world && world._internal ? world._internal.uiLayoutSystem : null;
+    if (!sys) return;
+    sys.config = normalizeUiLayoutConfig(UI_LAYOUT);
+    sys.enabled = sys.config.enabled !== false;
+    if (!sys.root) sys.root = ensureUiLayoutRoot();
+    if (!sys.enabled) {
+        sys.root.style.display = 'none';
+        sys.root.innerHTML = '';
+        sys.layerNodes = {};
+        return;
+    }
+    sys.root.innerHTML = '';
+    sys.layerNodes = {};
+    renderUiLayoutLayer(world, 'hud');
+    if (isMobile()) renderUiLayoutLayer(world, 'mobile');
+    updateUiLayoutRuntime(world);
+}
+
+function updateUiLayoutRuntime(world) {
+    const sys = world && world._internal ? world._internal.uiLayoutSystem : null;
+    if (!sys || !sys.enabled || !sys.root) return;
+    const player = world.getPlayerEntity();
+    const showingExclusive = isExclusiveMenuOpen(world);
+    sys.root.style.display = showingExclusive ? 'none' : 'block';
+    const hudLayer = sys.layerNodes.hud;
+    const mobileLayer = sys.layerNodes.mobile;
+    if (hudLayer) hudLayer.style.display = world.mode === 'game' ? 'block' : 'none';
+    if (mobileLayer) mobileLayer.style.display = (world.mode === 'game' && isMobile()) ? 'block' : 'none';
+    if (showingExclusive) return;
+    if (!player) {
+        sys.vars.playerName = 'A.S.S';
+        sys.vars.playerPortraitTexture = 'ui_player_face';
+        sys.vars.hp = 0;
+        sys.vars.hpMax = 1;
+        sys.vars.itemName = '-';
+        sys.vars.itemCount = '-';
+        sys.vars.selectedItemTexture = '';
+        sys.vars.selectedHandTexture = 'ui_empty_hand';
+        sys.vars.itemLine = 'Item: - x-';
+        sys.vars.hpLine = 'HP: -';
+        sys.vars.coinsLine = 'Coins: -';
+        sys.vars.hudStatsText = 'HP: -\nItem: -\nCoins: -';
+        sys.vars.mode = String(world.mode || 'game');
+        return;
+    }
+
+    let itemName = '-';
+    let itemCount = '-';
+    let previewSpriteKey = '';
+    let handSpriteKey = '';
+    let useEmptyHand = true;
+    if (player.selectedItem) {
+        if (player.selectedItem.kind === 'block') {
+            const bt = Object.values(BLOCK_TYPES).find((b) => b.id === player.selectedItem.id);
+            itemName = bt ? bt.name : '-';
+            itemCount = player.inventory ? (player.inventory[player.selectedItem.id] || 0) : 0;
+            previewSpriteKey = bt && bt.textures ? (bt.textures.all || bt.textures.top || '') : '';
+            handSpriteKey = bt ? (bt.handTextureKey || '') : '';
+            useEmptyHand = !handSpriteKey;
+        } else if (player.selectedItem.kind === 'item') {
+            const it = Object.values(ITEMS).find((x) => x.id === player.selectedItem.id);
+            itemName = it ? it.name : '-';
+            itemCount = player.itemInventory ? (player.itemInventory[player.selectedItem.id] || 0) : 0;
+            previewSpriteKey = it ? (it.uiTextureKey || it.textureKey || '') : '';
+            handSpriteKey = it ? (it.handTextureKey || '') : '';
+            useEmptyHand = !handSpriteKey;
+        } else if (player.selectedItem.kind === 'empty') {
+            itemName = 'Mãos';
+            itemCount = '-';
+            previewSpriteKey = 'ui_empty_hand';
+            useEmptyHand = true;
+        } else if (player.selectedItem.kind === 'entity') {
+            itemName = 'Spawner';
+            itemCount = '-';
+            const npcType = getNpcTypeById(player.selectedItem.npcTypeId);
+            previewSpriteKey = npcType ? (npcType.texture || '') : '';
+            useEmptyHand = false;
+        }
+    } else if (player.selectedBlockType) {
+        previewSpriteKey = getBlockThumbnailTextureKey(player.selectedBlockType) || '';
+        handSpriteKey = player.selectedBlockType.handTextureKey || '';
+        useEmptyHand = !handSpriteKey;
+        itemName = player.selectedBlockType.name || '-';
+        itemCount = player.inventory ? (player.inventory[player.selectedBlockType.id] || 0) : 0;
+    }
+    const emptyHandKeyCandidates = ['empty-hand', 'empty_hand', 'ui_empty_hand'];
+    let emptyHandKey = 'ui_empty_hand';
+    for (const candidate of emptyHandKeyCandidates) {
+        if (resolvePreviewTextureUrl(candidate) || isGeneratedUiTextureKey(candidate)) {
+            emptyHandKey = candidate;
+            break;
+        }
+    }
+    const finalHandSprite = handSpriteKey || (useEmptyHand ? emptyHandKey : '');
+
+    sys.vars.playerName = String(player.name || 'A.S.S');
+    sys.vars.playerPortraitTexture = String(player.uiPortraitKey || 'ui_player_face');
+    sys.vars.hp = Math.max(0, Math.round(Number(player.hp || 0)));
+    sys.vars.hpMax = Math.max(1, Math.round(Number(player.maxHP || 1)));
+    sys.vars.itemName = String(itemName || '-');
+    sys.vars.itemCount = String(itemCount);
+    sys.vars.selectedItemTexture = String(previewSpriteKey || '');
+    sys.vars.selectedHandTexture = String(finalHandSprite || '');
+    sys.vars.itemLine = `Item: ${itemName || '-'} x${itemCount}`;
+    sys.vars.hpLine = `HP: ${sys.vars.hp}/${sys.vars.hpMax}`;
+    sys.vars.coinsLine = 'Coins: -';
+    sys.vars.hudStatsText = `${sys.vars.hpLine}\n${sys.vars.itemLine}\n${sys.vars.coinsLine}`;
+    sys.vars.mode = String(world.mode || 'game');
+
+    for (const layerId of Object.keys(sys.layerNodes)) {
+        const layerNode = sys.layerNodes[layerId];
+        if (!layerNode) continue;
+        const layer = sys.config.layers[layerId];
+        if (!layer) continue;
+        for (const element of layer.elements) {
+            const node = layerNode.querySelector(`[data-ui-element-id="${element.id}"]`);
+            if (!node) continue;
+            if (element.type === 'text') {
+                node.textContent = buildUiLayoutText(world, element.text || '');
+            } else if (element.type === 'input') {
+                if (element.bind && document.activeElement !== node) {
+                    node.value = String(sys.vars[element.bind] || '');
+                }
+            }
+            const spriteKey = element.spriteVar ? String(sys.vars[element.spriteVar] || '') : element.spriteKey;
+            const spriteUrl = spriteKey ? resolvePreviewTextureUrl(spriteKey) : null;
+            if (spriteUrl) {
+                node.style.backgroundImage = `url("${spriteUrl}")`;
+                node.style.backgroundSize = element.spriteFit === 'contain' ? 'contain' : (element.spriteFit === 'stretch' ? '100% 100%' : 'cover');
+                node.style.backgroundPosition = 'center';
+                node.style.backgroundRepeat = 'no-repeat';
+            } else if (!element.spriteKey && !element.spriteVar) {
+                node.style.backgroundImage = '';
+            } else if (element.spriteVar && !sys.vars[element.spriteVar]) {
+                node.style.backgroundImage = '';
+            }
+            node.style.opacity = String(Math.max(0, Math.min(1, Number(element.opacity == null ? 1 : element.opacity))));
+        }
+    }
+}
+
 const INVENTORY_CATEGORIES = [
     { id: 'item', label: 'Itens' },
     { id: 'block', label: 'Blocos' }
@@ -949,16 +1435,21 @@ async function init() {
     setRendererVisible(world, false);
     document.body.dataset.mode = world.mode;
     updateDocumentTitleForMode(world.mode);
-    ensureItemLabel();
-    ensureHud();
-    ensureHandOverlay();
+    initializeUiLayoutSystem(world);
+    if (!world._internal.uiLayoutSystem || !world._internal.uiLayoutSystem.enabled) {
+        ensureItemLabel();
+        ensureHud();
+        ensureHandOverlay();
+    }
     initializeExclusiveMenus(world);
     setGameplayUiVisible(world, false);
     setupRenderDebugHotkey(world);
-    
-    setupMobileControls(world);
+    if (!world._internal.uiLayoutSystem || !world._internal.uiLayoutSystem.enabled) {
+        setupMobileControls(world);
+    }
 
     await maybeLoadRomAtBoot();
+    refreshUiLayoutSystemFromConfig(world);
     updateDocumentTitleForMode(world.mode);
     
     initAudioOnFirstGesture();
@@ -1010,6 +1501,17 @@ async function initAudio() {
         const stringsBank = ROM_RUNTIME.assetUrlByPath['audio/Master.strings.bank'];
         if (masterBank) await audioSystem.loadBank(masterBank, true);
         if (stringsBank) await audioSystem.loadBank(stringsBank, false);
+        const configuredBanks = Array.isArray(ROM_AUDIO_CONFIG.banks) ? ROM_AUDIO_CONFIG.banks : [];
+        for (const bank of configuredBanks) {
+            if (bank && bank.autoLoad === false) continue;
+            const rawPath = String((bank && bank.path) || '').trim();
+            if (!rawPath) continue;
+            const normalized = normalizeRomPath(rawPath).replace(/^data\//, '');
+            if (normalized === 'audio/Master.bank' || normalized === 'audio/Master.strings.bank') continue;
+            const bankUrl = ROM_RUNTIME.assetUrlByPath[normalized] || ROM_RUNTIME.assetUrlByPath[`data/${normalized}`];
+            if (!bankUrl) continue;
+            await audioSystem.loadBank(bankUrl, bank.loadSamples !== false);
+        }
         
         console.log('✅ Audio FMOD ready');
     } catch (error) {
@@ -1273,7 +1775,8 @@ function createNpcEntity(world, npcType, position, nameOverride = null, factionO
             }
             entity.isSpeaking = true;
 
-            audioSystem.playEvent('event:/teste', {}, { autoStart: true }).then((instance) => {
+            const npcTalkEvent = String((ROM_AUDIO_CONFIG.events && ROM_AUDIO_CONFIG.events.npcTalk) || 'event:/teste');
+            audioSystem.playEvent(npcTalkEvent, {}, { autoStart: true }).then((instance) => {
                 if (!instance) return;
                 audioSystem.attachEvent(instance, {
                     relative: entity,
@@ -3681,6 +4184,7 @@ function animate(world) {
             updateEditorMovePreview(world);
             updateCurrentItemLabel(world);
             updateHud(world);
+            updateUiLayoutRuntime(world);
             updateEditorCoords(world);
             
             // Atualiza câmera e listener de áudio
