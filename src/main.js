@@ -7,7 +7,7 @@ import BLOCK_TYPES from "../data/config/blocks.js"
 import ITEMS from "../data/config/items.js"
 import texturesToLoad from "../data/config/textures.js"
 import { vocabulario } from "../lib/vocabulario.js"
-import { FACTIONS, FACTION_ORDER } from "../data/config/factions.js"
+import { FACTIONS, FACTION_RELATIONS, FACTION_ORDER } from "../data/config/factions.js"
 import world from "./world.js"
 import { updateEntity, checkInteractionTarget, refreshEntityIndicators } from "./entity.js"
 import { handleInteraction } from './entity.js';
@@ -20,13 +20,90 @@ import audioSystem from './audio.js';
 import { getGroundLevel } from './collision.js';
 import { openInspectorWindow } from './inspector.js';
 
-const TEXTURE_PREVIEW_MAP = texturesToLoad.reduce((map, entry) => {
-    map[entry.key] = entry.url;
-    return map;
-}, {});
+const ROM_RUNTIME = {
+    enabled: false,
+    name: null,
+    mapPayload: null,
+    mapByName: {},
+    textureUrlByKey: {},
+    objectUrls: []
+};
+
+let TEXTURE_PREVIEW_MAP = {};
+let INVENTORY_ITEM_OPTIONS = [];
+let INVENTORY_BLOCK_OPTIONS = [];
+
+function replaceObjectContents(target, source) {
+    for (const key of Object.keys(target)) delete target[key];
+    Object.assign(target, source || {});
+}
+
+function replaceArrayContents(target, source) {
+    target.splice(0, target.length, ...(Array.isArray(source) ? source : []));
+}
+
+function parseDefaultExportModule(code) {
+    const exec = new Function(`${code.replace(/export\s+default/, 'return')}`);
+    return exec();
+}
+
+function parseFactionsModule(code) {
+    const transformed = code
+        .replace(/export\s+const\s+/g, 'const ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+default\s+/g, 'const __default_export__ = ');
+    const wrapped = `${transformed}\nreturn { FACTIONS, FACTION_RELATIONS, FACTION_ORDER };`;
+    return new Function(wrapped)();
+}
+
+function normalizeRomPath(path) {
+    return String(path || '').replace(/^\.\//, '').replace(/^\/+/, '');
+}
+
+function pickZipFile(zip, candidates) {
+    for (const c of candidates) {
+        const file = zip.file(normalizeRomPath(c));
+        if (file) return file;
+    }
+    return null;
+}
+
+function resolveTextureLoadUrl(key, fallbackUrl) {
+    return ROM_RUNTIME.textureUrlByKey[key] || fallbackUrl;
+}
+
+function refreshCatalogCaches() {
+    TEXTURE_PREVIEW_MAP = texturesToLoad.reduce((map, entry) => {
+        map[entry.key] = entry.url;
+        return map;
+    }, {});
+
+    INVENTORY_ITEM_OPTIONS = Object.values(ITEMS)
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((itemDef) => ({
+            id: itemDef.id,
+            label: itemDef.name,
+            textureKey: getItemTextureKey(itemDef, 'ui'),
+            textureUrl: resolvePreviewTextureUrl(getItemTextureKey(itemDef, 'ui'))
+        }));
+
+    INVENTORY_BLOCK_OPTIONS = Object.values(BLOCK_TYPES)
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((blockType) => {
+            const textureKey = getBlockThumbnailTextureKey(blockType);
+            return {
+                id: blockType.id,
+                label: blockType.name,
+                textureKey,
+                textureUrl: resolvePreviewTextureUrl(textureKey)
+            };
+        });
+}
 
 function resolvePreviewTextureUrl(key) {
-    return TEXTURE_PREVIEW_MAP[key] || null;
+    return ROM_RUNTIME.textureUrlByKey[key] || TEXTURE_PREVIEW_MAP[key] || null;
 }
 
 function getItemTextureKey(itemDef, purpose = 'ui') {
@@ -50,6 +127,182 @@ function getBlockThumbnailTextureKey(blockType) {
         blockType.textures.side ||
         blockType.textures.bottom ||
         null;
+}
+
+function revokeRomTextureUrls() {
+    for (const url of ROM_RUNTIME.objectUrls) {
+        URL.revokeObjectURL(url);
+    }
+    ROM_RUNTIME.objectUrls = [];
+}
+
+async function loadRomFromZipFile(file) {
+    if (!window.JSZip) throw new Error('JSZip indisponível');
+    const zip = await window.JSZip.loadAsync(file);
+
+    const blocksFile = pickZipFile(zip, ['data/config/blocks.js']);
+    const itemsFile = pickZipFile(zip, ['data/config/items.js']);
+    const npcsFile = pickZipFile(zip, ['data/config/npcs.js']);
+    const texturesFile = pickZipFile(zip, ['data/config/textures.js']);
+    const factionsFile = pickZipFile(zip, ['data/config/factions.js']);
+    const mapFile = pickZipFile(zip, ['data/maps/default.json', 'map.json']);
+
+    if (blocksFile) replaceObjectContents(BLOCK_TYPES, parseDefaultExportModule(await blocksFile.async('string')));
+    if (itemsFile) replaceObjectContents(ITEMS, parseDefaultExportModule(await itemsFile.async('string')));
+    if (npcsFile) replaceObjectContents(NPC_TYPES, parseDefaultExportModule(await npcsFile.async('string')));
+    if (texturesFile) replaceArrayContents(texturesToLoad, parseDefaultExportModule(await texturesFile.async('string')));
+
+    if (factionsFile) {
+        const parsedFactions = parseFactionsModule(await factionsFile.async('string'));
+        replaceObjectContents(FACTIONS, parsedFactions.FACTIONS || {});
+        replaceObjectContents(FACTION_RELATIONS, parsedFactions.FACTION_RELATIONS || {});
+        replaceArrayContents(FACTION_ORDER, parsedFactions.FACTION_ORDER || []);
+    }
+
+    revokeRomTextureUrls();
+    ROM_RUNTIME.textureUrlByKey = {};
+    for (const tex of texturesToLoad) {
+        if (!tex || !tex.key || !tex.url) continue;
+        const path = normalizeRomPath(tex.url);
+        const imageFile = zip.file(path);
+        if (!imageFile) continue;
+        const blob = await imageFile.async('blob');
+        const objectUrl = URL.createObjectURL(blob);
+        ROM_RUNTIME.textureUrlByKey[tex.key] = objectUrl;
+        ROM_RUNTIME.objectUrls.push(objectUrl);
+    }
+
+    ROM_RUNTIME.mapPayload = null;
+    ROM_RUNTIME.mapByName = {};
+    const zipMapFiles = Object.values(zip.files).filter((f) => !f.dir && /^data\/maps\/.+\.json$/i.test(normalizeRomPath(f.name)));
+    for (const mf of zipMapFiles) {
+        try {
+            const payload = JSON.parse(await mf.async('string'));
+            if (!payload || !Array.isArray(payload.blocks)) continue;
+            const shortName = normalizeRomPath(mf.name).replace(/^data\/maps\//i, '');
+            ROM_RUNTIME.mapByName[shortName] = payload;
+        } catch {}
+    }
+    if (!Object.keys(ROM_RUNTIME.mapByName).length && mapFile) {
+        try {
+            const fallbackMap = JSON.parse(await mapFile.async('string'));
+            if (fallbackMap && Array.isArray(fallbackMap.blocks)) {
+                ROM_RUNTIME.mapByName['default.json'] = fallbackMap;
+            }
+        } catch (err) {
+            console.warn('ROM sem mapa válido:', err);
+        }
+    }
+    ROM_RUNTIME.mapPayload = ROM_RUNTIME.mapByName['default.json'] || Object.values(ROM_RUNTIME.mapByName)[0] || null;
+
+    ROM_RUNTIME.enabled = true;
+    ROM_RUNTIME.name = file.name;
+    refreshCatalogCaches();
+}
+
+function buildRomPrompt() {
+    const wrap = document.createElement('div');
+    wrap.style.position = 'fixed';
+    wrap.style.inset = '0';
+    wrap.style.background = 'rgba(0,0,0,0.86)';
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.justifyContent = 'center';
+    wrap.style.zIndex = '120';
+    wrap.style.fontFamily = '"Courier New", monospace';
+
+    const card = document.createElement('div');
+    card.style.width = 'min(92vw, 520px)';
+    card.style.background = '#131722';
+    card.style.border = '1px solid rgba(255,255,255,0.2)';
+    card.style.borderRadius = '12px';
+    card.style.padding = '14px';
+    card.style.color = 'white';
+
+    const title = document.createElement('div');
+    title.textContent = 'ROM Loader';
+    title.style.fontSize = '18px';
+    title.style.marginBottom = '8px';
+
+    const text = document.createElement('div');
+    text.textContent = 'Selecione um ROM (.zip) para carregar conteúdo do jogo, ou use os dados embutidos.';
+    text.style.fontSize = '13px';
+    text.style.opacity = '0.9';
+    text.style.marginBottom = '12px';
+
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '8px';
+    row.style.flexWrap = 'wrap';
+
+    const loadBtn = document.createElement('button');
+    loadBtn.textContent = 'Carregar ROM (.zip)';
+    const skipBtn = document.createElement('button');
+    skipBtn.textContent = 'Usar embutido';
+
+    [loadBtn, skipBtn].forEach((btn) => {
+        btn.style.padding = '8px 10px';
+        btn.style.borderRadius = '8px';
+        btn.style.border = '1px solid rgba(255,255,255,0.3)';
+        btn.style.background = 'rgba(255,255,255,0.08)';
+        btn.style.color = 'white';
+        btn.style.cursor = 'pointer';
+        btn.style.fontFamily = 'inherit';
+    });
+
+    row.appendChild(loadBtn);
+    row.appendChild(skipBtn);
+    card.appendChild(title);
+    card.appendChild(text);
+    card.appendChild(row);
+    wrap.appendChild(card);
+    return { wrap, loadBtn, skipBtn };
+}
+
+async function maybeLoadRomAtBoot() {
+    const params = new URLSearchParams(window.location.search);
+    const forceBuiltIn = params.get('rom') === '0';
+    if (forceBuiltIn || !window.JSZip) {
+        refreshCatalogCaches();
+        return;
+    }
+
+    await new Promise((resolve) => {
+        const { wrap, loadBtn, skipBtn } = buildRomPrompt();
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.zip,application/zip';
+        input.style.display = 'none';
+        document.body.appendChild(input);
+        document.body.appendChild(wrap);
+
+        const closePrompt = () => {
+            wrap.remove();
+            input.remove();
+            resolve();
+        };
+
+        skipBtn.onclick = () => closePrompt();
+        loadBtn.onclick = () => {
+            input.value = '';
+            input.click();
+        };
+        input.onchange = async () => {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            showLoadingOverlay('Carregando ROM...');
+            try {
+                await loadRomFromZipFile(file);
+            } catch (err) {
+                console.warn('Falha ao carregar ROM:', err);
+            } finally {
+                hideLoadingOverlay();
+                closePrompt();
+            }
+        };
+    });
+
+    refreshCatalogCaches();
 }
 
 let loadingOverlay = null;
@@ -91,29 +344,6 @@ const INVENTORY_CATEGORIES = [
     { id: 'item', label: 'Itens' },
     { id: 'block', label: 'Blocos' }
 ];
-
-const INVENTORY_ITEM_OPTIONS = Object.values(ITEMS)
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((itemDef) => ({
-        id: itemDef.id,
-        label: itemDef.name,
-        textureKey: getItemTextureKey(itemDef, 'ui'),
-        textureUrl: resolvePreviewTextureUrl(getItemTextureKey(itemDef, 'ui'))
-    }));
-
-const INVENTORY_BLOCK_OPTIONS = Object.values(BLOCK_TYPES)
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((blockType) => {
-        const textureKey = getBlockThumbnailTextureKey(blockType);
-        return {
-            id: blockType.id,
-            label: blockType.name,
-            textureKey,
-            textureUrl: resolvePreviewTextureUrl(textureKey)
-        };
-    });
 
 let inventoryEditorState = null;
 // ============================================================
@@ -198,6 +428,8 @@ async function init() {
     setupRenderDebugHotkey(world);
     
     setupMobileControls(world);
+
+    await maybeLoadRomAtBoot();
     
     await initAudio();
     
@@ -262,6 +494,13 @@ function loadTextures(world) {
     const loader = new THREE.TextureLoader();
     let loaded = 0;
     const total = texturesToLoad.length;
+
+    if (total === 0) {
+        world._internal.texturesLoaded = true;
+        showLoadingOverlay('Gerando terreno…');
+        initWorld(world).then(() => hideLoadingOverlay());
+        return;
+    }
     
     function checkLoaded() {
         loaded++;
@@ -275,7 +514,7 @@ function loadTextures(world) {
     }
     
     texturesToLoad.forEach(({ key, url }) => {
-        loader.load(url, (tex) => {
+        loader.load(resolveTextureLoadUrl(key, url), (tex) => {
             tex.magFilter = THREE.NearestFilter;
             tex.minFilter = THREE.NearestFilter;
             tex.wrapS = THREE.RepeatWrapping;
@@ -367,7 +606,8 @@ function createPlayer(world) {
         npcData: playerNpcData,
         hp: isEditor ? 999999 : 100,
         maxHP: isEditor ? 999999 : 100,
-        faction: FACTIONS.PLAYER.id
+        faction: FACTIONS.PLAYER.id,
+        uiPortrait: './data/images/ui/player-face.png'
     });
 }
 
@@ -538,7 +778,7 @@ function ensureHud() {
 
     const playerPhoto = document.createElement('img');
     playerPhoto.id = 'hud-player-photo';
-    playerPhoto.src = './data/images/a.s.s.jpg';
+    playerPhoto.src = './data/images/ui/player-face.png';
     playerPhoto.alt = 'Foto do jogador';
     playerPhoto.style.width = '68px';
     playerPhoto.style.height = '68px';
@@ -1889,18 +2129,49 @@ function buildEditorDefaultMap() {
 }
 
 async function loadInitialMap(world) {
-    await loadMapFromUrl(world, './data/maps/default.json');
+    const params = new URLSearchParams(window.location.search);
+    const requestedMap = String(params.get('map') || '').trim();
+    const normalizeMapName = (name) => {
+        if (!name) return '';
+        return name.toLowerCase().endsWith('.json') ? name : `${name}.json`;
+    };
+    const requestedMapName = normalizeMapName(requestedMap);
+
+    if (ROM_RUNTIME.enabled) {
+        const romMap = requestedMapName
+            ? (ROM_RUNTIME.mapByName[requestedMapName] || ROM_RUNTIME.mapByName[requestedMap])
+            : null;
+        const selected = romMap || ROM_RUNTIME.mapPayload;
+        if (selected && Array.isArray(selected.blocks)) {
+            applyMap(world, selected);
+            return;
+        }
+    }
+
+    if (requestedMapName && requestedMapName !== 'default.json') {
+        const okRequested = await loadMapFromUrl(world, `./data/maps/${requestedMapName}`, { fallbackToEditorDefault: false });
+        if (okRequested) return;
+    }
+    const okDefault = await loadMapFromUrl(world, './data/maps/default.json', { fallbackToEditorDefault: false });
+    if (!okDefault) {
+        applyMap(world, buildEditorDefaultMap());
+    }
 }
 
-async function loadMapFromUrl(world, url) {
+async function loadMapFromUrl(world, url, options = {}) {
+    const { fallbackToEditorDefault = true } = options;
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Map fetch failed: ${response.status}`);
         const payload = await response.json();
         applyMap(world, payload);
+        return true;
     } catch (err) {
-        console.warn('Falha ao carregar mapa, usando default:', err);
-        applyMap(world, buildEditorDefaultMap());
+        console.warn('Falha ao carregar mapa:', err);
+        if (fallbackToEditorDefault) {
+            applyMap(world, buildEditorDefaultMap());
+        }
+        return false;
     }
 }
 
@@ -1952,6 +2223,7 @@ function exportMap(world) {
             z: player.z,
             yaw: player.yaw || 0,
             pitch: player.pitch || 0,
+            portrait: player.uiPortrait || './data/images/ui/player-face.png',
             inventory: player.inventory || {},
             itemInventory: player.itemInventory || {}
         };
@@ -2087,6 +2359,9 @@ function applyMap(world, payload) {
         }
         if (payload.player.itemInventory && typeof payload.player.itemInventory === 'object') {
             player.itemInventory = { ...payload.player.itemInventory };
+        }
+        if (typeof payload.player.portrait === 'string' && payload.player.portrait.trim()) {
+            player.uiPortrait = payload.player.portrait;
         }
     }
 }
@@ -2304,6 +2579,7 @@ function updateHud(world) {
     const hud = document.getElementById('hud');
     const hudText = document.getElementById('hud-text');
     const hudPreview = document.getElementById('hud-item-preview');
+    const hudPhoto = document.getElementById('hud-player-photo');
     if (!hud || !hudText || !hudPreview) return;
     if (world.mode !== 'game') {
         hud.style.display = 'none';
@@ -2316,8 +2592,12 @@ function updateHud(world) {
     if (!player) {
         hudText.textContent = 'HP: -\nItem: -\nCoins: -';
         hudPreview.style.backgroundImage = 'none';
+        if (hudPhoto) hudPhoto.src = './data/images/ui/player-face.png';
         updateHandOverlay(world, null);
         return;
+    }
+    if (hudPhoto) {
+        hudPhoto.src = player.uiPortrait || './data/images/ui/player-face.png';
     }
     
     const hpMax = player.maxHP || 0;

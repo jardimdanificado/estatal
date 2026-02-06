@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Editor 2D Completo</title>
+  <title>estatal editor</title>
   <style>
     :root {
-      --bg: #0f1115;
-      --panel: #151a22;
-      --panel2: #10151d;
-      --text: #e6e9ef;
-      --muted: #9aa4b2;
-      --line: rgba(255, 255, 255, 0.08);
-      --accent: #3b82f6;
-      --bad: #fb7185;
-      --good: #34d399;
+      --bg: #f5f5f5;
+      --panel: #ffffff;
+      --panel2: #ffffff;
+      --text: #222222;
+      --muted: #666666;
+      --line: #d0d0d0;
+      --accent: #005fcc;
+      --bad: #c62828;
+      --good: #2e7d32;
     }
     * { box-sizing: border-box; }
     body {
@@ -22,26 +22,33 @@
       height: 100vh;
       background: var(--bg);
       color: var(--text);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: sans-serif;
       overflow: hidden;
     }
     #app { display: grid; grid-template-columns: 460px 1fr; height: 100vh; }
+    #app.no-stage { grid-template-columns: 1fr; }
     #sidebar {
-      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      background: var(--panel);
       border-right: 1px solid var(--line);
       padding: 12px;
       overflow: auto;
     }
+    #app.no-stage #sidebar {
+      border-right: 0;
+      width: 100vw;
+      padding: 14px 16px;
+    }
     #stage { position: relative; height: 100vh; overflow: hidden; }
+    #app.no-stage #stage { display: none; }
 
     h1 { font-size: 16px; margin: 0 0 10px 0; }
     h2 { font-size: 13px; margin: 14px 0 8px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
 
     .card {
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 4px;
       padding: 10px;
-      background: rgba(0, 0, 0, 0.18);
+      background: #fff;
       margin-top: 10px;
     }
     .card:first-of-type { margin-top: 0; }
@@ -55,30 +62,29 @@
 
     select, input[type="text"], input[type="number"], textarea {
       width: 100%;
-      padding: 9px 10px;
-      border-radius: 10px;
+      padding: 6px 8px;
+      border-radius: 2px;
       border: 1px solid var(--line);
-      background: rgba(0, 0, 0, 0.25);
+      background: #fff;
       color: var(--text);
       outline: none;
-      font-family: inherit;
+      font-family: sans-serif;
+      font-size: 14px;
     }
 
     textarea { min-height: 64px; resize: vertical; }
 
     button {
-      padding: 9px 10px;
-      border-radius: 10px;
+      padding: 6px 10px;
+      border-radius: 2px;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.04);
+      background: #f3f3f3;
       color: var(--text);
       cursor: pointer;
-      font-family: inherit;
+      font-family: sans-serif;
     }
-    button:hover { border-color: rgba(255, 255, 255, 0.18); }
-    button.primary { background: rgba(59, 130, 246, 0.14); border-color: rgba(59, 130, 246, 0.35); }
-    button.good { background: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.35); }
-    button.bad { background: rgba(251, 113, 133, 0.12); border-color: rgba(251, 113, 133, 0.35); }
+    button:hover { background: #ececec; border-color: #bcbcbc; }
+    button.primary, button.good, button.bad { background: #f3f3f3; border-color: var(--line); }
 
     .btnbar { display: flex; flex-wrap: wrap; gap: 8px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -90,8 +96,9 @@
       color: var(--muted);
       line-height: 1.35;
       border: 1px dashed var(--line);
-      border-radius: 12px;
+      border-radius: 2px;
       padding: 10px;
+      background: #fff;
     }
 
     .palette {
@@ -110,21 +117,21 @@
       gap: 10px;
       align-items: center;
       padding: 8px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      background: rgba(255, 255, 255, 0.03);
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      background: #fff;
       cursor: pointer;
       user-select: none;
     }
-    .entry:hover { border-color: rgba(255, 255, 255, 0.18); }
-    .entry.active { outline: 2px solid rgba(59, 130, 246, 0.55); border-color: rgba(59, 130, 246, 0.35); }
+    .entry:hover { border-color: #bcbcbc; }
+    .entry.active { outline: 1px solid var(--accent); border-color: var(--accent); }
 
     .thumb {
       width: 36px;
       height: 36px;
-      border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(0, 0, 0, 0.2);
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      background: #fff;
       display: grid;
       place-items: center;
       overflow: hidden;
@@ -142,7 +149,7 @@
       width: 100%;
       height: 100%;
       image-rendering: pixelated;
-      background: #0b0f14;
+      background: #fafafa;
       cursor: crosshair;
     }
 
@@ -151,10 +158,9 @@
       left: 12px;
       top: 12px;
       padding: 8px 10px;
-      background: rgba(0, 0, 0, 0.35);
+      background: rgba(255, 255, 255, 0.9);
       border: 1px solid var(--line);
-      border-radius: 12px;
-      backdrop-filter: blur(6px);
+      border-radius: 2px;
       font-size: 12px;
       color: var(--muted);
       user-select: none;
@@ -167,54 +173,85 @@
       font-size: 12px;
       color: var(--muted);
       padding: 8px;
-      border-radius: 12px;
+      border-radius: 2px;
       border: 1px solid var(--line);
-      background: rgba(0, 0, 0, 0.2);
+      background: #fff;
       white-space: pre-wrap;
       max-height: 170px;
       overflow: auto;
     }
 
     .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-    .tab-btn.active { border-color: rgba(59, 130, 246, 0.6); background: rgba(59, 130, 246, 0.18); }
+    .tab-btn.active { border-color: var(--accent); background: #e9f1ff; }
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
+    .primary-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px 0; }
+    .primary-tab-btn.active { border-color: var(--accent); background: #e9f1ff; }
+    .section-pane { display: none; }
+    .section-pane.active { display: block; }
 
     .listbox {
       max-height: 160px;
       overflow: auto;
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: 2px;
       padding: 6px;
-      background: rgba(0, 0, 0, 0.18);
+      background: #fff;
     }
 
     .list-item {
       padding: 6px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 2px;
+      border: 1px solid var(--line);
       cursor: pointer;
       font-size: 12px;
       margin-bottom: 6px;
+      background: #fff;
     }
     .list-item:last-child { margin-bottom: 0; }
-    .list-item.active { border-color: rgba(59, 130, 246, 0.55); background: rgba(59, 130, 246, 0.16); }
+    .list-item.active { border-color: var(--accent); background: #e9f1ff; }
 
     .relation-grid {
       overflow: auto;
       max-height: 240px;
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: 2px;
       padding: 8px;
-      background: rgba(0, 0, 0, 0.2);
+      background: #fff;
     }
 
     table { border-collapse: collapse; width: 100%; font-size: 11px; }
-    th, td { border: 1px solid rgba(255, 255, 255, 0.1); padding: 4px; }
-    th { background: rgba(255, 255, 255, 0.05); }
-    td select { font-size: 11px; padding: 4px; border-radius: 6px; }
+    th, td { border: 1px solid var(--line); padding: 4px; }
+    th { background: #efefef; }
+    td select { font-size: 11px; padding: 4px; border-radius: 2px; }
 
     .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    #app.no-stage .primary-tabs {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--bg);
+      padding-bottom: 8px;
+    }
+
+    #app.no-stage .section-pane[data-section="content"],
+    #app.no-stage .section-pane[data-section="inventory"],
+    #app.no-stage .section-pane[data-section="rom"] {
+      height: calc(100vh - 88px);
+      overflow: auto;
+    }
+
+    #app.no-stage .section-pane[data-section="content"] .split,
+    #app.no-stage .section-pane[data-section="inventory"] .split {
+      grid-template-columns: minmax(280px, 380px) 1fr;
+      align-items: start;
+    }
+
+    #app.no-stage .section-pane[data-section="content"] .listbox,
+    #app.no-stage .section-pane[data-section="inventory"] .listbox {
+      max-height: calc(100vh - 220px);
+    }
 
     a { color: var(--accent); }
   </style>
@@ -223,17 +260,23 @@
   <div id="app">
     <aside id="sidebar">
       <h1>Editor 2D Completo</h1>
-
-      <div class="card">
-        <h2>Pacote ZIP</h2>
-        <div class="btnbar">
-          <button class="primary" id="btn-import-zip">Importar ZIP do jogo</button>
-          <button class="good" id="btn-export-zip">Exportar ZIP do jogo</button>
-        </div>
-        <div class="status" id="zip-status">Nenhum ZIP carregado.</div>
+      <div class="primary-tabs">
+        <button class="primary-tab-btn active" data-section="world">Mapa</button>
+        <button class="primary-tab-btn" data-section="inventory">Inventário</button>
+        <button class="primary-tab-btn" data-section="content">Conteúdo</button>
+        <button class="primary-tab-btn" data-section="rom">ROM</button>
       </div>
 
-      <div class="card">
+      <div class="card section-pane" data-section="rom">
+        <h2>ROM (ZIP)</h2>
+        <div class="btnbar">
+          <button class="primary" id="btn-import-zip">Importar ROM</button>
+          <button class="good" id="btn-export-zip">Exportar ROM</button>
+        </div>
+        <div class="status" id="zip-status">Nenhuma ROM carregada.</div>
+      </div>
+
+      <div class="card section-pane active" data-section="world">
         <h2>Mapa</h2>
         <div class="btnbar">
           <button class="primary" id="btn-load-default">Carregar default.json</button>
@@ -241,10 +284,26 @@
           <button class="good" id="btn-export">Exportar JSON</button>
           <button class="bad" id="btn-clear">Limpar</button>
         </div>
+        <label>Mapa atual</label>
+        <div class="row">
+          <select id="map-select"></select>
+          <input id="map-name" type="text" placeholder="nome-do-mapa.json" />
+        </div>
+        <div class="btnbar" style="margin-top:8px;">
+          <button id="map-new">Novo mapa</button>
+          <button id="map-rename">Renomear</button>
+          <button class="bad" id="map-delete">Excluir mapa</button>
+        </div>
+        <label>Imagem do jogador (HUD)</label>
+        <div class="row">
+          <input id="player-image-path" type="text" placeholder="./data/images/ui/player-face.png" />
+          <input id="player-image" type="file" accept="image/*" />
+        </div>
+        <div id="player-image-preview" class="thumb" style="width:80px;height:80px;margin-top:8px;"></div>
         <div class="status" id="status">Pronto.</div>
       </div>
 
-      <div class="card">
+      <div class="card section-pane active" data-section="world">
         <h2>Ferramenta</h2>
         <label>Modo</label>
         <div class="row">
@@ -276,6 +335,12 @@
 
         <label>Busca no catálogo</label>
         <input id="search" type="text" placeholder="filtrar por nome…" />
+        <label>Ferramentas de camada</label>
+        <div class="btnbar">
+          <button id="layer-copy">Copiar Y atual</button>
+          <button id="layer-paste">Colar em Y atual</button>
+          <button class="bad" id="layer-clear">Limpar Y atual</button>
+        </div>
 
         <div class="hint">
           <b>Controles:</b><br/>
@@ -290,12 +355,12 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card section-pane active" data-section="world">
         <h2>Paleta</h2>
         <div class="palette" id="palette"></div>
       </div>
 
-      <div class="card">
+      <div class="card section-pane" data-section="inventory">
         <h2>Inventário</h2>
         <label>Entidade</label>
         <select id="inv-target"></select>
@@ -318,18 +383,25 @@
 
         <div class="status" id="inv-status" style="margin-top: 10px;">Selecione uma entidade.</div>
         <div class="status" id="inv-list" style="margin-top: 8px;"></div>
+        <label>Preset</label>
+        <div class="row">
+          <select id="inv-preset"></select>
+          <button id="inv-apply-preset">Aplicar preset</button>
+        </div>
       </div>
 
-      <div class="card">
+      <div class="card section-pane" data-section="content">
         <h2>Editor de Conteúdo</h2>
         <div class="tabs">
-          <button class="tab-btn active" data-tab="tab-blocks">Blocos</button>
-          <button class="tab-btn" data-tab="tab-items">Itens/Armas</button>
-          <button class="tab-btn" data-tab="tab-creatures">Criaturas</button>
-          <button class="tab-btn" data-tab="tab-factions">Facções</button>
+          <button class="tab-btn content-tab-btn active" data-tab="tab-blocks">Blocos</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-items">Itens/Armas</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-creatures">Criaturas</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-factions">Facções</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-textures">Texturas</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-presets">Presets Inv.</button>
         </div>
 
-        <div id="tab-blocks" class="tab-pane active">
+        <div id="tab-blocks" class="tab-pane content-tab-pane active">
           <div class="split">
             <div>
               <label>Lista de blocos</label>
@@ -374,6 +446,21 @@
               <input type="text" id="block-texture-key" placeholder="EX: basalt" />
               <label>Upload imagem (opcional)</label>
               <input type="file" id="block-image" accept="image/*" />
+              <label>Preview da textura</label>
+              <div id="block-preview" class="thumb" style="width:80px;height:80px;"></div>
+              <label>Script onUse</label>
+              <select id="block-script-mode">
+                <option value="none">Sem script</option>
+                <option value="preset">Preset</option>
+                <option value="custom">Custom JS</option>
+              </select>
+              <label>Preset</label>
+              <select id="block-script-preset">
+                <option value="door_toggle">Door Toggle</option>
+                <option value="gold_flash">Gold Flash</option>
+              </select>
+              <label>Função custom (onUse)</label>
+              <textarea id="block-script" placeholder="function(world, block, creature) { ... }"></textarea>
               <div class="btnbar" style="margin-top:8px;">
                 <button class="good" id="block-save">Salvar bloco</button>
                 <button id="block-new">Novo</button>
@@ -383,7 +470,7 @@
           </div>
         </div>
 
-        <div id="tab-items" class="tab-pane">
+        <div id="tab-items" class="tab-pane content-tab-pane">
           <div class="split">
             <div>
               <label>Lista de itens/armas</label>
@@ -428,6 +515,8 @@
               <input type="text" id="item-texture-key" placeholder="EX: item-machado" />
               <label>Upload imagem (usa como texture/ui/drop)</label>
               <input type="file" id="item-image" accept="image/*" />
+              <label>Preview da textura</label>
+              <div id="item-preview" class="thumb" style="width:80px;height:80px;"></div>
               <div class="btnbar" style="margin-top:8px;">
                 <button class="good" id="item-save">Salvar item/arma</button>
                 <button id="item-new">Novo</button>
@@ -437,7 +526,7 @@
           </div>
         </div>
 
-        <div id="tab-creatures" class="tab-pane">
+        <div id="tab-creatures" class="tab-pane content-tab-pane">
           <div class="split">
             <div>
               <label>Lista de criaturas</label>
@@ -484,6 +573,8 @@
               <input type="text" id="creature-texture-key" placeholder="EX: monster_goblin" />
               <label>Upload imagem</label>
               <input type="file" id="creature-image" accept="image/*" />
+              <label>Preview da textura</label>
+              <div id="creature-preview" class="thumb" style="width:80px;height:80px;"></div>
               <div class="btnbar" style="margin-top:8px;">
                 <button class="good" id="creature-save">Salvar criatura</button>
                 <button id="creature-new">Novo</button>
@@ -493,7 +584,7 @@
           </div>
         </div>
 
-        <div id="tab-factions" class="tab-pane">
+        <div id="tab-factions" class="tab-pane content-tab-pane">
           <div class="split">
             <div>
               <label>Facções</label>
@@ -512,6 +603,52 @@
               <label>Relações entre facções</label>
               <div id="relations-grid" class="relation-grid"></div>
               <div class="hint">Relações podem ser: <b>friendly</b>, <b>neutral</b> ou <b>hostile</b>.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-textures" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Lista de texturas</label>
+              <div id="texture-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Texture key</label>
+              <input type="text" id="texture-key" placeholder="EX: wall_brick_01" />
+              <label>URL</label>
+              <input type="text" id="texture-url" placeholder="./data/images/custom/wall_brick_01.png" />
+              <label>Upload imagem</label>
+              <input type="file" id="texture-image" accept="image/*" />
+              <label>Preview</label>
+              <div id="texture-preview" class="thumb" style="width:80px;height:80px;"></div>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="texture-save">Salvar textura</button>
+                <button id="texture-new">Nova</button>
+                <button class="bad" id="texture-delete">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-presets" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Lista de presets</label>
+              <div id="preset-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Nome do preset</label>
+              <input type="text" id="preset-key" placeholder="starter_guard" />
+              <label>Inventário de blocos (JSON)</label>
+              <textarea id="preset-blocks" placeholder='{"1": 50, "5": 2}'></textarea>
+              <label>Inventário de itens (JSON)</label>
+              <textarea id="preset-items" placeholder='{"revolver": 24, "cuscuz": 5}'></textarea>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="preset-save">Salvar preset</button>
+                <button id="preset-new">Novo</button>
+                <button class="bad" id="preset-delete">Excluir</button>
+              </div>
             </div>
           </div>
         </div>
@@ -572,6 +709,7 @@
     }
 
     const $ = (id) => document.getElementById(id);
+    const appEl = $('app');
 
     const canvas = $('canvas');
     const ctx = canvas.getContext('2d');
@@ -582,8 +720,12 @@
 
     const textureByKey = new Map();
     const imgCache = new Map();
+    const blockTypeById = new Map();
+    const npcTypeById = new Map();
+    const itemTypeById = new Map();
 
     const state = {
+      activeSection: 'world',
       toolMode: 'block',
       layerY: 0,
       zoom: 26,
@@ -600,6 +742,9 @@
       selectedItemKey: null,
       selectedCreatureKey: null,
       selectedFactionKey: null,
+      selectedTextureKey: null,
+      selectedPresetKey: null,
+      layerClipboard: null,
       importedZip: null,
       db: {
         blocks: deepCloneWithFns(BLOCK_TYPES),
@@ -611,6 +756,11 @@
           relations: deepCloneWithFns(FACTION_RELATIONS),
           order: [...FACTION_ORDER]
         },
+        inventoryPresets: {},
+        ui: {
+          playerPortraitPath: './data/images/ui/player-face.png',
+          playerPortraitDataUrl: null
+        },
         embeddedImages: {}
       },
       map: {
@@ -620,12 +770,128 @@
         items: [],
         entities: []
       },
-      view: { minX: 0, minZ: 0, maxX: 15, maxZ: 15 }
+      maps: {},
+      currentMapName: 'default.json',
+      view: { minX: 0, minZ: 0, maxX: 15, maxZ: 15 },
+      viewDirty: true
+    };
+
+    function updateSectionLayout() {
+      const showMap = state.activeSection === 'world';
+      appEl.classList.toggle('no-stage', !showMap);
+      if (showMap) {
+        resizeCanvas();
+        draw();
+      }
+    }
+
+    const BLOCK_SCRIPT_PRESETS = {
+      door_toggle: `function(world, block, creature) {
+  const isOpening = block.userData.solid;
+  const targetSolid = !isOpening;
+  const visited = new Set();
+  const queue = [{ x: block.userData.x, y: block.userData.y, z: block.userData.z }];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const key = \`\${current.x},\${current.y},\${current.z}\`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    const targetBlock = world.blocks.find((b) =>
+      Math.abs(b.x - current.x) < 0.01 &&
+      Math.abs(b.y - current.y) < 0.01 &&
+      Math.abs(b.z - current.z) < 0.01 &&
+      b.type && b.type.onUse === block.type.onUse
+    );
+    if (!targetBlock) continue;
+    targetBlock.solid = targetSolid;
+    if (targetBlock.mesh && Array.isArray(targetBlock.mesh.material)) {
+      targetBlock.mesh.material.forEach(mat => {
+        mat.opacity = targetSolid ? (targetBlock.type.opacity ?? 1) : 0.35;
+        mat.transparent = mat.opacity < 1;
+      });
+    }
+    queue.push(
+      { x: current.x + 1, y: current.y, z: current.z },
+      { x: current.x - 1, y: current.y, z: current.z },
+      { x: current.x, y: current.y, z: current.z + 1 },
+      { x: current.x, y: current.y, z: current.z - 1 },
+      { x: current.x, y: current.y + 1, z: current.z },
+      { x: current.x, y: current.y - 1, z: current.z }
+    );
+  }
+  if (world && typeof world.markTerrainDirty === 'function') {
+    world.markTerrainDirty();
+  }
+}`,
+      gold_flash: `function(world, block, creature) {
+  if (!block || !Array.isArray(block.material)) return;
+  block.material.forEach(mat => {
+    mat.emissive = new THREE.Color(0xFFD700);
+    mat.emissiveIntensity = 0.5;
+  });
+  setTimeout(() => {
+    block.material.forEach(mat => {
+      mat.emissiveIntensity = 0;
+    });
+  }, 1000);
+}`
     };
 
     function setStatus(msg) { statusEl.textContent = msg; }
     function setZipStatus(msg) { zipStatusEl.textContent = msg; }
     function setDbStatus(msg) { dbStatusEl.textContent = msg; }
+
+    function cloneMapPayload(payload) {
+      return JSON.parse(JSON.stringify(payload || {
+        version: 1,
+        player: { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, inventory: {}, itemInventory: {} },
+        blocks: [],
+        items: [],
+        entities: []
+      }));
+    }
+
+    function normalizeMapName(name) {
+      const clean = String(name || '').trim().replace(/[^A-Za-z0-9._-]/g, '_');
+      if (!clean) return '';
+      return clean.toLowerCase().endsWith('.json') ? clean : `${clean}.json`;
+    }
+
+    function saveCurrentMapIntoCollection() {
+      if (!state.currentMapName) return;
+      state.maps[state.currentMapName] = cloneMapPayload(buildMapPayload());
+    }
+
+    function renderMapManager() {
+      mapSelectEl.innerHTML = '';
+      const names = Object.keys(state.maps).sort((a, b) => a.localeCompare(b));
+      for (const name of names) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        mapSelectEl.appendChild(opt);
+      }
+      if (!names.length) {
+        const fallback = 'default.json';
+        state.maps[fallback] = cloneMapPayload(state.map);
+      }
+      if (!state.maps[state.currentMapName]) {
+        state.currentMapName = Object.keys(state.maps)[0];
+      }
+      mapSelectEl.value = state.currentMapName;
+      mapNameEl.value = state.currentMapName;
+    }
+
+    function switchToMap(name) {
+      const normalized = normalizeMapName(name);
+      if (!normalized || !state.maps[normalized]) return;
+      saveCurrentMapIntoCollection();
+      state.currentMapName = normalized;
+      applyMapPayload(state.maps[normalized], { skipCollectionSync: true });
+      mapSelectEl.value = state.currentMapName;
+      mapNameEl.value = state.currentMapName;
+      setStatus(`Mapa ativo: ${state.currentMapName}`);
+    }
 
     function rebuildTextureMap() {
       textureByKey.clear();
@@ -633,6 +899,19 @@
         if (t && t.key) textureByKey.set(t.key, t.url);
       }
       imgCache.clear();
+    }
+
+    function rebuildTypeIndexes() {
+      blockTypeById.clear();
+      npcTypeById.clear();
+      itemTypeById.clear();
+      for (const b of Object.values(state.db.blocks)) blockTypeById.set(String(b.id), b);
+      for (const n of Object.values(state.db.npcs)) npcTypeById.set(String(n.id), n);
+      for (const i of Object.values(state.db.items)) itemTypeById.set(String(i.id), i);
+    }
+
+    function markMapDirty() {
+      state.viewDirty = true;
     }
 
     function getTextureUrl(key) {
@@ -691,6 +970,17 @@
     const layerEl = $('layer-y');
     const zoomEl = $('zoom');
     const paintShapeEl = $('paint-shape');
+    const playerImagePathEl = $('player-image-path');
+    const playerImageEl = $('player-image');
+    const playerImagePreviewEl = $('player-image-preview');
+    const layerCopyEl = $('layer-copy');
+    const layerPasteEl = $('layer-paste');
+    const layerClearEl = $('layer-clear');
+    const mapSelectEl = $('map-select');
+    const mapNameEl = $('map-name');
+    const mapNewEl = $('map-new');
+    const mapRenameEl = $('map-rename');
+    const mapDeleteEl = $('map-delete');
 
     const invTargetEl = $('inv-target');
     const invCategoryEl = $('inv-category');
@@ -701,6 +991,12 @@
     const invClearEl = $('inv-clear');
     const invStatusEl = $('inv-status');
     const invListEl = $('inv-list');
+    const invPresetEl = $('inv-preset');
+    const invApplyPresetEl = $('inv-apply-preset');
+    const presetListEl = $('preset-list');
+    const presetKeyEl = $('preset-key');
+    const presetBlocksEl = $('preset-blocks');
+    const presetItemsEl = $('preset-items');
 
     const inventoryState = { targetKey: 'player', category: 'item' };
 
@@ -758,15 +1054,15 @@
     }
 
     function findNpcTypeById(id) {
-      return getNpcEntries().find(n => n.id === id) || null;
+      return npcTypeById.get(String(id)) || null;
     }
 
     function findBlockTypeById(id) {
-      return getBlockEntries().find(b => String(b.id) === String(id)) || null;
+      return blockTypeById.get(String(id)) || null;
     }
 
     function findItemTypeById(id) {
-      return getItemEntries().find(i => String(i.id) === String(id)) || null;
+      return itemTypeById.get(String(id)) || null;
     }
 
     function getNpcLabel(npc) {
@@ -903,6 +1199,20 @@
       }
     }
 
+    function renderInventoryPresetOptions() {
+      invPresetEl.innerHTML = '';
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = '(sem preset)';
+      invPresetEl.appendChild(none);
+      for (const key of Object.keys(state.db.inventoryPresets).sort((a, b) => a.localeCompare(b))) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = key;
+        invPresetEl.appendChild(opt);
+      }
+    }
+
     function adjustInventory(kind, id, delta) {
       const target = getInventoryTarget();
       if (!target) return;
@@ -945,6 +1255,20 @@
       target.entity.inventory = {};
       target.entity.itemInventory = {};
       renderInventoryList();
+    });
+
+    invApplyPresetEl.addEventListener('click', () => {
+      const key = invPresetEl.value;
+      const preset = state.db.inventoryPresets[key];
+      const target = getInventoryTarget();
+      if (!preset || !target) {
+        setStatus('Preset inválido ou alvo inválido.');
+        return;
+      }
+      target.entity.inventory = { ...(preset.inventory || {}) };
+      target.entity.itemInventory = { ...(preset.itemInventory || {}) };
+      renderInventoryList();
+      setStatus(`Preset aplicado: ${key}`);
     });
 
     function recalcBounds() {
@@ -1004,7 +1328,8 @@
       state.map.blocks.push({ x, y, z, typeId, isFloor: !!isFloor });
     }
 
-    function eraseAtCell(x, z) {
+    function eraseAtCell(x, z, options = {}) {
+      const { skipInventoryRefresh = false } = options;
       const blockY = state.layerY + 0.5;
       const floorY = -0.5;
       state.map.blocks = state.map.blocks.filter((b) => !(b.x === x && b.z === z && (b.y === blockY || b.y === floorY)));
@@ -1024,8 +1349,134 @@
         Math.abs((it.z ?? 0) - cz) < 0.51 &&
         layerFromWorldY(it.y) === targetLayer
       ));
-      renderInventoryTargets();
-      renderInventoryList();
+      if (!skipInventoryRefresh) {
+        renderInventoryTargets();
+        renderInventoryList();
+      }
+    }
+
+    function applyRectOperation(minX, maxX, minZ, maxZ, erase) {
+      const width = (maxX - minX + 1);
+      const height = (maxZ - minZ + 1);
+      if (width <= 0 || height <= 0) return;
+
+      if (erase || state.toolMode === 'erase') {
+        const keySet = new Set();
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) keySet.add(`${x},${z}`);
+        }
+        const blockY = state.layerY + 0.5;
+        const floorY = -0.5;
+        state.map.blocks = state.map.blocks.filter((b) => {
+          if (b.y !== blockY && b.y !== floorY) return true;
+          return !keySet.has(`${b.x},${b.z}`);
+        });
+        state.map.entities = state.map.entities.filter((e) => {
+          if (layerFromWorldY(e.y) !== state.layerY) return true;
+          return !keySet.has(`${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`);
+        });
+        state.map.items = state.map.items.filter((it) => {
+          if (layerFromWorldY(it.y) !== state.layerY) return true;
+          return !keySet.has(`${Math.floor(it.x ?? 0)},${Math.floor(it.z ?? 0)}`);
+        });
+        renderInventoryTargets();
+        renderInventoryList();
+        markMapDirty();
+        setStatus(`Apagado retângulo: (${minX},${minZ}) → (${maxX},${maxZ}) em Y=${state.layerY}`);
+        draw();
+        return;
+      }
+
+      if (!state.selected) return;
+
+      if (state.toolMode === 'block') {
+        const bt = state.selected.bt;
+        if (!bt) return;
+        const isFloor = !!bt.isFloor;
+        const targetY = isFloor ? -0.5 : (state.layerY + 0.5);
+        const existing = new Map();
+        for (const b of state.map.blocks) {
+          if (b.y === targetY) existing.set(`${b.x},${b.z}`, b);
+        }
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) {
+            const key = `${x},${z}`;
+            const block = existing.get(key);
+            if (block) {
+              block.typeId = bt.id;
+              block.isFloor = isFloor;
+            } else {
+              const entry = { x, y: targetY, z, typeId: bt.id, isFloor };
+              state.map.blocks.push(entry);
+              existing.set(key, entry);
+            }
+          }
+        }
+        markMapDirty();
+        setStatus(`Bloco: ${bt.name} aplicado em ${width * height} células (Y=${state.layerY})`);
+        draw();
+        return;
+      }
+
+      if (state.toolMode === 'npc') {
+        const npc = state.selected.npc;
+        if (!npc) return;
+        const keySet = new Set();
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) keySet.add(`${x},${z}`);
+        }
+        state.map.entities = state.map.entities.filter((e) => {
+          if (layerFromWorldY(e.y) !== state.layerY) return true;
+          return !keySet.has(`${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`);
+        });
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) {
+            state.map.entities.push({
+              type: 'npc',
+              npcTypeId: npc.id,
+              name: npc.name,
+              faction: npc.faction || null,
+              x: x + 0.5,
+              y: state.layerY,
+              z: z + 0.5,
+              yaw: 0,
+              pitch: 0,
+              hp: npc.maxHP || 100,
+              maxHP: npc.maxHP || 100,
+              isHostile: !!npc.isHostile,
+              inventory: {},
+              itemInventory: {}
+            });
+          }
+        }
+        renderInventoryTargets();
+        renderInventoryList();
+        markMapDirty();
+        setStatus(`Criatura: ${npc.name} aplicada em ${width * height} células (Y=${state.layerY})`);
+        draw();
+        return;
+      }
+
+      if (state.toolMode === 'item') {
+        const it = state.selected.it;
+        if (!it) return;
+        const keySet = new Set();
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) keySet.add(`${x},${z}`);
+        }
+        state.map.items = state.map.items.filter((i) => {
+          if (layerFromWorldY(i.y) !== state.layerY) return true;
+          return !keySet.has(`${Math.floor(i.x ?? 0)},${Math.floor(i.z ?? 0)}`);
+        });
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) {
+            state.map.items.push({ kind: 'item', itemId: it.id, amount: 1, x: x + 0.5, y: state.layerY + 0.2, z: z + 0.5 });
+          }
+        }
+        markMapDirty();
+        setStatus(`Item/Arma: ${it.name} aplicado em ${width * height} células (Y=${state.layerY})`);
+        draw();
+      }
     }
 
     function resizeCanvas() {
@@ -1041,7 +1492,10 @@
     window.addEventListener('resize', resizeCanvas);
 
     function draw() {
-      recalcBounds();
+      if (state.viewDirty) {
+        recalcBounds();
+        state.viewDirty = false;
+      }
       const rect = $('stage').getBoundingClientRect();
       const w = rect.width;
       const h = rect.height;
@@ -1054,10 +1508,10 @@
       const ox = Math.floor((w - spanX * cell) / 2);
       const oz = Math.floor((h - spanZ * cell) / 2);
 
-      ctx.fillStyle = '#0b0f14';
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
       ctx.lineWidth = 1;
       for (let i = 0; i <= spanX; i++) {
         const x = ox + i * cell;
@@ -1093,10 +1547,10 @@
         if (img && img.complete && img.naturalWidth) {
           ctx.drawImage(img, px, pz, cell, cell);
         } else {
-          ctx.fillStyle = 'rgba(100,116,139,0.55)';
+          ctx.fillStyle = 'rgba(180,180,180,0.55)';
           ctx.fillRect(px, pz, cell, cell);
         }
-        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        ctx.strokeStyle = 'rgba(0,0,0,0.16)';
         ctx.strokeRect(px + 0.5, pz + 0.5, cell - 1, cell - 1);
         ctx.restore();
       }
@@ -1133,12 +1587,12 @@
         const px = ox + gx * cell;
         const pz = oz + gz * cell;
 
-        ctx.fillStyle = 'rgba(59, 130, 246, 0.22)';
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.18)';
         ctx.fillRect(px, pz, cell, cell);
         if (img && img.complete && img.naturalWidth) ctx.drawImage(img, px, pz, cell, cell);
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
         ctx.fillRect(px, pz + cell - 16, cell, 16);
-        ctx.fillStyle = '#e6e9ef';
+        ctx.fillStyle = '#222';
         ctx.font = '11px ui-monospace, monospace';
         ctx.fillText('NPC', px + 4, pz + cell - 4);
       }
@@ -1157,12 +1611,12 @@
         const px = ox + gx * cell;
         const pz = oz + gz * cell;
 
-        ctx.fillStyle = 'rgba(52, 211, 153, 0.18)';
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.15)';
         ctx.fillRect(px, pz, cell, cell);
         if (img && img.complete && img.naturalWidth) ctx.drawImage(img, px, pz, cell, cell);
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
         ctx.fillRect(px, pz + cell - 16, cell, 16);
-        ctx.fillStyle = '#e6e9ef';
+        ctx.fillStyle = '#222';
         ctx.fillText('ITEM', px + 4, pz + cell - 4);
       }
 
@@ -1228,15 +1682,17 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       return { x: state.view.minX + gx, z: state.view.minZ + gz };
     }
 
-    function applyAtCell(cellPos, isErase) {
+    function applyAtCell(cellPos, isErase, options = {}) {
+      const { skipDraw = false, skipStatus = false, skipInventoryRefresh = false } = options;
       if (!cellPos) return;
       const { x, z } = cellPos;
       const mode = state.toolMode;
 
       if (isErase || mode === 'erase') {
-        eraseAtCell(x, z);
-        setStatus(`Apagado em (${x}, layer=${state.layerY}, ${z}).`);
-        draw();
+        eraseAtCell(x, z, { skipInventoryRefresh });
+        markMapDirty();
+        if (!skipStatus) setStatus(`Apagado em (${x}, layer=${state.layerY}, ${z}).`);
+        if (!skipDraw) draw();
         return;
       }
 
@@ -1248,8 +1704,9 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         const isFloor = !!bt.isFloor;
         const y = isFloor ? -0.5 : state.layerY + 0.5;
         upsertBlock(x, y, z, bt.id, isFloor);
-        setStatus(`Bloco: ${bt.name} em (${x}, ${y}, ${z})`);
-        draw();
+        markMapDirty();
+        if (!skipStatus) setStatus(`Bloco: ${bt.name} em (${x}, ${y}, ${z})`);
+        if (!skipDraw) draw();
         return;
       }
 
@@ -1278,10 +1735,13 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           layerFromWorldY(e.y) === state.layerY
         ));
         state.map.entities.push(entry);
-        setStatus(`Criatura: ${npc.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
-        renderInventoryTargets();
-        renderInventoryList();
-        draw();
+        markMapDirty();
+        if (!skipStatus) setStatus(`Criatura: ${npc.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
+        if (!skipInventoryRefresh) {
+          renderInventoryTargets();
+          renderInventoryList();
+        }
+        if (!skipDraw) draw();
         return;
       }
 
@@ -1295,8 +1755,9 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           layerFromWorldY(i.y) === state.layerY
         ));
         state.map.items.push(entry);
-        setStatus(`Item/Arma: ${it.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
-        draw();
+        markMapDirty();
+        if (!skipStatus) setStatus(`Item/Arma: ${it.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
+        if (!skipDraw) draw();
       }
     }
 
@@ -1366,17 +1827,9 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         const minZ = Math.min(a.z, b.z);
         const maxZ = Math.max(a.z, b.z);
         const erase = !!state.rectErase;
-
-        for (let z = minZ; z <= maxZ; z++) {
-          for (let x = minX; x <= maxX; x++) {
-            applyAtCell({ x, z }, erase);
-          }
-        }
-
-        setStatus(`${erase ? 'Apagado' : 'Aplicado'} retângulo: (${minX},${minZ}) → (${maxX},${maxZ}) em Y=${state.layerY}`);
+        applyRectOperation(minX, maxX, minZ, maxZ, erase);
         state.rectStart = null;
         state.rectEnd = null;
-        draw();
       }
     });
 
@@ -1431,6 +1884,163 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     searchEl.addEventListener('input', renderPalette);
 
+    mapSelectEl.addEventListener('change', () => {
+      switchToMap(mapSelectEl.value);
+    });
+
+    mapNewEl.addEventListener('click', () => {
+      saveCurrentMapIntoCollection();
+      let base = normalizeMapName(mapNameEl.value || 'new-map.json');
+      if (!base) base = 'new-map.json';
+      let candidate = base;
+      let i = 1;
+      while (state.maps[candidate]) {
+        candidate = base.replace(/\.json$/i, `-${i}.json`);
+        i++;
+      }
+      state.maps[candidate] = cloneMapPayload({
+        version: 1,
+        player: { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, inventory: {}, itemInventory: {} },
+        blocks: [],
+        items: [],
+        entities: []
+      });
+      state.currentMapName = candidate;
+      applyMapPayload(state.maps[candidate], { skipCollectionSync: true });
+      renderMapManager();
+      setStatus(`Novo mapa criado: ${candidate}`);
+    });
+
+    mapRenameEl.addEventListener('click', () => {
+      const next = normalizeMapName(mapNameEl.value);
+      if (!next) {
+        setStatus('Nome de mapa inválido.');
+        return;
+      }
+      if (next !== state.currentMapName && state.maps[next]) {
+        setStatus('Já existe um mapa com esse nome.');
+        return;
+      }
+      saveCurrentMapIntoCollection();
+      const current = state.currentMapName;
+      state.maps[next] = state.maps[current];
+      if (next !== current) delete state.maps[current];
+      state.currentMapName = next;
+      renderMapManager();
+      setStatus(`Mapa renomeado para: ${next}`);
+    });
+
+    mapDeleteEl.addEventListener('click', () => {
+      const names = Object.keys(state.maps);
+      if (names.length <= 1) {
+        setStatus('Não é possível excluir o último mapa.');
+        return;
+      }
+      const current = state.currentMapName;
+      delete state.maps[current];
+      const next = Object.keys(state.maps).sort((a, b) => a.localeCompare(b))[0];
+      state.currentMapName = next;
+      applyMapPayload(state.maps[next], { skipCollectionSync: true });
+      renderMapManager();
+      setStatus(`Mapa excluído: ${current}`);
+    });
+
+    playerImagePathEl.addEventListener('input', () => {
+      state.db.ui.playerPortraitPath = String(playerImagePathEl.value || '').trim() || './data/images/ui/player-face.png';
+      updatePlayerImagePreview();
+    });
+
+    playerImageEl.addEventListener('change', async () => {
+      const file = playerImageEl.files && playerImageEl.files[0];
+      if (!file) return;
+      state.db.ui.playerPortraitDataUrl = await fileToDataUrl(file);
+      const extMatch = file.name.match(/\.[A-Za-z0-9]+$/);
+      const ext = extMatch ? extMatch[0].toLowerCase() : '.png';
+      state.db.ui.playerPortraitPath = `./data/images/ui/player-face${ext}`;
+      playerImagePathEl.value = state.db.ui.playerPortraitPath;
+      updatePlayerImagePreview();
+      setDbStatus('Imagem do jogador atualizada.');
+    });
+
+    function copyCurrentLayer() {
+      const layer = state.layerY;
+      const blockY = layer + 0.5;
+      state.layerClipboard = {
+        sourceLayer: layer,
+        blocks: state.map.blocks
+          .filter((b) => b.y === blockY)
+          .map((b) => ({ x: b.x, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor })),
+        entities: state.map.entities
+          .filter((e) => layerFromWorldY(e.y) === layer)
+          .map((e) => ({ ...e })),
+        items: state.map.items
+          .filter((i) => layerFromWorldY(i.y) === layer)
+          .map((i) => ({ ...i }))
+      };
+      const total = state.layerClipboard.blocks.length + state.layerClipboard.entities.length + state.layerClipboard.items.length;
+      setStatus(`Camada Y=${layer} copiada (${total} entradas).`);
+    }
+
+    function pasteToCurrentLayer() {
+      if (!state.layerClipboard) {
+        setStatus('Nenhuma camada copiada ainda.');
+        return;
+      }
+      const targetLayer = state.layerY;
+      const targetBlockY = targetLayer + 0.5;
+
+      const blockKeys = new Set(state.layerClipboard.blocks.map((b) => `${b.x},${b.z}`));
+      state.map.blocks = state.map.blocks.filter((b) => {
+        if (b.y !== targetBlockY) return true;
+        return !blockKeys.has(`${b.x},${b.z}`);
+      });
+      for (const b of state.layerClipboard.blocks) {
+        state.map.blocks.push({ x: b.x, y: targetBlockY, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor });
+      }
+
+      const entityKeys = new Set(state.layerClipboard.entities.map((e) => `${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`));
+      state.map.entities = state.map.entities.filter((e) => {
+        if (layerFromWorldY(e.y) !== targetLayer) return true;
+        return !entityKeys.has(`${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`);
+      });
+      for (const e of state.layerClipboard.entities) {
+        state.map.entities.push({ ...e, y: targetLayer });
+      }
+
+      const itemKeys = new Set(state.layerClipboard.items.map((i) => `${Math.floor(i.x ?? 0)},${Math.floor(i.z ?? 0)}`));
+      state.map.items = state.map.items.filter((i) => {
+        if (layerFromWorldY(i.y) !== targetLayer) return true;
+        return !itemKeys.has(`${Math.floor(i.x ?? 0)},${Math.floor(i.z ?? 0)}`);
+      });
+      for (const i of state.layerClipboard.items) {
+        state.map.items.push({ ...i, y: targetLayer + 0.2 });
+      }
+
+      renderInventoryTargets();
+      renderInventoryList();
+      markMapDirty();
+      draw();
+      const total = state.layerClipboard.blocks.length + state.layerClipboard.entities.length + state.layerClipboard.items.length;
+      setStatus(`Camada colada em Y=${targetLayer} (${total} entradas).`);
+    }
+
+    function clearCurrentLayer() {
+      const layer = state.layerY;
+      const blockY = layer + 0.5;
+      state.map.blocks = state.map.blocks.filter((b) => b.y !== blockY);
+      state.map.entities = state.map.entities.filter((e) => layerFromWorldY(e.y) !== layer);
+      state.map.items = state.map.items.filter((i) => layerFromWorldY(i.y) !== layer);
+      renderInventoryTargets();
+      renderInventoryList();
+      markMapDirty();
+      draw();
+      setStatus(`Camada Y=${layer} limpa.`);
+    }
+
+    layerCopyEl.addEventListener('click', copyCurrentLayer);
+    layerPasteEl.addEventListener('click', pasteToCurrentLayer);
+    layerClearEl.addEventListener('click', clearCurrentLayer);
+
     const mapFileInput = document.createElement('input');
     mapFileInput.type = 'file';
     mapFileInput.accept = 'application/json';
@@ -1442,7 +2052,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       mapFileInput.click();
     });
 
-    function applyMapPayload(payload) {
+    function applyMapPayload(payload, options = {}) {
       state.map = {
         version: payload.version || 1,
         player: payload.player || { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, inventory: {}, itemInventory: {} },
@@ -1454,9 +2064,19 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         entities: (payload.entities || []).map((e) => ({ ...e }))
       };
       ensurePlayer();
+      if (state.map.player && typeof state.map.player.portrait === 'string' && state.map.player.portrait.trim()) {
+        state.db.ui.playerPortraitPath = state.map.player.portrait;
+      }
+      playerImagePathEl.value = state.db.ui.playerPortraitPath;
+      updatePlayerImagePreview();
+      markMapDirty();
+      if (!options.skipCollectionSync && state.currentMapName) {
+        state.maps[state.currentMapName] = cloneMapPayload(state.map);
+      }
       setStatus(`Mapa carregado. Blocos: ${state.map.blocks.length}, NPCs: ${state.map.entities.length}, Itens: ${state.map.items.length}`);
       renderInventoryTargets();
       renderInventoryList();
+      renderMapManager();
       draw();
     }
 
@@ -1468,7 +2088,20 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         try {
           const payload = JSON.parse(String(r.result || ''));
           if (!payload || !Array.isArray(payload.blocks)) throw new Error('invalid');
+          saveCurrentMapIntoCollection();
           applyMapPayload(payload);
+          if (file.name) {
+            const mapName = normalizeMapName(file.name);
+            if (mapName) {
+              const prevName = state.currentMapName;
+              state.maps[mapName] = cloneMapPayload(state.map);
+              if (prevName && prevName !== mapName) {
+                delete state.maps[prevName];
+              }
+              state.currentMapName = mapName;
+              renderMapManager();
+            }
+          }
         } catch {
           setStatus('Falha ao importar: JSON inválido.');
         }
@@ -1477,16 +2110,17 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
     });
 
     $('btn-export').addEventListener('click', () => {
+      saveCurrentMapIntoCollection();
       const payload = buildMapPayload();
       const data = JSON.stringify(payload, null, 2);
       const blob = new Blob([data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'map.json';
+      a.download = state.currentMapName || 'map.json';
       a.click();
       URL.revokeObjectURL(url);
-      setStatus('Exportado: map.json');
+      setStatus(`Exportado: ${a.download}`);
     });
 
     function buildMapPayload() {
@@ -1499,6 +2133,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
           z: player.z,
           yaw: player.yaw || 0,
           pitch: player.pitch || 0,
+          portrait: state.db.ui.playerPortraitPath || './data/images/ui/player-face.png',
           inventory: player.inventory || {},
           itemInventory: player.itemInventory || {}
         },
@@ -1536,7 +2171,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         const resp = await fetch('./data/maps/default.json');
         if (!resp.ok) throw new Error(String(resp.status));
         const payload = await resp.json();
+        saveCurrentMapIntoCollection();
         applyMapPayload(payload);
+        state.maps[state.currentMapName] = cloneMapPayload(state.map);
+        renderMapManager();
       } catch {
         setStatus('Falha ao carregar ./data/maps/default.json');
       }
@@ -1546,9 +2184,12 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       state.map.blocks = [];
       state.map.items = [];
       state.map.entities = [];
+      markMapDirty();
+      saveCurrentMapIntoCollection();
       setStatus('Mapa limpo.');
       renderInventoryTargets();
       renderInventoryList();
+      renderMapManager();
       draw();
     });
 
@@ -1568,6 +2209,31 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     function sanitizeFactionId(v) {
       return String(v || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    }
+
+    function functionText(fn) {
+      return (typeof fn === 'function') ? fn.toString() : '';
+    }
+
+    function normalizeScriptText(text) {
+      return String(text || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function detectBlockScriptPreset(fn) {
+      const src = normalizeScriptText(functionText(fn));
+      if (!src) return null;
+      for (const [presetId, presetText] of Object.entries(BLOCK_SCRIPT_PRESETS)) {
+        if (normalizeScriptText(presetText) === src) return presetId;
+      }
+      return null;
+    }
+
+    function parseScriptFunction(raw) {
+      const text = String(raw || '').trim();
+      if (!text) return null;
+      const fn = new Function(`return (${text});`)();
+      if (typeof fn !== 'function') throw new Error('Script deve ser uma função');
+      return fn;
     }
 
     async function fileToDataUrl(file) {
@@ -1613,15 +2279,59 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       }
     }
 
+    function setPreviewBox(el, key) {
+      el.innerHTML = '';
+      const url = getTextureUrl(key);
+      if (!url) {
+        el.textContent = 'N/A';
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      el.appendChild(img);
+    }
+
+    function updatePlayerImagePreview() {
+      const path = String(playerImagePathEl.value || state.db.ui.playerPortraitPath || './data/images/ui/player-face.png').trim();
+      playerImagePreviewEl.innerHTML = '';
+      const dataUrl = state.db.ui.playerPortraitDataUrl;
+      const img = document.createElement('img');
+      img.src = dataUrl || path;
+      img.alt = '';
+      playerImagePreviewEl.appendChild(img);
+    }
+
+    function updateBlockPreview() {
+      const key = sanitizeTextureKey($('block-texture-key').value || '');
+      setPreviewBox($('block-preview'), key);
+    }
+
+    function updateItemPreview() {
+      const key = sanitizeTextureKey($('item-texture-key').value || '');
+      setPreviewBox($('item-preview'), key);
+    }
+
+    function updateCreaturePreview() {
+      const key = sanitizeTextureKey($('creature-texture-key').value || '');
+      setPreviewBox($('creature-preview'), key);
+    }
+
     function refreshAllForCatalogChanges() {
       rebuildTextureMap();
+      rebuildTypeIndexes();
       renderPalette();
       renderInventoryOptions();
       renderInventoryList();
+      renderInventoryPresetOptions();
       renderBlocksTab();
       renderItemsTab();
       renderCreaturesTab();
       renderFactionsTab();
+      renderTexturesTab();
+      renderPresetsTab();
+      updatePlayerImagePreview();
+      markMapDirty();
       draw();
     }
 
@@ -1652,6 +2362,27 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('block-floor').value = selected ? String(!!selected.isFloor) : 'false';
       $('block-droppable').value = selected ? String(selected.droppable !== false) : 'true';
       $('block-texture-key').value = selected ? String(getBlockThumbKey(selected) || '') : '';
+      const presetId = detectBlockScriptPreset(selected?.onUse);
+      if (!selected?.onUse) {
+        $('block-script-mode').value = 'none';
+        $('block-script-preset').value = 'door_toggle';
+        $('block-script').value = '';
+      } else if (presetId) {
+        $('block-script-mode').value = 'preset';
+        $('block-script-preset').value = presetId;
+        $('block-script').value = BLOCK_SCRIPT_PRESETS[presetId];
+      } else {
+        $('block-script-mode').value = 'custom';
+        $('block-script').value = functionText(selected.onUse);
+      }
+      updateBlockScriptUi();
+      updateBlockPreview();
+    }
+
+    function updateBlockScriptUi() {
+      const mode = $('block-script-mode').value;
+      $('block-script-preset').disabled = mode !== 'preset';
+      $('block-script').disabled = mode === 'none';
     }
 
     $('block-new').addEventListener('click', () => {
@@ -1667,6 +2398,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('block-droppable').value = 'true';
       $('block-texture-key').value = '';
       $('block-image').value = '';
+      $('block-script-mode').value = 'none';
+      $('block-script-preset').value = 'door_toggle';
+      $('block-script').value = '';
+      updateBlockPreview();
     });
 
     $('block-save').addEventListener('click', async () => {
@@ -1678,6 +2413,24 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       }
       const textureKey = sanitizeTextureKey($('block-texture-key').value || `${key.toLowerCase()}`);
       await applyUploadedTexture($('block-image'), textureKey);
+      let scriptFn = null;
+      const scriptMode = $('block-script-mode').value;
+      if (scriptMode === 'preset') {
+        const presetId = $('block-script-preset').value;
+        try {
+          scriptFn = parseScriptFunction(BLOCK_SCRIPT_PRESETS[presetId]);
+        } catch {
+          setDbStatus(`Falha ao carregar preset de script: ${presetId}`);
+          return;
+        }
+      } else if (scriptMode === 'custom') {
+        try {
+          scriptFn = parseScriptFunction($('block-script').value);
+        } catch (err) {
+          setDbStatus(`Script inválido: ${err.message}`);
+          return;
+        }
+      }
 
       state.db.blocks[key] = {
         ...(state.db.blocks[key] || {}),
@@ -1693,11 +2446,17 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         droppable: asBool($('block-droppable').value),
         textures: { all: textureKey }
       };
+      if (scriptFn) state.db.blocks[key].onUse = scriptFn;
+      else delete state.db.blocks[key].onUse;
 
       state.selectedBlockKey = key;
       setDbStatus(`Bloco salvo: ${key}`);
       refreshAllForCatalogChanges();
     });
+
+    $('block-script-mode').addEventListener('change', updateBlockScriptUi);
+    $('block-texture-key').addEventListener('input', updateBlockPreview);
+    $('block-image').addEventListener('change', updateBlockPreview);
 
     $('block-delete').addEventListener('click', () => {
       const key = sanitizeConstKey($('block-key').value || state.selectedBlockKey || '');
@@ -1736,6 +2495,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('item-speed').value = selected ? String(selected.projectileSpeed || 0) : '0';
       $('item-proj-dmg').value = selected ? String(selected.projectileDamage || 0) : '0';
       $('item-texture-key').value = selected ? String(selected.textureKey || selected.uiTextureKey || '') : '';
+      updateItemPreview();
     }
 
     $('item-new').addEventListener('click', () => {
@@ -1751,7 +2511,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('item-proj-dmg').value = '0';
       $('item-texture-key').value = '';
       $('item-image').value = '';
+      updateItemPreview();
     });
+    $('item-texture-key').addEventListener('input', updateItemPreview);
+    $('item-image').addEventListener('change', updateItemPreview);
 
     $('item-save').addEventListener('click', async () => {
       const key = sanitizeConstKey($('item-key').value || state.selectedItemKey || 'NEW_ITEM', 'NEW_ITEM');
@@ -1849,6 +2612,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('creature-interactable').value = selected ? String(!!selected.interactable) : 'true';
       $('creature-dialogue').value = selected ? String(selected.dialogue || '') : '';
       $('creature-texture-key').value = selected ? String(selected.texture || '') : '';
+      updateCreaturePreview();
     }
 
     $('creature-new').addEventListener('click', () => {
@@ -1865,7 +2629,10 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       $('creature-texture-key').value = '';
       $('creature-image').value = '';
       fillFactionSelect($('creature-faction'));
+      updateCreaturePreview();
     });
+    $('creature-texture-key').addEventListener('input', updateCreaturePreview);
+    $('creature-image').addEventListener('change', updateCreaturePreview);
 
     $('creature-save').addEventListener('click', async () => {
       const key = sanitizeConstKey($('creature-key').value || state.selectedCreatureKey || 'NEW_CREATURE', 'NEW_CREATURE');
@@ -2035,13 +2802,210 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       refreshAllForCatalogChanges();
     });
 
-    document.querySelectorAll('.tab-btn').forEach((btn) => {
+    function updateTexturePreview() {
+      const key = String($('texture-key').value || '').trim();
+      const url = state.db.embeddedImages[key] || $('texture-url').value || getTextureUrl(key) || '';
+      const holder = $('texture-preview');
+      holder.innerHTML = '';
+      if (!url) {
+        holder.textContent = 'N/A';
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      holder.appendChild(img);
+    }
+
+    function renameTextureReferences(oldKey, newKey) {
+      if (!oldKey || !newKey || oldKey === newKey) return;
+      for (const block of Object.values(state.db.blocks)) {
+        if (!block.textures) continue;
+        for (const texSlot of ['all', 'top', 'side', 'bottom']) {
+          if (block.textures[texSlot] === oldKey) block.textures[texSlot] = newKey;
+        }
+      }
+      for (const item of Object.values(state.db.items)) {
+        for (const field of ['textureKey', 'uiTextureKey', 'dropTextureKey', 'handTextureKey', 'projectileTextureKey']) {
+          if (item[field] === oldKey) item[field] = newKey;
+        }
+      }
+      for (const npc of Object.values(state.db.npcs)) {
+        if (npc.texture === oldKey) npc.texture = newKey;
+      }
+    }
+
+    function renderTexturesTab() {
+      const listEl = $('texture-list');
+      const entries = state.db.textures.slice().sort((a, b) => String(a.key || '').localeCompare(String(b.key || '')));
+      if (!state.selectedTextureKey && entries.length) state.selectedTextureKey = entries[0].key;
+      const selected = entries.find((e) => e.key === state.selectedTextureKey) || null;
+
+      renderSimpleList(
+        listEl,
+        entries,
+        (e) => e.key === state.selectedTextureKey,
+        (e) => `${e.key} -> ${e.url}`,
+        (e) => {
+          state.selectedTextureKey = e.key;
+          renderTexturesTab();
+        }
+      );
+
+      $('texture-key').value = selected ? String(selected.key || '') : '';
+      $('texture-url').value = selected ? String(selected.url || '') : '';
+      $('texture-image').value = '';
+      updateTexturePreview();
+    }
+
+    $('texture-key').addEventListener('input', updateTexturePreview);
+    $('texture-url').addEventListener('input', updateTexturePreview);
+    $('texture-image').addEventListener('change', async () => {
+      const key = sanitizeTextureKey($('texture-key').value || state.selectedTextureKey || 'new_texture');
+      if (!key) return;
+      await applyUploadedTexture($('texture-image'), key);
+      const entry = state.db.textures.find((t) => t.key === key);
+      if (entry) $('texture-url').value = entry.url || '';
+      updateTexturePreview();
+    });
+
+    $('texture-new').addEventListener('click', () => {
+      state.selectedTextureKey = null;
+      $('texture-key').value = '';
+      $('texture-url').value = '';
+      $('texture-image').value = '';
+      updateTexturePreview();
+    });
+
+    $('texture-save').addEventListener('click', async () => {
+      const oldKey = state.selectedTextureKey;
+      const key = sanitizeTextureKey($('texture-key').value || oldKey || 'new_texture');
+      if (!key) {
+        setDbStatus('Texture key inválida.');
+        return;
+      }
+      const urlField = String($('texture-url').value || '').trim();
+      let entry = state.db.textures.find((t) => t.key === oldKey) || state.db.textures.find((t) => t.key === key);
+      if (!entry) {
+        entry = { key, url: urlField || `./data/images/custom/${key}.png` };
+        state.db.textures.push(entry);
+      }
+      if (oldKey && oldKey !== key) {
+        renameTextureReferences(oldKey, key);
+        if (state.db.embeddedImages[oldKey]) {
+          state.db.embeddedImages[key] = state.db.embeddedImages[oldKey];
+          delete state.db.embeddedImages[oldKey];
+        }
+      }
+      entry.key = key;
+      if (urlField) entry.url = urlField;
+      await applyUploadedTexture($('texture-image'), key);
+      state.selectedTextureKey = key;
+      setDbStatus(`Textura salva: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    $('texture-delete').addEventListener('click', () => {
+      const key = sanitizeTextureKey($('texture-key').value || state.selectedTextureKey || '');
+      if (!key) return;
+      state.db.textures = state.db.textures.filter((t) => t.key !== key);
+      delete state.db.embeddedImages[key];
+      state.selectedTextureKey = state.db.textures[0]?.key || null;
+      setDbStatus(`Textura removida: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    function normalizeInventoryObject(obj) {
+      const out = {};
+      if (!obj || typeof obj !== 'object') return out;
+      for (const [k, v] of Object.entries(obj)) {
+        const qty = Math.max(0, Math.floor(Number(v) || 0));
+        if (!qty) continue;
+        out[String(k)] = qty;
+      }
+      return out;
+    }
+
+    function renderPresetsTab() {
+      const entries = Object.entries(state.db.inventoryPresets).sort((a, b) => a[0].localeCompare(b[0]));
+      if (!state.selectedPresetKey && entries.length) state.selectedPresetKey = entries[0][0];
+      const selected = state.selectedPresetKey ? state.db.inventoryPresets[state.selectedPresetKey] : null;
+
+      renderSimpleList(
+        presetListEl,
+        entries.map(([key, value]) => ({ key, value })),
+        (e) => e.key === state.selectedPresetKey,
+        (e) => e.key,
+        (e) => {
+          state.selectedPresetKey = e.key;
+          renderPresetsTab();
+        }
+      );
+
+      presetKeyEl.value = state.selectedPresetKey || '';
+      presetBlocksEl.value = selected ? JSON.stringify(selected.inventory || {}, null, 2) : '{}';
+      presetItemsEl.value = selected ? JSON.stringify(selected.itemInventory || {}, null, 2) : '{}';
+      renderInventoryPresetOptions();
+    }
+
+    $('preset-new').addEventListener('click', () => {
+      state.selectedPresetKey = null;
+      presetKeyEl.value = '';
+      presetBlocksEl.value = '{}';
+      presetItemsEl.value = '{}';
+    });
+
+    $('preset-save').addEventListener('click', () => {
+      const key = String(presetKeyEl.value || '').trim();
+      if (!key) {
+        setDbStatus('Nome do preset é obrigatório.');
+        return;
+      }
+      let blocks = {};
+      let items = {};
+      try {
+        blocks = normalizeInventoryObject(JSON.parse(String(presetBlocksEl.value || '{}')));
+        items = normalizeInventoryObject(JSON.parse(String(presetItemsEl.value || '{}')));
+      } catch {
+        setDbStatus('JSON inválido em inventários do preset.');
+        return;
+      }
+      state.db.inventoryPresets[key] = { inventory: blocks, itemInventory: items };
+      state.selectedPresetKey = key;
+      setDbStatus(`Preset salvo: ${key}`);
+      renderPresetsTab();
+    });
+
+    $('preset-delete').addEventListener('click', () => {
+      const key = String(presetKeyEl.value || state.selectedPresetKey || '').trim();
+      if (!key || !state.db.inventoryPresets[key]) return;
+      delete state.db.inventoryPresets[key];
+      state.selectedPresetKey = Object.keys(state.db.inventoryPresets)[0] || null;
+      setDbStatus(`Preset removido: ${key}`);
+      renderPresetsTab();
+    });
+
+    document.querySelectorAll('.content-tab-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach((p) => p.classList.remove('active'));
+        document.querySelectorAll('.content-tab-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.content-tab-pane').forEach((p) => p.classList.remove('active'));
         btn.classList.add('active');
         const id = btn.getAttribute('data-tab');
         if (id) $(id).classList.add('active');
+      });
+    });
+
+    document.querySelectorAll('.primary-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const section = btn.getAttribute('data-section');
+        state.activeSection = section || 'world';
+        document.querySelectorAll('.primary-tab-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.section-pane').forEach((pane) => {
+          const ok = pane.getAttribute('data-section') === section;
+          pane.classList.toggle('active', ok);
+        });
+        btn.classList.add('active');
+        updateSectionLayout();
       });
     });
 
@@ -2144,6 +3108,44 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       return out;
     }
 
+    function createSolidPngDataUrl(color, size = 16) {
+      const c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      const cctx = c.getContext('2d');
+      cctx.fillStyle = color;
+      cctx.fillRect(0, 0, size, size);
+      return c.toDataURL('image/png');
+    }
+
+    function ensureMandatoryUiTextures() {
+      const mandatory = {
+        mdam_almost_dead: '#8b0000',
+        mdam_severely_damaged: '#b22222',
+        mdam_heavily_damaged: '#d2691e',
+        mdam_moderately_damaged: '#daa520',
+        mdam_lightly_damaged: '#3cb371'
+      };
+      for (const [key, color] of Object.entries(mandatory)) {
+        let tex = state.db.textures.find((t) => t.key === key);
+        if (!tex) {
+          tex = { key, url: `./data/images/ui/${key}.png` };
+          state.db.textures.push(tex);
+        } else {
+          tex.url = `./data/images/ui/${key}.png`;
+        }
+        if (!state.db.embeddedImages[key]) {
+          state.db.embeddedImages[key] = createSolidPngDataUrl(color, 16);
+        }
+      }
+      if (!state.db.ui.playerPortraitPath) {
+        state.db.ui.playerPortraitPath = './data/images/ui/player-face.png';
+      }
+      if (!state.db.ui.playerPortraitDataUrl) {
+        state.db.ui.playerPortraitDataUrl = createSolidPngDataUrl('#808080', 64);
+      }
+    }
+
     function mimeFromPath(path) {
       const lower = String(path || '').toLowerCase();
       if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
@@ -2154,7 +3156,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
 
     async function importZip(file) {
       if (!window.JSZip) {
-        setZipStatus('JSZip não carregou. Verifique conexão para usar ZIP.');
+        setZipStatus('JSZip não carregou. Verifique conexão para usar ROM.');
         return;
       }
       const zip = await window.JSZip.loadAsync(file);
@@ -2165,6 +3167,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const npcsFile = pickZipFile(zip, ['data/config/npcs.js', './data/config/npcs.js']);
       const texturesFile = pickZipFile(zip, ['data/config/textures.js', './data/config/textures.js']);
       const factionsFile = pickZipFile(zip, ['data/config/factions.js', './data/config/factions.js']);
+      const presetsFile = pickZipFile(zip, ['data/config/inventory-presets.json', './data/config/inventory-presets.json']);
       const mapFile = pickZipFile(zip, ['data/maps/default.json', './data/maps/default.json', 'map.json']);
 
       if (blocksFile) state.db.blocks = deepCloneWithFns(parseDefaultExportModule(await blocksFile.async('string')) || state.db.blocks);
@@ -2178,11 +3181,37 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         state.db.factions.relations = deepCloneWithFns(parsed.FACTION_RELATIONS || state.db.factions.relations);
         state.db.factions.order = [...(parsed.FACTION_ORDER || state.db.factions.order)];
       }
-
-      if (mapFile) {
-        const payload = JSON.parse(await mapFile.async('string'));
-        if (payload && Array.isArray(payload.blocks)) applyMapPayload(payload);
+      if (presetsFile) {
+        try {
+          state.db.inventoryPresets = JSON.parse(await presetsFile.async('string')) || {};
+        } catch {
+          state.db.inventoryPresets = {};
+        }
       }
+
+      state.maps = {};
+      const mapFiles = Object.values(zip.files).filter((f) => !f.dir && /^data\/maps\/.+\.json$/i.test(normalizeZipPath(f.name)));
+      if (mapFiles.length) {
+        for (const f of mapFiles) {
+          try {
+            const payload = JSON.parse(await f.async('string'));
+            if (!payload || !Array.isArray(payload.blocks)) continue;
+            const shortName = normalizeZipPath(f.name).replace(/^data\/maps\//i, '');
+            state.maps[shortName] = cloneMapPayload(payload);
+          } catch {}
+        }
+      } else if (mapFile) {
+        const payload = JSON.parse(await mapFile.async('string'));
+        if (payload && Array.isArray(payload.blocks)) {
+          state.maps['default.json'] = cloneMapPayload(payload);
+        }
+      }
+      if (!Object.keys(state.maps).length) {
+        state.maps['default.json'] = cloneMapPayload(state.map);
+      }
+      state.currentMapName = state.maps['default.json'] ? 'default.json' : Object.keys(state.maps)[0];
+      applyMapPayload(state.maps[state.currentMapName], { skipCollectionSync: true });
+      renderMapManager();
 
       state.db.embeddedImages = {};
       rebuildTextureMap();
@@ -2199,16 +3228,26 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         state.db.embeddedImages[t.key] = dataUrl;
       }
 
-      setZipStatus(`ZIP carregado: ${file.name}. Arquivos: ${Object.keys(zip.files).length}`);
-      setDbStatus('Catálogo carregado do ZIP.');
+      const portraitPath = normalizeZipPath(state.db.ui.playerPortraitPath || './data/images/ui/player-face.png');
+      const portraitFile = zip.file(portraitPath);
+      if (portraitFile) {
+        const bytes = await portraitFile.async('uint8array');
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        state.db.ui.playerPortraitDataUrl = `data:${mimeFromPath(portraitPath)};base64,${btoa(binary)}`;
+      }
+
+      setZipStatus(`ROM carregada: ${file.name}. Arquivos: ${Object.keys(zip.files).length}`);
+      setDbStatus('Catálogo carregado da ROM.');
       refreshAllForCatalogChanges();
     }
 
     async function exportZip() {
       if (!window.JSZip) {
-        setZipStatus('JSZip não carregou. Verifique conexão para usar ZIP.');
+        setZipStatus('JSZip não carregou. Verifique conexão para usar ROM.');
         return;
       }
+      ensureMandatoryUiTextures();
       const out = new window.JSZip();
 
       if (state.importedZip) {
@@ -2222,7 +3261,8 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
             path === 'data/config/npcs.js' ||
             path === 'data/config/textures.js' ||
             path === 'data/config/factions.js' ||
-            path === 'data/maps/default.json'
+            path === 'data/config/inventory-presets.json' ||
+            /^data\/maps\/.+\.json$/i.test(path)
           ) {
             continue;
           }
@@ -2236,7 +3276,15 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       out.file('data/config/npcs.js', buildNpcsJS());
       out.file('data/config/textures.js', buildTexturesJS());
       out.file('data/config/factions.js', buildFactionsJS());
-      out.file('data/maps/default.json', JSON.stringify(buildMapPayload(), null, 2));
+      out.file('data/config/inventory-presets.json', JSON.stringify(state.db.inventoryPresets || {}, null, 2));
+      saveCurrentMapIntoCollection();
+      if (!state.maps['default.json']) {
+        const first = Object.keys(state.maps)[0];
+        state.maps['default.json'] = cloneMapPayload(state.maps[first] || buildMapPayload());
+      }
+      for (const [mapName, mapPayload] of Object.entries(state.maps)) {
+        out.file(`data/maps/${normalizeMapName(mapName)}`, JSON.stringify(mapPayload, null, 2));
+      }
 
       for (const [textureKey, dataUrl] of Object.entries(state.db.embeddedImages)) {
         const texture = state.db.textures.find((t) => t.key === textureKey);
@@ -2244,6 +3292,9 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         let targetPath = normalizeZipPath(texture.url);
         if (!targetPath) targetPath = `data/images/custom/${textureKey}.png`;
         out.file(targetPath, dataUrlToUint8Array(dataUrl));
+      }
+      if (state.db.ui.playerPortraitDataUrl) {
+        out.file(normalizeZipPath(state.db.ui.playerPortraitPath || './data/images/ui/player-face.png'), dataUrlToUint8Array(state.db.ui.playerPortraitDataUrl));
       }
 
       out.file('editor-manifest.json', JSON.stringify({
@@ -2262,11 +3313,11 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'game-content.zip';
+      a.download = 'game-content.rom.zip';
       a.click();
       URL.revokeObjectURL(url);
 
-      setZipStatus('ZIP exportado: game-content.zip');
+      setZipStatus('ROM exportada: game-content.rom.zip');
     }
 
     const zipInput = document.createElement('input');
@@ -2287,7 +3338,7 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         await importZip(file);
       } catch (err) {
         console.error(err);
-        setZipStatus('Falha ao importar ZIP. Verifique estrutura do pacote.');
+        setZipStatus('Falha ao importar ROM. Verifique estrutura do pacote.');
       }
     });
 
@@ -2296,26 +3347,35 @@ Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens:
         await exportZip();
       } catch (err) {
         console.error(err);
-        setZipStatus('Falha ao exportar ZIP.');
+        setZipStatus('Falha ao exportar ROM.');
       }
     });
 
     function boot() {
       rebuildTextureMap();
+      rebuildTypeIndexes();
       state.toolMode = toolEl.value;
       state.layerY = Math.trunc(Number(layerEl.value || 0));
       state.zoom = Math.trunc(Number(zoomEl.value || 26));
       ensurePlayer();
+      state.maps = { [state.currentMapName]: cloneMapPayload(state.map) };
+      renderMapManager();
+      playerImagePathEl.value = state.db.ui.playerPortraitPath || './data/images/ui/player-face.png';
+      updatePlayerImagePreview();
       renderPalette();
       renderInventoryTargets();
       inventoryState.targetKey = invTargetEl.value || 'player';
       inventoryState.category = invCategoryEl.value || 'item';
       renderInventoryOptions();
       renderInventoryList();
+      renderInventoryPresetOptions();
       renderBlocksTab();
       renderItemsTab();
       renderCreaturesTab();
       renderFactionsTab();
+      renderTexturesTab();
+      renderPresetsTab();
+      updateSectionLayout();
       resizeCanvas();
       draw();
     }

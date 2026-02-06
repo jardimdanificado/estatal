@@ -30,7 +30,6 @@ const HP_ICONS = [
 ];
 
 const CONSUMABLE_HEALTH_RATIO = 0.6;
-const CONSUMABLE_ITEMS = Object.values(ITEMS).filter((item) => item.isConsumable);
 
 function getBestItemWeapon(entity) {
     if (!entity || !entity.itemInventory) return null;
@@ -56,7 +55,8 @@ function getBestItemWeapon(entity) {
 function getBestConsumableInInventory(entity) {
     if (!entity.itemInventory) return null;
     let best = null;
-    for (const itemDef of CONSUMABLE_ITEMS) {
+    for (const itemDef of Object.values(ITEMS)) {
+        if (!itemDef.isConsumable) continue;
         const count = entity.itemInventory[itemDef.id] || 0;
         if (count <= 0) continue;
         if (!best || (itemDef.healValue || 0) > (best.healValue || 0)) {
