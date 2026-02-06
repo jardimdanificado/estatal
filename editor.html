@@ -1,0 +1,3662 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>estatal editor</title>
+<link rel="icon" href="data:,">
+  <style>
+    :root {
+      --bg: #f5f5f5;
+      --panel: #ffffff;
+      --panel2: #ffffff;
+      --text: #222222;
+      --muted: #666666;
+      --line: #d0d0d0;
+      --accent: #005fcc;
+      --bad: #c62828;
+      --good: #2e7d32;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    #app { display: grid; grid-template-columns: 460px 1fr; height: 100vh; }
+    #app.no-stage { grid-template-columns: 1fr; }
+    #sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 12px;
+      overflow: auto;
+    }
+    #app.no-stage #sidebar {
+      border-right: 0;
+      width: 100vw;
+      padding: 14px 16px;
+    }
+    #stage { position: relative; height: 100vh; overflow: hidden; }
+    #app.no-stage #stage { display: none; }
+
+    h1 { font-size: 16px; margin: 0 0 10px 0; }
+    h2 { font-size: 13px; margin: 14px 0 8px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 10px;
+      background: #fff;
+      margin-top: 10px;
+    }
+    .card:first-of-type { margin-top: 0; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 8px 0 6px;
+    }
+
+    select, input[type="text"], input[type="number"], textarea {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+
+    textarea { min-height: 64px; resize: vertical; }
+
+    button {
+      padding: 6px 10px;
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      background: #f3f3f3;
+      color: var(--text);
+      cursor: pointer;
+      font-family: sans-serif;
+    }
+    button:hover { background: #ececec; border-color: #bcbcbc; }
+    button.primary, button.good, button.bad { background: #f3f3f3; border-color: var(--line); }
+
+    .btnbar { display: flex; flex-wrap: wrap; gap: 8px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+      border: 1px dashed var(--line);
+      border-radius: 2px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 10px;
+      max-height: 260px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .entry {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      background: #fff;
+      cursor: pointer;
+      user-select: none;
+    }
+    .entry:hover { border-color: #bcbcbc; }
+    .entry.active { outline: 1px solid var(--accent); border-color: var(--accent); }
+
+    .thumb {
+      width: 36px;
+      height: 36px;
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      background: #fff;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      font-size: 11px;
+    }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+
+    .meta { display: grid; gap: 2px; }
+    .meta .name { font-size: 13px; }
+    .meta .sub { font-size: 11px; color: var(--muted); }
+
+    #canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      background: #fafafa;
+      cursor: crosshair;
+    }
+
+    #overlay {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+      pointer-events: none;
+      white-space: pre;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 8px;
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      background: #fff;
+      white-space: pre-wrap;
+      max-height: 170px;
+      overflow: auto;
+    }
+
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .tab-btn.active { border-color: var(--accent); background: #e9f1ff; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .primary-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px 0; }
+    .primary-tab-btn.active { border-color: var(--accent); background: #e9f1ff; }
+    .section-pane { display: none; }
+    .section-pane.active { display: block; }
+
+    .listbox {
+      max-height: 160px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 6px;
+      background: #fff;
+    }
+
+    .list-item {
+      padding: 6px;
+      border-radius: 2px;
+      border: 1px solid var(--line);
+      cursor: pointer;
+      font-size: 12px;
+      margin-bottom: 6px;
+      background: #fff;
+    }
+    .list-item:last-child { margin-bottom: 0; }
+    .list-item.active { border-color: var(--accent); background: #e9f1ff; }
+
+    .relation-grid {
+      overflow: auto;
+      max-height: 240px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 8px;
+      background: #fff;
+    }
+
+    table { border-collapse: collapse; width: 100%; font-size: 11px; }
+    th, td { border: 1px solid var(--line); padding: 4px; }
+    th { background: #efefef; }
+    td select { font-size: 11px; padding: 4px; border-radius: 2px; }
+
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    #app.no-stage .primary-tabs {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--bg);
+      padding-bottom: 8px;
+    }
+
+    #app.no-stage .section-pane[data-section="content"],
+    #app.no-stage .section-pane[data-section="inventory"],
+    #app.no-stage .section-pane[data-section="rom"] {
+      height: calc(100vh - 88px);
+      overflow: auto;
+    }
+
+    #app.no-stage .section-pane[data-section="content"] .split,
+    #app.no-stage .section-pane[data-section="inventory"] .split {
+      grid-template-columns: minmax(280px, 380px) 1fr;
+      align-items: start;
+    }
+
+    #app.no-stage .section-pane[data-section="content"] .listbox,
+    #app.no-stage .section-pane[data-section="inventory"] .listbox {
+      max-height: calc(100vh - 220px);
+    }
+
+    #inv-list.listbox {
+      min-height: 280px;
+    }
+
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <h1>Editor 2D Completo</h1>
+      <div class="primary-tabs">
+        <button class="primary-tab-btn active" data-section="world">Mapa</button>
+        <button class="primary-tab-btn" data-section="inventory">Inventário</button>
+        <button class="primary-tab-btn" data-section="content">Conteúdo</button>
+        <button class="primary-tab-btn" data-section="rom">ROM</button>
+      </div>
+
+      <div class="card section-pane" data-section="rom">
+        <h2>ROM (ZIP)</h2>
+        <div class="btnbar">
+          <button class="primary" id="btn-import-zip">Importar ROM</button>
+          <button class="good" id="btn-export-zip">Exportar ROM</button>
+        </div>
+        <div class="status" id="zip-status">Nenhuma ROM carregada.</div>
+      </div>
+
+      <div class="card section-pane active" data-section="world">
+        <h2>Mapa</h2>
+        <div class="btnbar">
+          <button class="primary" id="btn-load-default">Carregar default.json</button>
+          <button id="btn-import">Importar JSON…</button>
+          <button class="good" id="btn-export">Exportar JSON</button>
+          <button class="bad" id="btn-clear">Limpar</button>
+        </div>
+        <label>Mapa atual</label>
+        <div class="row">
+          <select id="map-select"></select>
+          <input id="map-name" type="text" placeholder="nome-do-mapa.json" />
+        </div>
+        <div class="btnbar" style="margin-top:8px;">
+          <button id="map-new">Novo mapa</button>
+          <button id="map-rename">Renomear</button>
+          <button class="bad" id="map-delete">Excluir mapa</button>
+        </div>
+        <label>Texture ID da imagem do jogador (HUD)</label>
+        <div class="row">
+          <input id="player-image-key" type="text" placeholder="ui_player_face" />
+          <input id="player-image" type="file" accept="image/*" />
+        </div>
+        <label>Nome do jogador (HUD)</label>
+        <input id="player-name" type="text" placeholder="A.S.S" />
+        <div id="player-image-preview" class="thumb" style="width:80px;height:80px;margin-top:8px;"></div>
+        <div class="status" id="status">Pronto.</div>
+      </div>
+
+      <div class="card section-pane active" data-section="world">
+        <h2>Ferramenta</h2>
+        <label>Modo</label>
+        <div class="row">
+          <select id="tool-mode">
+            <option value="block">Bloco</option>
+            <option value="npc">Entidade (Criatura)</option>
+            <option value="item">Item/Arma (drop)</option>
+            <option value="erase">Apagar</option>
+          </select>
+          <div>
+            <label style="margin-top:0;">Camada Y</label>
+            <input id="layer-y" type="number" value="0" step="1" />
+          </div>
+        </div>
+
+        <label>Forma de pintura</label>
+        <div class="row">
+          <select id="paint-shape">
+            <option value="brush">Pincel (1 célula)</option>
+            <option value="rect">Retângulo</option>
+          </select>
+          <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; padding:0 2px;">
+            <span style="font-size:12px; color: var(--muted);">Arrastar = pintar</span>
+          </div>
+        </div>
+
+        <label>Zoom</label>
+        <input id="zoom" type="number" value="26" min="8" max="96" step="1" />
+
+        <label>Busca no catálogo</label>
+        <input id="search" type="text" placeholder="filtrar por nome…" />
+        <label>Ferramentas de camada</label>
+        <div class="btnbar">
+          <button id="layer-copy">Copiar Y atual</button>
+          <button id="layer-paste">Colar em Y atual</button>
+          <button class="bad" id="layer-clear">Limpar Y atual</button>
+        </div>
+
+        <div class="hint">
+          <b>Controles:</b><br/>
+          - Clique esquerdo: aplicar<br/>
+          - Botão direito: apagar<br/>
+          - Shift + clique: apagar<br/>
+          - Rodinha: zoom<br/>
+          - Shift + rodinha: trocar camada Y<br/>
+          - Arrastar: pintar várias células<br/>
+          <br/>
+          <b>Camadas:</b> bloco em y = (camada + 0.5). Chão usa y = -0.5.
+        </div>
+      </div>
+
+      <div class="card section-pane active" data-section="world">
+        <h2>Paleta</h2>
+        <div class="palette" id="palette"></div>
+      </div>
+
+      <div class="card section-pane" data-section="inventory">
+        <h2>Inventário</h2>
+        <div class="split">
+          <div>
+            <label>Entidade</label>
+            <select id="inv-target"></select>
+
+            <label>Categoria</label>
+            <select id="inv-category">
+              <option value="block">Blocos</option>
+              <option value="item">Itens/Armas</option>
+            </select>
+
+            <div class="row" style="margin-top: 6px;">
+              <select id="inv-item"></select>
+              <input id="inv-qty" type="number" value="1" min="1" />
+            </div>
+            <div class="btnbar" style="margin-top: 8px;">
+              <button class="good" id="inv-add">Adicionar</button>
+              <button class="bad" id="inv-remove">Remover</button>
+              <button id="inv-clear">Limpar</button>
+            </div>
+
+            <label>Preset</label>
+            <div class="row">
+              <select id="inv-preset"></select>
+              <button id="inv-apply-preset">Aplicar preset</button>
+            </div>
+          </div>
+          <div>
+            <label>Inventário atual</label>
+            <div class="status" id="inv-status">Selecione uma entidade.</div>
+            <div id="inv-list" class="listbox" style="margin-top: 8px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card section-pane" data-section="content">
+        <h2>Editor de Conteúdo</h2>
+        <div class="tabs">
+          <button class="tab-btn content-tab-btn active" data-tab="tab-blocks">Blocos</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-items">Itens/Armas</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-creatures">Criaturas</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-factions">Facções</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-textures">Texturas</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-ui">UI</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-config">Config</button>
+          <button class="tab-btn content-tab-btn" data-tab="tab-presets">Presets Inv.</button>
+        </div>
+
+        <div id="tab-blocks" class="tab-pane content-tab-pane active">
+          <div class="split">
+            <div>
+              <label>Lista de blocos</label>
+              <div id="block-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Nome interno</label>
+              <input type="text" id="block-key" placeholder="EX: BASALT" />
+              <label>ID numérico</label>
+              <input type="number" id="block-id" />
+              <label>Nome visível</label>
+              <input type="text" id="block-name" />
+              <div class="row3">
+                <div>
+                  <label>HP</label>
+                  <input type="number" id="block-hp" value="100" />
+                </div>
+                <div>
+                  <label>Dano quebra</label>
+                  <input type="number" id="block-break" value="10" />
+                </div>
+                <div>
+                  <label>Opacidade</label>
+                  <input type="number" id="block-opacity" step="0.05" value="1" />
+                </div>
+              </div>
+              <div class="row3">
+                <div>
+                  <label>Solid</label>
+                  <select id="block-solid"><option value="true">true</option><option value="false">false</option></select>
+                </div>
+                <div>
+                  <label>Floor</label>
+                  <select id="block-floor"><option value="false">false</option><option value="true">true</option></select>
+                </div>
+                <div>
+                  <label>Droppable</label>
+                  <select id="block-droppable"><option value="true">true</option><option value="false">false</option></select>
+                </div>
+              </div>
+              <label>Texture key</label>
+              <input type="text" id="block-texture-key" placeholder="EX: basalt" />
+              <label>Upload imagem (opcional)</label>
+              <input type="file" id="block-image" accept="image/*" />
+              <label>Preview da textura</label>
+              <div id="block-preview" class="thumb" style="width:80px;height:80px;"></div>
+              <label>Script onUse</label>
+              <select id="block-script-mode">
+                <option value="none">Sem script</option>
+                <option value="preset">Preset</option>
+                <option value="custom">Custom JS</option>
+              </select>
+              <label>Preset</label>
+              <select id="block-script-preset">
+                <option value="door_toggle">Door Toggle</option>
+                <option value="gold_flash">Gold Flash</option>
+              </select>
+              <label>Função custom (onUse)</label>
+              <textarea id="block-script" placeholder="function(world, block, creature) { ... }"></textarea>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="block-save">Salvar bloco</button>
+                <button id="block-new">Novo</button>
+                <button class="bad" id="block-delete">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-items" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Lista de itens/armas</label>
+              <div id="item-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Nome interno</label>
+              <input type="text" id="item-key" placeholder="EX: MACHADO" />
+              <label>ID string</label>
+              <input type="text" id="item-id" />
+              <label>Nome visível</label>
+              <input type="text" id="item-name" />
+              <div class="row3">
+                <div>
+                  <label>É arma?</label>
+                  <select id="item-weapon"><option value="false">false</option><option value="true">true</option></select>
+                </div>
+                <div>
+                  <label>Consumível?</label>
+                  <select id="item-consumable"><option value="false">false</option><option value="true">true</option></select>
+                </div>
+                <div>
+                  <label>Cura</label>
+                  <input type="number" id="item-heal" value="0" />
+                </div>
+              </div>
+              <div class="row3">
+                <div>
+                  <label>Dano</label>
+                  <input type="number" id="item-damage" value="0" />
+                </div>
+                <div>
+                  <label>Velocidade proj.</label>
+                  <input type="number" id="item-speed" step="0.05" value="0" />
+                </div>
+                <div>
+                  <label>Dano proj.</label>
+                  <input type="number" id="item-proj-dmg" value="0" />
+                </div>
+              </div>
+              <label>Texture key base</label>
+              <input type="text" id="item-texture-key" placeholder="EX: item-machado" />
+              <label>Upload imagem (usa como texture/ui/drop)</label>
+              <input type="file" id="item-image" accept="image/*" />
+              <label>Preview da textura</label>
+              <div id="item-preview" class="thumb" style="width:80px;height:80px;"></div>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="item-save">Salvar item/arma</button>
+                <button id="item-new">Novo</button>
+                <button class="bad" id="item-delete">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-creatures" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Lista de criaturas</label>
+              <div id="creature-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Nome interno</label>
+              <input type="text" id="creature-key" placeholder="EX: GOBLIN" />
+              <label>ID numérico</label>
+              <input type="number" id="creature-id" />
+              <label>Nome visível</label>
+              <input type="text" id="creature-name" />
+              <div class="row3">
+                <div>
+                  <label>Largura</label>
+                  <input type="number" id="creature-width" step="0.1" value="0.8" />
+                </div>
+                <div>
+                  <label>Altura</label>
+                  <input type="number" id="creature-height" step="0.1" value="1.6" />
+                </div>
+                <div>
+                  <label>HP</label>
+                  <input type="number" id="creature-hp" value="100" />
+                </div>
+              </div>
+              <div class="row3">
+                <div>
+                  <label>Hostil?</label>
+                  <select id="creature-hostile"><option value="false">false</option><option value="true">true</option></select>
+                </div>
+                <div>
+                  <label>Interagível?</label>
+                  <select id="creature-interactable"><option value="true">true</option><option value="false">false</option></select>
+                </div>
+                <div>
+                  <label>Facção</label>
+                  <select id="creature-faction"></select>
+                </div>
+              </div>
+              <label>Dialogue</label>
+              <textarea id="creature-dialogue"></textarea>
+              <label>Texture key</label>
+              <input type="text" id="creature-texture-key" placeholder="EX: monster_goblin" />
+              <label>Upload imagem</label>
+              <input type="file" id="creature-image" accept="image/*" />
+              <label>Preview da textura</label>
+              <div id="creature-preview" class="thumb" style="width:80px;height:80px;"></div>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="creature-save">Salvar criatura</button>
+                <button id="creature-new">Novo</button>
+                <button class="bad" id="creature-delete">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-factions" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Facções</label>
+              <div id="faction-list" class="listbox"></div>
+              <div class="row">
+                <input id="faction-id" type="text" placeholder="id" />
+                <input id="faction-name" type="text" placeholder="nome" />
+              </div>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="faction-save">Salvar facção</button>
+                <button id="faction-new">Nova</button>
+                <button class="bad" id="faction-delete">Excluir</button>
+              </div>
+            </div>
+            <div>
+              <label>Relações entre facções</label>
+              <div id="relations-grid" class="relation-grid"></div>
+              <div class="hint">Relações podem ser: <b>friendly</b>, <b>neutral</b> ou <b>hostile</b>.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-textures" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Lista de texturas</label>
+              <div id="texture-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Texture key</label>
+              <input type="text" id="texture-key" placeholder="EX: wall_brick_01" />
+              <label>URL</label>
+              <input type="text" id="texture-url" placeholder="./data/images/custom/wall_brick_01.png" />
+              <label>Upload imagem</label>
+              <input type="file" id="texture-image" accept="image/*" />
+              <label>Preview</label>
+              <div id="texture-preview" class="thumb" style="width:80px;height:80px;"></div>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="texture-save">Salvar textura</button>
+                <button id="texture-new">Nova</button>
+                <button class="bad" id="texture-delete">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-presets" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Lista de presets</label>
+              <div id="preset-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Nome do preset</label>
+              <input type="text" id="preset-key" placeholder="starter_guard" />
+              <label>Inventário de blocos (JSON)</label>
+              <textarea id="preset-blocks" placeholder='{"1": 50, "5": 2}'></textarea>
+              <label>Inventário de itens (JSON)</label>
+              <textarea id="preset-items" placeholder='{"revolver": 24, "cuscuz": 5}'></textarea>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="preset-save">Salvar preset</button>
+                <button id="preset-new">Novo</button>
+                <button class="bad" id="preset-delete">Excluir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-ui" class="tab-pane content-tab-pane">
+          <div class="split">
+            <div>
+              <label>Aliases UI</label>
+              <div id="ui-alias-list" class="listbox"></div>
+            </div>
+            <div>
+              <label>Alias</label>
+              <input type="text" id="ui-alias-key" readonly />
+              <label>Texture ID (origem)</label>
+              <input type="text" id="ui-alias-value" placeholder="texture_key" />
+              <label>Upload imagem (opcional)</label>
+              <input type="file" id="ui-alias-image" accept="image/*" />
+              <label>Preview</label>
+              <div id="ui-alias-preview" class="thumb" style="width:80px;height:80px;"></div>
+              <div class="btnbar" style="margin-top:8px;">
+                <button class="good" id="ui-alias-save">Salvar UI alias</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-config" class="tab-pane content-tab-pane">
+          <label>Objeto do arquivo <code>data/config/config.js</code></label>
+          <textarea id="config-json" style="min-height:320px;" spellcheck="false"></textarea>
+          <div class="btnbar" style="margin-top:8px;">
+            <button class="good" id="config-save">Salvar config</button>
+            <button id="config-reset">Recarregar</button>
+          </div>
+        </div>
+
+        <div class="status" id="db-status">Editor de conteúdo pronto.</div>
+      </div>
+
+      <div class="card">
+        <h2>Links</h2>
+        <div style="font-size:12px; color: var(--muted); line-height:1.35;">
+          <div>- <a href="./index.html">Voltar pro jogo (index.html)</a></div>
+        </div>
+      </div>
+    </aside>
+
+    <main id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="overlay"></div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script type="module">
+    async function importWithFallback(candidates) {
+      let lastErr = null;
+      for (const p of candidates) {
+        try { return await import(p); } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error('Falha ao importar módulos.');
+    }
+
+    const [
+      { default: CONFIG },
+      { default: BLOCK_TYPES },
+      { default: NPC_TYPES },
+      { default: ITEMS },
+      { default: texturesToLoad },
+      factionsModule,
+    ] = await Promise.all([
+      importWithFallback(['./src/rom-config/config.js', './src/config.js']),
+      importWithFallback(['./src/rom-config/blocks.js', './src/blocks.js']),
+      importWithFallback(['./src/rom-config/npcs.js', './src/npcs.js']),
+      importWithFallback(['./src/rom-config/items.js', './src/items.js']),
+      importWithFallback(['./src/rom-config/textures.js', './src/textures.js']),
+      importWithFallback(['./src/rom-config/factions.js', './src/factions.js'])
+    ]);
+
+    const { FACTIONS = {}, FACTION_RELATIONS = {}, FACTION_ORDER = [] } = factionsModule;
+
+    function deepCloneWithFns(value) {
+      if (value === null || typeof value !== 'object') return value;
+      if (Array.isArray(value)) return value.map(deepCloneWithFns);
+      const out = {};
+      for (const [k, v] of Object.entries(value)) {
+        out[k] = typeof v === 'function' ? v : deepCloneWithFns(v);
+      }
+      return out;
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const appEl = $('app');
+
+    const canvas = $('canvas');
+    const ctx = canvas.getContext('2d');
+    const statusEl = $('status');
+    const zipStatusEl = $('zip-status');
+    const dbStatusEl = $('db-status');
+    const overlayEl = $('overlay');
+
+    const textureByKey = new Map();
+    const imgCache = new Map();
+    const blockTypeById = new Map();
+    const npcTypeById = new Map();
+    const itemTypeById = new Map();
+
+    const state = {
+      activeSection: 'world',
+      toolMode: 'block',
+      layerY: 0,
+      zoom: 26,
+      paintShape: 'brush',
+      isPointerDown: false,
+      dragButton: 0,
+      lastPaintKey: null,
+      hover: null,
+      rectStart: null,
+      rectEnd: null,
+      rectErase: false,
+      selected: null,
+      selectedBlockKey: null,
+      selectedItemKey: null,
+      selectedCreatureKey: null,
+      selectedFactionKey: null,
+      selectedTextureKey: null,
+      selectedPresetKey: null,
+      selectedUiAliasKey: null,
+      layerClipboard: null,
+      importedZip: null,
+      db: {
+        blocks: deepCloneWithFns(BLOCK_TYPES),
+        items: deepCloneWithFns(ITEMS),
+        npcs: deepCloneWithFns(NPC_TYPES),
+        textures: deepCloneWithFns(texturesToLoad),
+        factions: {
+          list: deepCloneWithFns(FACTIONS),
+          relations: deepCloneWithFns(FACTION_RELATIONS),
+          order: [...FACTION_ORDER]
+        },
+        inventoryPresets: {},
+        ui: {
+          playerPortraitTextureKey: 'ui_player_face',
+          playerName: 'A.S.S',
+          aliases: {}
+        },
+        config: deepCloneWithFns(CONFIG),
+        embeddedImages: {}
+      },
+      map: {
+        version: 1,
+        player: { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, name: 'A.S.S', inventory: {}, itemInventory: {} },
+        blocks: [],
+        items: [],
+        entities: []
+      },
+      maps: {},
+      currentMapName: 'default.json',
+      view: { minX: 0, minZ: 0, maxX: 15, maxZ: 15 },
+      viewDirty: true
+    };
+
+    function updateSectionLayout() {
+      const showMap = state.activeSection === 'world';
+      appEl.classList.toggle('no-stage', !showMap);
+      if (showMap) {
+        resizeCanvas();
+        draw();
+      }
+    }
+
+    const BLOCK_SCRIPT_PRESETS = {
+      door_toggle: `function(world, block, creature) {
+  const isOpening = block.userData.solid;
+  const targetSolid = !isOpening;
+  const visited = new Set();
+  const queue = [{ x: block.userData.x, y: block.userData.y, z: block.userData.z }];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const key = \`\${current.x},\${current.y},\${current.z}\`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    const targetBlock = world.blocks.find((b) =>
+      Math.abs(b.x - current.x) < 0.01 &&
+      Math.abs(b.y - current.y) < 0.01 &&
+      Math.abs(b.z - current.z) < 0.01 &&
+      b.type && b.type.onUse === block.type.onUse
+    );
+    if (!targetBlock) continue;
+    targetBlock.solid = targetSolid;
+    if (targetBlock.mesh && Array.isArray(targetBlock.mesh.material)) {
+      targetBlock.mesh.material.forEach(mat => {
+        mat.opacity = targetSolid ? (targetBlock.type.opacity ?? 1) : 0.35;
+        mat.transparent = mat.opacity < 1;
+      });
+    }
+    queue.push(
+      { x: current.x + 1, y: current.y, z: current.z },
+      { x: current.x - 1, y: current.y, z: current.z },
+      { x: current.x, y: current.y, z: current.z + 1 },
+      { x: current.x, y: current.y, z: current.z - 1 },
+      { x: current.x, y: current.y + 1, z: current.z },
+      { x: current.x, y: current.y - 1, z: current.z }
+    );
+  }
+  if (world && typeof world.markTerrainDirty === 'function') {
+    world.markTerrainDirty();
+  }
+}`,
+      gold_flash: `function(world, block, creature) {
+  if (!block || !Array.isArray(block.material)) return;
+  block.material.forEach(mat => {
+    mat.emissive = new THREE.Color(0xFFD700);
+    mat.emissiveIntensity = 0.5;
+  });
+  setTimeout(() => {
+    block.material.forEach(mat => {
+      mat.emissiveIntensity = 0;
+    });
+  }, 1000);
+}`
+    };
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+    function setZipStatus(msg) { zipStatusEl.textContent = msg; }
+    function setDbStatus(msg) { dbStatusEl.textContent = msg; }
+
+    function cloneMapPayload(payload) {
+      return JSON.parse(JSON.stringify(payload || {
+        version: 1,
+        player: { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, name: 'A.S.S', inventory: {}, itemInventory: {} },
+        blocks: [],
+        items: [],
+        entities: []
+      }));
+    }
+
+    function normalizeMapName(name) {
+      const clean = String(name || '').trim().replace(/[^A-Za-z0-9._-]/g, '_');
+      if (!clean) return '';
+      return clean.toLowerCase().endsWith('.json') ? clean : `${clean}.json`;
+    }
+
+    function saveCurrentMapIntoCollection() {
+      if (!state.currentMapName) return;
+      state.maps[state.currentMapName] = cloneMapPayload(buildMapPayload());
+    }
+
+    function renderMapManager() {
+      mapSelectEl.innerHTML = '';
+      const names = Object.keys(state.maps).sort((a, b) => a.localeCompare(b));
+      for (const name of names) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        mapSelectEl.appendChild(opt);
+      }
+      if (!names.length) {
+        const fallback = 'default.json';
+        state.maps[fallback] = cloneMapPayload(state.map);
+      }
+      if (!state.maps[state.currentMapName]) {
+        state.currentMapName = Object.keys(state.maps)[0];
+      }
+      mapSelectEl.value = state.currentMapName;
+      mapNameEl.value = state.currentMapName;
+    }
+
+    function switchToMap(name) {
+      const normalized = normalizeMapName(name);
+      if (!normalized || !state.maps[normalized]) return;
+      saveCurrentMapIntoCollection();
+      state.currentMapName = normalized;
+      applyMapPayload(state.maps[normalized], { skipCollectionSync: true });
+      mapSelectEl.value = state.currentMapName;
+      mapNameEl.value = state.currentMapName;
+      setStatus(`Mapa ativo: ${state.currentMapName}`);
+    }
+
+    function rebuildTextureMap() {
+      textureByKey.clear();
+      for (const t of state.db.textures) {
+        if (t && t.key) textureByKey.set(t.key, t.url);
+      }
+      imgCache.clear();
+    }
+
+    function rebuildTypeIndexes() {
+      blockTypeById.clear();
+      npcTypeById.clear();
+      itemTypeById.clear();
+      for (const b of Object.values(state.db.blocks)) blockTypeById.set(String(b.id), b);
+      for (const n of Object.values(state.db.npcs)) npcTypeById.set(String(n.id), n);
+      for (const i of Object.values(state.db.items)) itemTypeById.set(String(i.id), i);
+    }
+
+    function markMapDirty() {
+      state.viewDirty = true;
+    }
+
+    function getTextureUrl(key) {
+      if (!key) return null;
+      if (state.db.embeddedImages[key]) return state.db.embeddedImages[key];
+      if (state.importedZip) return null;
+      return textureByKey.get(key) || null;
+    }
+
+    function loadImg(key) {
+      const url = getTextureUrl(key);
+      if (!url) return null;
+      const cacheKey = `${key}|${url}`;
+      if (imgCache.has(cacheKey)) return imgCache.get(cacheKey);
+      const img = new Image();
+      img.src = url;
+      imgCache.set(cacheKey, img);
+      return img;
+    }
+
+    function getBlockThumbKey(bt) {
+      const t = bt && bt.textures ? bt.textures : null;
+      return t ? (t.all || t.top || t.side || t.bottom || null) : null;
+    }
+
+    function getBlockEntries() {
+      return Object.entries(state.db.blocks)
+        .map(([key, bt]) => ({ key, ...bt }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    function getNpcEntries() {
+      return Object.entries(state.db.npcs)
+        .map(([key, npc]) => ({ key, ...npc }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    function getItemEntries() {
+      return Object.entries(state.db.items)
+        .map(([key, it]) => ({ key, ...it }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    function getActiveList() {
+      if (state.toolMode === 'npc') {
+        return getNpcEntries().map((npc) => ({ kind: 'npc', id: npc.id, label: npc.name, npc, thumbKey: npc.texture || 'npc' }));
+      }
+      if (state.toolMode === 'item') {
+        return getItemEntries().map((it) => ({ kind: 'item', id: it.id, label: it.name, it, thumbKey: it.uiTextureKey || it.textureKey || null }));
+      }
+      return getBlockEntries().map((bt) => ({ kind: 'block', id: bt.id, label: bt.name, bt, thumbKey: getBlockThumbKey(bt) }));
+    }
+
+    const paletteEl = $('palette');
+    const searchEl = $('search');
+    const toolEl = $('tool-mode');
+    const layerEl = $('layer-y');
+    const zoomEl = $('zoom');
+    const paintShapeEl = $('paint-shape');
+    const playerImageKeyEl = $('player-image-key');
+    const playerImageEl = $('player-image');
+    const playerNameEl = $('player-name');
+    const playerImagePreviewEl = $('player-image-preview');
+    const layerCopyEl = $('layer-copy');
+    const layerPasteEl = $('layer-paste');
+    const layerClearEl = $('layer-clear');
+    const mapSelectEl = $('map-select');
+    const mapNameEl = $('map-name');
+    const mapNewEl = $('map-new');
+    const mapRenameEl = $('map-rename');
+    const mapDeleteEl = $('map-delete');
+
+    const invTargetEl = $('inv-target');
+    const invCategoryEl = $('inv-category');
+    const invItemEl = $('inv-item');
+    const invQtyEl = $('inv-qty');
+    const invAddEl = $('inv-add');
+    const invRemoveEl = $('inv-remove');
+    const invClearEl = $('inv-clear');
+    const invStatusEl = $('inv-status');
+    const invListEl = $('inv-list');
+    const invPresetEl = $('inv-preset');
+    const invApplyPresetEl = $('inv-apply-preset');
+    const presetListEl = $('preset-list');
+    const presetKeyEl = $('preset-key');
+    const presetBlocksEl = $('preset-blocks');
+    const presetItemsEl = $('preset-items');
+    const uiAliasListEl = $('ui-alias-list');
+    const uiAliasKeyEl = $('ui-alias-key');
+    const uiAliasValueEl = $('ui-alias-value');
+    const uiAliasImageEl = $('ui-alias-image');
+    const uiAliasPreviewEl = $('ui-alias-preview');
+    const configJsonEl = $('config-json');
+
+    const inventoryState = { targetKey: 'player', category: 'item' };
+
+    function renderPalette() {
+      paletteEl.innerHTML = '';
+      const q = (searchEl.value || '').trim().toLowerCase();
+      const list = getActiveList().filter(e => !q || (e.label || '').toLowerCase().includes(q));
+
+      if (!state.selected || state.selected.kind !== (state.toolMode === 'npc' ? 'npc' : state.toolMode === 'item' ? 'item' : 'block')) {
+        state.selected = list[0] || null;
+      }
+
+      for (const entry of list.slice(0, 2200)) {
+        const div = document.createElement('div');
+        div.className = 'entry' + (state.selected === entry ? ' active' : '');
+
+        const thumb = document.createElement('div');
+        thumb.className = 'thumb';
+        const k = entry.thumbKey;
+        const url = getTextureUrl(k);
+        if (k && url) {
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = '';
+          thumb.appendChild(img);
+        } else {
+          thumb.textContent = entry.kind === 'npc' ? 'NPC' : entry.kind === 'item' ? 'IT' : 'BL';
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        const name = document.createElement('div');
+        name.className = 'name';
+        name.textContent = entry.label || '—';
+        const sub = document.createElement('div');
+        sub.className = 'sub';
+        sub.textContent = `${entry.kind.toUpperCase()} • id=${entry.id}`;
+        meta.appendChild(name);
+        meta.appendChild(sub);
+
+        div.appendChild(thumb);
+        div.appendChild(meta);
+        div.addEventListener('click', () => {
+          state.selected = entry;
+          renderPalette();
+          draw();
+        });
+        paletteEl.appendChild(div);
+      }
+      draw();
+    }
+
+    function getNpcEntities() {
+      return state.map.entities.filter(e => e && e.type === 'npc');
+    }
+
+    function findNpcTypeById(id) {
+      return npcTypeById.get(String(id)) || null;
+    }
+
+    function findBlockTypeById(id) {
+      return blockTypeById.get(String(id)) || null;
+    }
+
+    function findItemTypeById(id) {
+      return itemTypeById.get(String(id)) || null;
+    }
+
+    function getNpcLabel(npc) {
+      const npcType = findNpcTypeById(npc.npcTypeId);
+      return npc.name || (npcType ? npcType.name : 'NPC');
+    }
+
+    function ensurePlayer() {
+      if (!state.map.player) {
+        state.map.player = { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, name: 'A.S.S', inventory: {}, itemInventory: {} };
+      }
+      if (!String(state.map.player.name || '').trim()) state.map.player.name = state.db.ui.playerName || 'A.S.S';
+      state.map.player.inventory = state.map.player.inventory || {};
+      state.map.player.itemInventory = state.map.player.itemInventory || {};
+      return state.map.player;
+    }
+
+    function getInventoryTarget() {
+      if (inventoryState.targetKey === 'player') {
+        const p = ensurePlayer();
+        return { entity: p, label: 'Player', isPlayer: true };
+      }
+      const npcList = getNpcEntities();
+      const idx = Number(String(inventoryState.targetKey).replace('npc-', ''));
+      const npc = npcList[idx];
+      if (!npc) return null;
+      npc.inventory = npc.inventory || {};
+      npc.itemInventory = npc.itemInventory || {};
+      return { entity: npc, label: getNpcLabel(npc), isPlayer: false };
+    }
+
+    function renderInventoryTargets() {
+      const npcList = getNpcEntities();
+      invTargetEl.innerHTML = '';
+
+      const playerOption = document.createElement('option');
+      playerOption.value = 'player';
+      playerOption.textContent = 'Player';
+      invTargetEl.appendChild(playerOption);
+
+      npcList.forEach((npc, idx) => {
+        const opt = document.createElement('option');
+        opt.value = `npc-${idx}`;
+        opt.textContent = `${getNpcLabel(npc)} (NPC ${idx + 1})`;
+        invTargetEl.appendChild(opt);
+      });
+
+      if (inventoryState.targetKey !== 'player' && !invTargetEl.querySelector(`option[value="${inventoryState.targetKey}"]`)) {
+        inventoryState.targetKey = 'player';
+      }
+      invTargetEl.value = inventoryState.targetKey;
+    }
+
+    function renderInventoryOptions() {
+      const category = invCategoryEl.value;
+      invItemEl.innerHTML = '';
+      const options = category === 'block' ? getBlockEntries() : getItemEntries();
+      for (const entry of options) {
+        const opt = document.createElement('option');
+        opt.value = String(entry.id);
+        opt.textContent = entry.name || String(entry.id);
+        invItemEl.appendChild(opt);
+      }
+    }
+
+    function renderInventoryList() {
+      const target = getInventoryTarget();
+      invListEl.innerHTML = '';
+      if (!target) {
+        invStatusEl.textContent = 'Selecione uma entidade válida.';
+        return;
+      }
+
+      invStatusEl.textContent = `Editando: ${target.label}`;
+      const entries = [];
+
+      if (target.entity.inventory) {
+        for (const [blockId, count] of Object.entries(target.entity.inventory)) {
+          const qty = Math.max(0, Math.floor(Number(count) || 0));
+          if (!qty) continue;
+          const blockType = findBlockTypeById(blockId);
+          entries.push({ kind: 'block', id: blockId, name: blockType ? blockType.name : `Bloco ${blockId}`, count: qty });
+        }
+      }
+
+      if (target.entity.itemInventory) {
+        for (const [itemId, count] of Object.entries(target.entity.itemInventory)) {
+          const qty = Math.max(0, Math.floor(Number(count) || 0));
+          if (!qty) continue;
+          const itemDef = findItemTypeById(itemId);
+          entries.push({ kind: 'item', id: itemId, name: itemDef ? itemDef.name : `Item ${itemId}`, count: qty });
+        }
+      }
+
+      if (!entries.length) {
+        const empty = document.createElement('div');
+        empty.textContent = 'Inventário vazio.';
+        invListEl.appendChild(empty);
+        return;
+      }
+
+      entries.sort((a, b) => a.name.localeCompare(b.name));
+      for (const entry of entries) {
+        const row = document.createElement('div');
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '1fr auto auto auto';
+        row.style.gap = '6px';
+        row.style.alignItems = 'center';
+        row.style.padding = '4px 0';
+
+        const label = document.createElement('div');
+        label.textContent = `${entry.name} x${entry.count}`;
+        label.style.fontSize = '12px';
+
+        const minus = document.createElement('button');
+        minus.textContent = '-';
+        minus.style.padding = '2px 8px';
+        minus.addEventListener('click', () => adjustInventory(entry.kind, entry.id, -1));
+
+        const plus = document.createElement('button');
+        plus.textContent = '+';
+        plus.style.padding = '2px 8px';
+        plus.addEventListener('click', () => adjustInventory(entry.kind, entry.id, 1));
+
+        const remove = document.createElement('button');
+        remove.textContent = 'x';
+        remove.style.padding = '2px 8px';
+        remove.addEventListener('click', () => adjustInventory(entry.kind, entry.id, -entry.count));
+
+        row.appendChild(label);
+        row.appendChild(minus);
+        row.appendChild(plus);
+        row.appendChild(remove);
+        invListEl.appendChild(row);
+      }
+    }
+
+    function renderInventoryPresetOptions() {
+      invPresetEl.innerHTML = '';
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = '(sem preset)';
+      invPresetEl.appendChild(none);
+      for (const key of Object.keys(state.db.inventoryPresets).sort((a, b) => a.localeCompare(b))) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = key;
+        invPresetEl.appendChild(opt);
+      }
+    }
+
+    function adjustInventory(kind, id, delta) {
+      const target = getInventoryTarget();
+      if (!target) return;
+      const store = kind === 'block' ? target.entity.inventory : target.entity.itemInventory;
+      const key = String(id);
+      const current = Math.max(0, Math.floor(Number(store[key] || 0)));
+      const next = Math.max(0, current + delta);
+      if (next <= 0) delete store[key];
+      else store[key] = next;
+      renderInventoryList();
+    }
+
+    invTargetEl.addEventListener('change', () => {
+      inventoryState.targetKey = invTargetEl.value;
+      renderInventoryList();
+    });
+
+    invCategoryEl.addEventListener('change', () => {
+      inventoryState.category = invCategoryEl.value;
+      renderInventoryOptions();
+    });
+
+    invAddEl.addEventListener('click', () => {
+      const qty = Math.max(1, Math.floor(Number(invQtyEl.value || 1)));
+      const id = invItemEl.value;
+      const kind = invCategoryEl.value === 'block' ? 'block' : 'item';
+      adjustInventory(kind, id, qty);
+    });
+
+    invRemoveEl.addEventListener('click', () => {
+      const qty = Math.max(1, Math.floor(Number(invQtyEl.value || 1)));
+      const id = invItemEl.value;
+      const kind = invCategoryEl.value === 'block' ? 'block' : 'item';
+      adjustInventory(kind, id, -qty);
+    });
+
+    invClearEl.addEventListener('click', () => {
+      const target = getInventoryTarget();
+      if (!target) return;
+      target.entity.inventory = {};
+      target.entity.itemInventory = {};
+      renderInventoryList();
+    });
+
+    invApplyPresetEl.addEventListener('click', () => {
+      const key = invPresetEl.value;
+      const preset = state.db.inventoryPresets[key];
+      const target = getInventoryTarget();
+      if (!preset || !target) {
+        setStatus('Preset inválido ou alvo inválido.');
+        return;
+      }
+      target.entity.inventory = { ...(preset.inventory || {}) };
+      target.entity.itemInventory = { ...(preset.itemInventory || {}) };
+      renderInventoryList();
+      setStatus(`Preset aplicado: ${key}`);
+    });
+
+    function recalcBounds() {
+      let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+      for (const b of state.map.blocks) {
+        minX = Math.min(minX, b.x);
+        maxX = Math.max(maxX, b.x);
+        minZ = Math.min(minZ, b.z);
+        maxZ = Math.max(maxZ, b.z);
+      }
+      for (const e of state.map.entities) {
+        if (!e) continue;
+        const cx = Math.floor(e.x ?? 0);
+        const cz = Math.floor(e.z ?? 0);
+        minX = Math.min(minX, cx);
+        maxX = Math.max(maxX, cx);
+        minZ = Math.min(minZ, cz);
+        maxZ = Math.max(maxZ, cz);
+      }
+      for (const it of state.map.items) {
+        if (!it) continue;
+        const cx = Math.floor(it.x ?? 0);
+        const cz = Math.floor(it.z ?? 0);
+        minX = Math.min(minX, cx);
+        maxX = Math.max(maxX, cx);
+        minZ = Math.min(minZ, cz);
+        maxZ = Math.max(maxZ, cz);
+      }
+      if (minX === Infinity) {
+        minX = 0;
+        minZ = 0;
+        maxX = 15;
+        maxZ = 15;
+      }
+      state.view = { minX: minX - 2, minZ: minZ - 2, maxX: maxX + 2, maxZ: maxZ + 2 };
+    }
+
+    const onionDepth = 2;
+    const onionAlpha = [0.28, 0.16];
+
+    function layerFromWorldY(y) {
+      if (typeof y !== 'number' || !isFinite(y)) return 0;
+      return Math.round(y);
+    }
+
+    function findBlockAt(x, y, z) {
+      return state.map.blocks.find((b) => b.x === x && b.y === y && b.z === z) || null;
+    }
+
+    function upsertBlock(x, y, z, typeId, isFloor) {
+      const existing = findBlockAt(x, y, z);
+      if (existing) {
+        existing.typeId = typeId;
+        existing.isFloor = !!isFloor;
+        return;
+      }
+      state.map.blocks.push({ x, y, z, typeId, isFloor: !!isFloor });
+    }
+
+    function eraseAtCell(x, z, options = {}) {
+      const { skipInventoryRefresh = false } = options;
+      const blockY = state.layerY + 0.5;
+      const floorY = -0.5;
+      state.map.blocks = state.map.blocks.filter((b) => !(b.x === x && b.z === z && (b.y === blockY || b.y === floorY)));
+
+      const cx = x + 0.5;
+      const cz = z + 0.5;
+      const targetLayer = state.layerY;
+
+      state.map.entities = state.map.entities.filter((e) => !(
+        Math.abs((e.x ?? 0) - cx) < 0.51 &&
+        Math.abs((e.z ?? 0) - cz) < 0.51 &&
+        layerFromWorldY(e.y) === targetLayer
+      ));
+
+      state.map.items = state.map.items.filter((it) => !(
+        Math.abs((it.x ?? 0) - cx) < 0.51 &&
+        Math.abs((it.z ?? 0) - cz) < 0.51 &&
+        layerFromWorldY(it.y) === targetLayer
+      ));
+      if (!skipInventoryRefresh) {
+        renderInventoryTargets();
+        renderInventoryList();
+      }
+    }
+
+    function applyRectOperation(minX, maxX, minZ, maxZ, erase) {
+      const width = (maxX - minX + 1);
+      const height = (maxZ - minZ + 1);
+      if (width <= 0 || height <= 0) return;
+
+      if (erase || state.toolMode === 'erase') {
+        const keySet = new Set();
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) keySet.add(`${x},${z}`);
+        }
+        const blockY = state.layerY + 0.5;
+        const floorY = -0.5;
+        state.map.blocks = state.map.blocks.filter((b) => {
+          if (b.y !== blockY && b.y !== floorY) return true;
+          return !keySet.has(`${b.x},${b.z}`);
+        });
+        state.map.entities = state.map.entities.filter((e) => {
+          if (layerFromWorldY(e.y) !== state.layerY) return true;
+          return !keySet.has(`${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`);
+        });
+        state.map.items = state.map.items.filter((it) => {
+          if (layerFromWorldY(it.y) !== state.layerY) return true;
+          return !keySet.has(`${Math.floor(it.x ?? 0)},${Math.floor(it.z ?? 0)}`);
+        });
+        renderInventoryTargets();
+        renderInventoryList();
+        markMapDirty();
+        setStatus(`Apagado retângulo: (${minX},${minZ}) → (${maxX},${maxZ}) em Y=${state.layerY}`);
+        draw();
+        return;
+      }
+
+      if (!state.selected) return;
+
+      if (state.toolMode === 'block') {
+        const bt = state.selected.bt;
+        if (!bt) return;
+        const isFloor = !!bt.isFloor;
+        const targetY = isFloor ? -0.5 : (state.layerY + 0.5);
+        const existing = new Map();
+        for (const b of state.map.blocks) {
+          if (b.y === targetY) existing.set(`${b.x},${b.z}`, b);
+        }
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) {
+            const key = `${x},${z}`;
+            const block = existing.get(key);
+            if (block) {
+              block.typeId = bt.id;
+              block.isFloor = isFloor;
+            } else {
+              const entry = { x, y: targetY, z, typeId: bt.id, isFloor };
+              state.map.blocks.push(entry);
+              existing.set(key, entry);
+            }
+          }
+        }
+        markMapDirty();
+        setStatus(`Bloco: ${bt.name} aplicado em ${width * height} células (Y=${state.layerY})`);
+        draw();
+        return;
+      }
+
+      if (state.toolMode === 'npc') {
+        const npc = state.selected.npc;
+        if (!npc) return;
+        const keySet = new Set();
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) keySet.add(`${x},${z}`);
+        }
+        state.map.entities = state.map.entities.filter((e) => {
+          if (layerFromWorldY(e.y) !== state.layerY) return true;
+          return !keySet.has(`${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`);
+        });
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) {
+            state.map.entities.push({
+              type: 'npc',
+              npcTypeId: npc.id,
+              name: npc.name,
+              faction: npc.faction || null,
+              x: x + 0.5,
+              y: state.layerY,
+              z: z + 0.5,
+              yaw: 0,
+              pitch: 0,
+              hp: npc.maxHP || 100,
+              maxHP: npc.maxHP || 100,
+              isHostile: !!npc.isHostile,
+              inventory: {},
+              itemInventory: {}
+            });
+          }
+        }
+        renderInventoryTargets();
+        renderInventoryList();
+        markMapDirty();
+        setStatus(`Criatura: ${npc.name} aplicada em ${width * height} células (Y=${state.layerY})`);
+        draw();
+        return;
+      }
+
+      if (state.toolMode === 'item') {
+        const it = state.selected.it;
+        if (!it) return;
+        const keySet = new Set();
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) keySet.add(`${x},${z}`);
+        }
+        state.map.items = state.map.items.filter((i) => {
+          if (layerFromWorldY(i.y) !== state.layerY) return true;
+          return !keySet.has(`${Math.floor(i.x ?? 0)},${Math.floor(i.z ?? 0)}`);
+        });
+        for (let z = minZ; z <= maxZ; z++) {
+          for (let x = minX; x <= maxX; x++) {
+            state.map.items.push({ kind: 'item', itemId: it.id, amount: 1, x: x + 0.5, y: state.layerY + 0.2, z: z + 0.5 });
+          }
+        }
+        markMapDirty();
+        setStatus(`Item/Arma: ${it.name} aplicado em ${width * height} células (Y=${state.layerY})`);
+        draw();
+      }
+    }
+
+    function resizeCanvas() {
+      const rect = $('stage').getBoundingClientRect();
+      const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function draw() {
+      if (state.viewDirty) {
+        recalcBounds();
+        state.viewDirty = false;
+      }
+      const rect = $('stage').getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const cell = state.zoom;
+      const spanX = state.view.maxX - state.view.minX + 1;
+      const spanZ = state.view.maxZ - state.view.minZ + 1;
+
+      const ox = Math.floor((w - spanX * cell) / 2);
+      const oz = Math.floor((h - spanZ * cell) / 2);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= spanX; i++) {
+        const x = ox + i * cell;
+        ctx.beginPath();
+        ctx.moveTo(x, oz);
+        ctx.lineTo(x, oz + spanZ * cell);
+        ctx.stroke();
+      }
+      for (let i = 0; i <= spanZ; i++) {
+        const y = oz + i * cell;
+        ctx.beginPath();
+        ctx.moveTo(ox, y);
+        ctx.lineTo(ox + spanX * cell, y);
+        ctx.stroke();
+      }
+
+      const blockLayerY = state.layerY + 0.5;
+      const floorLayerY = -0.5;
+      const activeEntityLayer = state.layerY;
+
+      function drawBlockCell(b, alpha = 1) {
+        const bt = findBlockTypeById(b.typeId);
+        const txKey = bt ? getBlockThumbKey(bt) : null;
+        const img = txKey ? loadImg(txKey) : null;
+
+        const gx = b.x - state.view.minX;
+        const gz = b.z - state.view.minZ;
+        const px = ox + gx * cell;
+        const pz = oz + gz * cell;
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+        if (img && img.complete && img.naturalWidth) {
+          ctx.drawImage(img, px, pz, cell, cell);
+        } else {
+          ctx.fillStyle = 'rgba(180,180,180,0.55)';
+          ctx.fillRect(px, pz, cell, cell);
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+        ctx.strokeRect(px + 0.5, pz + 0.5, cell - 1, cell - 1);
+        ctx.restore();
+      }
+
+      for (const b of state.map.blocks) {
+        if (b.isFloor || b.y === floorLayerY) drawBlockCell(b, 0.35);
+      }
+
+      for (let i = 1; i <= onionDepth; i++) {
+        const layerY = state.layerY - i + 0.5;
+        const alpha = onionAlpha[i - 1] ?? 0.12;
+        for (const b of state.map.blocks) {
+          if (b.y !== layerY) continue;
+          drawBlockCell(b, alpha);
+        }
+      }
+
+      for (const b of state.map.blocks) {
+        if (b.y !== blockLayerY) continue;
+        drawBlockCell(b, 1);
+      }
+
+      for (const e of state.map.entities) {
+        if (!e || e.type !== 'npc') continue;
+        if (layerFromWorldY(e.y) !== activeEntityLayer) continue;
+        const npc = findNpcTypeById(e.npcTypeId);
+        const txKey = npc ? (npc.texture || 'npc') : 'npc';
+        const img = loadImg(txKey);
+
+        const cx = Math.floor(e.x ?? 0);
+        const cz = Math.floor(e.z ?? 0);
+        const gx = cx - state.view.minX;
+        const gz = cz - state.view.minZ;
+        const px = ox + gx * cell;
+        const pz = oz + gz * cell;
+
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.18)';
+        ctx.fillRect(px, pz, cell, cell);
+        if (img && img.complete && img.naturalWidth) ctx.drawImage(img, px, pz, cell, cell);
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillRect(px, pz + cell - 16, cell, 16);
+        ctx.fillStyle = '#222';
+        ctx.font = '11px ui-monospace, monospace';
+        ctx.fillText('NPC', px + 4, pz + cell - 4);
+      }
+
+      for (const it of state.map.items) {
+        if (!it || it.kind !== 'item') continue;
+        if (layerFromWorldY(it.y) !== activeEntityLayer) continue;
+        const def = findItemTypeById(it.itemId);
+        const txKey = def ? (def.textureKey || def.uiTextureKey || null) : null;
+        const img = txKey ? loadImg(txKey) : null;
+
+        const cx = Math.floor(it.x ?? 0);
+        const cz = Math.floor(it.z ?? 0);
+        const gx = cx - state.view.minX;
+        const gz = cz - state.view.minZ;
+        const px = ox + gx * cell;
+        const pz = oz + gz * cell;
+
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.15)';
+        ctx.fillRect(px, pz, cell, cell);
+        if (img && img.complete && img.naturalWidth) ctx.drawImage(img, px, pz, cell, cell);
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillRect(px, pz + cell - 16, cell, 16);
+        ctx.fillStyle = '#222';
+        ctx.fillText('ITEM', px + 4, pz + cell - 4);
+      }
+
+      if (state.hover) {
+        const hx = state.hover.x - state.view.minX;
+        const hz = state.hover.z - state.view.minZ;
+        if (hx >= 0 && hz >= 0 && hx < spanX && hz < spanZ) {
+          const px = ox + hx * cell;
+          const pz = oz + hz * cell;
+          ctx.strokeStyle = 'rgba(59, 130, 246, 0.85)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px + 1, pz + 1, cell - 2, cell - 2);
+        }
+      }
+
+      if (state.paintShape === 'rect' && state.rectStart && state.rectEnd) {
+        const a = state.rectStart;
+        const b = state.rectEnd;
+        const minX = Math.min(a.x, b.x);
+        const maxX = Math.max(a.x, b.x);
+        const minZ = Math.min(a.z, b.z);
+        const maxZ = Math.max(a.z, b.z);
+
+        const gx0 = minX - state.view.minX;
+        const gz0 = minZ - state.view.minZ;
+        const gx1 = maxX - state.view.minX;
+        const gz1 = maxZ - state.view.minZ;
+
+        const px0 = ox + gx0 * cell;
+        const pz0 = oz + gz0 * cell;
+        const px1 = ox + (gx1 + 1) * cell;
+        const pz1 = oz + (gz1 + 1) * cell;
+
+        ctx.fillStyle = state.rectErase ? 'rgba(251, 113, 133, 0.16)' : 'rgba(52, 211, 153, 0.12)';
+        ctx.fillRect(px0, pz0, px1 - px0, pz1 - pz0);
+        ctx.strokeStyle = state.rectErase ? 'rgba(251, 113, 133, 0.85)' : 'rgba(52, 211, 153, 0.75)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px0 + 1, pz0 + 1, px1 - px0 - 2, pz1 - pz0 - 2);
+      }
+
+      overlayEl.textContent = `Modo: ${state.toolMode}
+Andar (camada Y): ${state.layerY}
+Zoom: ${cell}px
+Blocos: ${state.map.blocks.length} | NPCs: ${state.map.entities.length} | Itens: ${state.map.items.length}`;
+    }
+
+    function screenToCell(clientX, clientY) {
+      const rect = $('stage').getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      const cell = state.zoom;
+
+      const spanX = state.view.maxX - state.view.minX + 1;
+      const spanZ = state.view.maxZ - state.view.minZ + 1;
+      const ox = Math.floor((w - spanX * cell) / 2);
+      const oz = Math.floor((h - spanZ * cell) / 2);
+
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const gx = Math.floor((x - ox) / cell);
+      const gz = Math.floor((y - oz) / cell);
+      if (gx < 0 || gz < 0 || gx >= spanX || gz >= spanZ) return null;
+      return { x: state.view.minX + gx, z: state.view.minZ + gz };
+    }
+
+    function applyAtCell(cellPos, isErase, options = {}) {
+      const { skipDraw = false, skipStatus = false, skipInventoryRefresh = false } = options;
+      if (!cellPos) return;
+      const { x, z } = cellPos;
+      const mode = state.toolMode;
+
+      if (isErase || mode === 'erase') {
+        eraseAtCell(x, z, { skipInventoryRefresh });
+        markMapDirty();
+        if (!skipStatus) setStatus(`Apagado em (${x}, layer=${state.layerY}, ${z}).`);
+        if (!skipDraw) draw();
+        return;
+      }
+
+      if (!state.selected) return;
+
+      if (mode === 'block') {
+        const bt = state.selected.bt;
+        if (!bt) return;
+        const isFloor = !!bt.isFloor;
+        const y = isFloor ? -0.5 : state.layerY + 0.5;
+        upsertBlock(x, y, z, bt.id, isFloor);
+        markMapDirty();
+        if (!skipStatus) setStatus(`Bloco: ${bt.name} em (${x}, ${y}, ${z})`);
+        if (!skipDraw) draw();
+        return;
+      }
+
+      if (mode === 'npc') {
+        const npc = state.selected.npc;
+        if (!npc) return;
+        const entry = {
+          type: 'npc',
+          npcTypeId: npc.id,
+          name: npc.name,
+          faction: npc.faction || null,
+          x: x + 0.5,
+          y: state.layerY,
+          z: z + 0.5,
+          yaw: 0,
+          pitch: 0,
+          hp: npc.maxHP || 100,
+          maxHP: npc.maxHP || 100,
+          isHostile: !!npc.isHostile,
+          inventory: {},
+          itemInventory: {}
+        };
+        state.map.entities = state.map.entities.filter((e) => !(
+          Math.abs((e.x ?? 0) - (x + 0.5)) < 0.51 &&
+          Math.abs((e.z ?? 0) - (z + 0.5)) < 0.51 &&
+          layerFromWorldY(e.y) === state.layerY
+        ));
+        state.map.entities.push(entry);
+        markMapDirty();
+        if (!skipStatus) setStatus(`Criatura: ${npc.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
+        if (!skipInventoryRefresh) {
+          renderInventoryTargets();
+          renderInventoryList();
+        }
+        if (!skipDraw) draw();
+        return;
+      }
+
+      if (mode === 'item') {
+        const it = state.selected.it;
+        if (!it) return;
+        const entry = { kind: 'item', itemId: it.id, amount: 1, x: x + 0.5, y: state.layerY + 0.2, z: z + 0.5 };
+        state.map.items = state.map.items.filter((i) => !(
+          Math.abs((i.x ?? 0) - (x + 0.5)) < 0.51 &&
+          Math.abs((i.z ?? 0) - (z + 0.5)) < 0.51 &&
+          layerFromWorldY(i.y) === state.layerY
+        ));
+        state.map.items.push(entry);
+        markMapDirty();
+        if (!skipStatus) setStatus(`Item/Arma: ${it.name} em (${entry.x}, ${entry.y}, ${entry.z})`);
+        if (!skipDraw) draw();
+      }
+    }
+
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    function cellKey(c) {
+      if (!c) return 'null';
+      return `${c.x},${c.z}`;
+    }
+
+    function getEraseFlag(e) {
+      return e.button === 2 || e.shiftKey || String(toolEl.value || 'block') === 'erase';
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      state.isPointerDown = true;
+      state.dragButton = e.button;
+      state.lastPaintKey = null;
+
+      const cellPos = screenToCell(e.clientX, e.clientY);
+      state.hover = cellPos;
+      const erase = getEraseFlag(e);
+
+      if (state.paintShape === 'rect') {
+        state.rectStart = cellPos;
+        state.rectEnd = cellPos;
+        state.rectErase = erase;
+        draw();
+        return;
+      }
+
+      applyAtCell(cellPos, erase);
+      state.lastPaintKey = cellKey(cellPos);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      const cellPos = screenToCell(e.clientX, e.clientY);
+      state.hover = cellPos;
+
+      if (!state.isPointerDown) {
+        draw();
+        return;
+      }
+
+      if (state.paintShape === 'rect') {
+        state.rectEnd = cellPos;
+        draw();
+        return;
+      }
+
+      const k = cellKey(cellPos);
+      if (k === state.lastPaintKey) return;
+      state.lastPaintKey = k;
+
+      const erase = state.dragButton === 2 || e.shiftKey || String(toolEl.value || 'block') === 'erase';
+      applyAtCell(cellPos, erase);
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      state.isPointerDown = false;
+      if (state.paintShape === 'rect' && state.rectStart && state.rectEnd) {
+        const a = state.rectStart;
+        const b = state.rectEnd;
+        const minX = Math.min(a.x, b.x);
+        const maxX = Math.max(a.x, b.x);
+        const minZ = Math.min(a.z, b.z);
+        const maxZ = Math.max(a.z, b.z);
+        const erase = !!state.rectErase;
+        applyRectOperation(minX, maxX, minZ, maxZ, erase);
+        state.rectStart = null;
+        state.rectEnd = null;
+      }
+    });
+
+    canvas.addEventListener('pointercancel', () => {
+      state.isPointerDown = false;
+      state.rectStart = null;
+      state.rectEnd = null;
+      draw();
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.shiftKey) {
+        const dir = e.deltaY > 0 ? 1 : -1;
+        const next = Math.max(0, (state.layerY | 0) + dir);
+        if (next !== state.layerY) {
+          state.layerY = next;
+          layerEl.value = String(state.layerY);
+          setStatus(`Camada Y: ${state.layerY}`);
+          draw();
+        }
+        return;
+      }
+      state.zoom = Math.max(8, Math.min(96, state.zoom + (e.deltaY > 0 ? -1 : 1)));
+      zoomEl.value = String(state.zoom);
+      draw();
+    }, { passive: false });
+
+    toolEl.addEventListener('change', () => {
+      state.toolMode = toolEl.value;
+      renderPalette();
+    });
+
+    layerEl.addEventListener('change', () => {
+      state.layerY = Math.trunc(Number(layerEl.value || 0));
+      layerEl.value = String(state.layerY);
+      draw();
+    });
+
+    zoomEl.addEventListener('change', () => {
+      state.zoom = Math.max(8, Math.min(96, Math.trunc(Number(zoomEl.value || 26))));
+      zoomEl.value = String(state.zoom);
+      draw();
+    });
+
+    paintShapeEl.addEventListener('change', () => {
+      state.paintShape = String(paintShapeEl.value || 'brush');
+      state.rectStart = null;
+      state.rectEnd = null;
+      draw();
+    });
+
+    searchEl.addEventListener('input', renderPalette);
+
+    mapSelectEl.addEventListener('change', () => {
+      switchToMap(mapSelectEl.value);
+    });
+
+    mapNewEl.addEventListener('click', () => {
+      saveCurrentMapIntoCollection();
+      let base = normalizeMapName(mapNameEl.value || 'new-map.json');
+      if (!base) base = 'new-map.json';
+      let candidate = base;
+      let i = 1;
+      while (state.maps[candidate]) {
+        candidate = base.replace(/\.json$/i, `-${i}.json`);
+        i++;
+      }
+      state.maps[candidate] = cloneMapPayload({
+        version: 1,
+        player: { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, name: state.db.ui.playerName || 'A.S.S', inventory: {}, itemInventory: {} },
+        blocks: [],
+        items: [],
+        entities: []
+      });
+      state.currentMapName = candidate;
+      applyMapPayload(state.maps[candidate], { skipCollectionSync: true });
+      renderMapManager();
+      setStatus(`Novo mapa criado: ${candidate}`);
+    });
+
+    mapRenameEl.addEventListener('click', () => {
+      const next = normalizeMapName(mapNameEl.value);
+      if (!next) {
+        setStatus('Nome de mapa inválido.');
+        return;
+      }
+      if (next !== state.currentMapName && state.maps[next]) {
+        setStatus('Já existe um mapa com esse nome.');
+        return;
+      }
+      saveCurrentMapIntoCollection();
+      const current = state.currentMapName;
+      state.maps[next] = state.maps[current];
+      if (next !== current) delete state.maps[current];
+      state.currentMapName = next;
+      renderMapManager();
+      setStatus(`Mapa renomeado para: ${next}`);
+    });
+
+    mapDeleteEl.addEventListener('click', () => {
+      const names = Object.keys(state.maps);
+      if (names.length <= 1) {
+        setStatus('Não é possível excluir o último mapa.');
+        return;
+      }
+      const current = state.currentMapName;
+      delete state.maps[current];
+      const next = Object.keys(state.maps).sort((a, b) => a.localeCompare(b))[0];
+      state.currentMapName = next;
+      applyMapPayload(state.maps[next], { skipCollectionSync: true });
+      renderMapManager();
+      setStatus(`Mapa excluído: ${current}`);
+    });
+
+    playerImageKeyEl.addEventListener('input', () => {
+      state.db.ui.playerPortraitTextureKey = sanitizeTextureKey(playerImageKeyEl.value || 'ui_player_face');
+      updatePlayerImagePreview();
+    });
+
+    playerImageEl.addEventListener('change', async () => {
+      const file = playerImageEl.files && playerImageEl.files[0];
+      if (!file) return;
+      const key = sanitizeTextureKey(playerImageKeyEl.value || state.db.ui.playerPortraitTextureKey || 'ui_player_face');
+      await applyUploadedTexture(playerImageEl, key);
+      state.db.ui.playerPortraitTextureKey = key;
+      playerImageKeyEl.value = key;
+      updatePlayerImagePreview();
+      setDbStatus('Imagem do jogador atualizada.');
+    });
+
+    playerNameEl.addEventListener('input', () => {
+      const name = String(playerNameEl.value || '').trim();
+      state.db.ui.playerName = name || 'A.S.S';
+      ensurePlayer().name = state.db.ui.playerName;
+      markMapDirty();
+    });
+
+    function copyCurrentLayer() {
+      const layer = state.layerY;
+      const blockY = layer + 0.5;
+      state.layerClipboard = {
+        sourceLayer: layer,
+        blocks: state.map.blocks
+          .filter((b) => b.y === blockY)
+          .map((b) => ({ x: b.x, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor })),
+        entities: state.map.entities
+          .filter((e) => layerFromWorldY(e.y) === layer)
+          .map((e) => ({ ...e })),
+        items: state.map.items
+          .filter((i) => layerFromWorldY(i.y) === layer)
+          .map((i) => ({ ...i }))
+      };
+      const total = state.layerClipboard.blocks.length + state.layerClipboard.entities.length + state.layerClipboard.items.length;
+      setStatus(`Camada Y=${layer} copiada (${total} entradas).`);
+    }
+
+    function pasteToCurrentLayer() {
+      if (!state.layerClipboard) {
+        setStatus('Nenhuma camada copiada ainda.');
+        return;
+      }
+      const targetLayer = state.layerY;
+      const targetBlockY = targetLayer + 0.5;
+
+      const blockKeys = new Set(state.layerClipboard.blocks.map((b) => `${b.x},${b.z}`));
+      state.map.blocks = state.map.blocks.filter((b) => {
+        if (b.y !== targetBlockY) return true;
+        return !blockKeys.has(`${b.x},${b.z}`);
+      });
+      for (const b of state.layerClipboard.blocks) {
+        state.map.blocks.push({ x: b.x, y: targetBlockY, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor });
+      }
+
+      const entityKeys = new Set(state.layerClipboard.entities.map((e) => `${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`));
+      state.map.entities = state.map.entities.filter((e) => {
+        if (layerFromWorldY(e.y) !== targetLayer) return true;
+        return !entityKeys.has(`${Math.floor(e.x ?? 0)},${Math.floor(e.z ?? 0)}`);
+      });
+      for (const e of state.layerClipboard.entities) {
+        state.map.entities.push({ ...e, y: targetLayer });
+      }
+
+      const itemKeys = new Set(state.layerClipboard.items.map((i) => `${Math.floor(i.x ?? 0)},${Math.floor(i.z ?? 0)}`));
+      state.map.items = state.map.items.filter((i) => {
+        if (layerFromWorldY(i.y) !== targetLayer) return true;
+        return !itemKeys.has(`${Math.floor(i.x ?? 0)},${Math.floor(i.z ?? 0)}`);
+      });
+      for (const i of state.layerClipboard.items) {
+        state.map.items.push({ ...i, y: targetLayer + 0.2 });
+      }
+
+      renderInventoryTargets();
+      renderInventoryList();
+      markMapDirty();
+      draw();
+      const total = state.layerClipboard.blocks.length + state.layerClipboard.entities.length + state.layerClipboard.items.length;
+      setStatus(`Camada colada em Y=${targetLayer} (${total} entradas).`);
+    }
+
+    function clearCurrentLayer() {
+      const layer = state.layerY;
+      const blockY = layer + 0.5;
+      state.map.blocks = state.map.blocks.filter((b) => b.y !== blockY);
+      state.map.entities = state.map.entities.filter((e) => layerFromWorldY(e.y) !== layer);
+      state.map.items = state.map.items.filter((i) => layerFromWorldY(i.y) !== layer);
+      renderInventoryTargets();
+      renderInventoryList();
+      markMapDirty();
+      draw();
+      setStatus(`Camada Y=${layer} limpa.`);
+    }
+
+    layerCopyEl.addEventListener('click', copyCurrentLayer);
+    layerPasteEl.addEventListener('click', pasteToCurrentLayer);
+    layerClearEl.addEventListener('click', clearCurrentLayer);
+
+    const mapFileInput = document.createElement('input');
+    mapFileInput.type = 'file';
+    mapFileInput.accept = 'application/json';
+    mapFileInput.style.display = 'none';
+    document.body.appendChild(mapFileInput);
+
+    $('btn-import').addEventListener('click', () => {
+      mapFileInput.value = '';
+      mapFileInput.click();
+    });
+
+    function applyMapPayload(payload, options = {}) {
+      state.map = {
+        version: payload.version || 1,
+        player: payload.player || { x: 7.5, y: 2, z: 7.5, yaw: 0, pitch: 0, name: state.db.ui.playerName || 'A.S.S', inventory: {}, itemInventory: {} },
+        blocks: (payload.blocks || []).map((b) => {
+          const isFloor = !!b.isFloor || b.y === -0.5;
+          return { ...b, isFloor, y: isFloor ? -0.5 : b.y };
+        }),
+        items: (payload.items || []).map((i) => ({ ...i })),
+        entities: (payload.entities || []).map((e) => ({ ...e }))
+      };
+      ensurePlayer();
+      if (state.map.player && typeof state.map.player.portraitTextureKey === 'string' && state.map.player.portraitTextureKey.trim()) {
+        state.db.ui.playerPortraitTextureKey = state.map.player.portraitTextureKey;
+      }
+      if (state.map.player && typeof state.map.player.name === 'string' && state.map.player.name.trim()) {
+        state.db.ui.playerName = state.map.player.name.trim();
+      }
+      if (state.map.player && typeof state.map.player.portrait === 'string' && state.map.player.portrait.trim()) {
+        // backward compatibility with old path-based maps
+        if (!state.db.ui.playerPortraitTextureKey) state.db.ui.playerPortraitTextureKey = 'ui_player_face';
+      }
+      playerImageKeyEl.value = state.db.ui.playerPortraitTextureKey || 'ui_player_face';
+      playerNameEl.value = state.db.ui.playerName || 'A.S.S';
+      updatePlayerImagePreview();
+      markMapDirty();
+      if (!options.skipCollectionSync && state.currentMapName) {
+        state.maps[state.currentMapName] = cloneMapPayload(state.map);
+      }
+      setStatus(`Mapa carregado. Blocos: ${state.map.blocks.length}, NPCs: ${state.map.entities.length}, Itens: ${state.map.items.length}`);
+      renderInventoryTargets();
+      renderInventoryList();
+      renderMapManager();
+      draw();
+    }
+
+    mapFileInput.addEventListener('change', () => {
+      const file = mapFileInput.files && mapFileInput.files[0];
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const payload = JSON.parse(String(r.result || ''));
+          if (!payload || !Array.isArray(payload.blocks)) throw new Error('invalid');
+          saveCurrentMapIntoCollection();
+          applyMapPayload(payload);
+          if (file.name) {
+            const mapName = normalizeMapName(file.name);
+            if (mapName) {
+              const prevName = state.currentMapName;
+              state.maps[mapName] = cloneMapPayload(state.map);
+              if (prevName && prevName !== mapName) {
+                delete state.maps[prevName];
+              }
+              state.currentMapName = mapName;
+              renderMapManager();
+            }
+          }
+        } catch {
+          setStatus('Falha ao importar: JSON inválido.');
+        }
+      };
+      r.readAsText(file);
+    });
+
+    $('btn-export').addEventListener('click', () => {
+      saveCurrentMapIntoCollection();
+      const payload = buildMapPayload();
+      const data = JSON.stringify(payload, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = state.currentMapName || 'map.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus(`Exportado: ${a.download}`);
+    });
+
+    function buildMapPayload() {
+      const player = ensurePlayer();
+      return {
+        version: 1,
+        player: {
+          x: player.x,
+          y: player.y,
+          z: player.z,
+          yaw: player.yaw || 0,
+          pitch: player.pitch || 0,
+          name: state.db.ui.playerName || player.name || 'A.S.S',
+          portraitTextureKey: state.db.ui.playerPortraitTextureKey || 'ui_player_face',
+          inventory: player.inventory || {},
+          itemInventory: player.itemInventory || {}
+        },
+        blocks: state.map.blocks.map((b) => ({ x: b.x, y: b.y, z: b.z, typeId: b.typeId, isFloor: !!b.isFloor })),
+        items: state.map.items.map((i) => ({
+          kind: i.kind,
+          blockTypeId: i.blockTypeId || null,
+          itemId: i.itemId || null,
+          amount: i.amount || 1,
+          x: i.x,
+          y: i.y,
+          z: i.z
+        })),
+        entities: state.map.entities.map((e) => ({
+          type: e.type,
+          npcTypeId: e.npcTypeId || null,
+          name: e.name || null,
+          faction: e.faction || null,
+          x: e.x,
+          y: e.y,
+          z: e.z,
+          yaw: e.yaw || 0,
+          pitch: e.pitch || 0,
+          hp: typeof e.hp === 'number' ? e.hp : 100,
+          maxHP: typeof e.maxHP === 'number' ? e.maxHP : 100,
+          isHostile: !!e.isHostile,
+          inventory: e.inventory || {},
+          itemInventory: e.itemInventory || {}
+        }))
+      };
+    }
+
+    $('btn-load-default').addEventListener('click', async () => {
+      try {
+        await loadDefaultMapFromRomState();
+      } catch {
+        setStatus('default.json não está disponível no ROM carregado.');
+      }
+    });
+
+    $('btn-clear').addEventListener('click', () => {
+      state.map.blocks = [];
+      state.map.items = [];
+      state.map.entities = [];
+      markMapDirty();
+      saveCurrentMapIntoCollection();
+      setStatus('Mapa limpo.');
+      renderInventoryTargets();
+      renderInventoryList();
+      renderMapManager();
+      draw();
+    });
+
+    function asBool(v) {
+      return String(v) === 'true';
+    }
+
+    function sanitizeConstKey(v, fallback = 'NEW_ENTRY') {
+      const n = String(v || '').trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').toUpperCase();
+      return n || fallback;
+    }
+
+    function sanitizeTextureKey(v, fallback = 'new_texture') {
+      const n = String(v || '').trim().replace(/[^A-Za-z0-9_-]/g, '_').replace(/_+/g, '_').toLowerCase();
+      return n || fallback;
+    }
+
+    function sanitizeFactionId(v) {
+      return String(v || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    }
+
+    function functionText(fn) {
+      return (typeof fn === 'function') ? fn.toString() : '';
+    }
+
+    function normalizeScriptText(text) {
+      return String(text || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function detectBlockScriptPreset(fn) {
+      const src = normalizeScriptText(functionText(fn));
+      if (!src) return null;
+      for (const [presetId, presetText] of Object.entries(BLOCK_SCRIPT_PRESETS)) {
+        if (normalizeScriptText(presetText) === src) return presetId;
+      }
+      return null;
+    }
+
+    function parseScriptFunction(raw) {
+      const text = String(raw || '').trim();
+      if (!text) return null;
+      const fn = new Function(`return (${text});`)();
+      if (typeof fn !== 'function') throw new Error('Script deve ser uma função');
+      return fn;
+    }
+
+    async function fileToDataUrl(file) {
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function ensureTextureEntry(textureKey, fileName = null) {
+      let entry = state.db.textures.find((t) => t.key === textureKey);
+      if (!entry) {
+        const cleanName = fileName ? fileName.replace(/[^A-Za-z0-9._-]/g, '_') : `${textureKey}.png`;
+        entry = { key: textureKey, url: `./data/images/custom/${cleanName}` };
+        state.db.textures.push(entry);
+      }
+      return entry;
+    }
+
+    async function applyUploadedTexture(fileInput, textureKey) {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return false;
+      const dataUrl = await fileToDataUrl(file);
+      const entry = ensureTextureEntry(textureKey, file.name);
+      const extMatch = file.name.match(/\.[A-Za-z0-9]+$/);
+      const ext = extMatch ? extMatch[0].toLowerCase() : '.png';
+      entry.url = `./data/images/custom/${textureKey}${ext}`;
+      state.db.embeddedImages[textureKey] = dataUrl;
+      rebuildTextureMap();
+      return true;
+    }
+
+    function renderSimpleList(container, entries, isActiveFn, textFn, onClick) {
+      container.innerHTML = '';
+      for (const e of entries) {
+        const row = document.createElement('div');
+        row.className = 'list-item' + (isActiveFn(e) ? ' active' : '');
+        row.textContent = textFn(e);
+        row.addEventListener('click', () => onClick(e));
+        container.appendChild(row);
+      }
+    }
+
+    function setPreviewBox(el, key) {
+      el.innerHTML = '';
+      const url = getTextureUrl(key);
+      if (!url) {
+        el.textContent = 'N/A';
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      el.appendChild(img);
+    }
+
+    function updatePlayerImagePreview() {
+      const key = String(playerImageKeyEl.value || state.db.ui.playerPortraitTextureKey || 'ui_player_face').trim();
+      playerImagePreviewEl.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = getTextureUrl(key) || state.db.embeddedImages.ui_player_face || createSolidPngDataUrl('#808080', 64);
+      img.alt = '';
+      playerImagePreviewEl.appendChild(img);
+    }
+
+    function updateBlockPreview() {
+      const key = sanitizeTextureKey($('block-texture-key').value || '');
+      setPreviewBox($('block-preview'), key);
+    }
+
+    function updateItemPreview() {
+      const key = sanitizeTextureKey($('item-texture-key').value || '');
+      setPreviewBox($('item-preview'), key);
+    }
+
+    function updateCreaturePreview() {
+      const key = sanitizeTextureKey($('creature-texture-key').value || '');
+      setPreviewBox($('creature-preview'), key);
+    }
+
+    function refreshAllForCatalogChanges() {
+      rebuildTextureMap();
+      rebuildTypeIndexes();
+      renderPalette();
+      renderInventoryOptions();
+      renderInventoryList();
+      renderInventoryPresetOptions();
+      renderBlocksTab();
+      renderItemsTab();
+      renderCreaturesTab();
+      renderFactionsTab();
+      renderTexturesTab();
+      renderUiTab();
+      renderConfigTab();
+      renderPresetsTab();
+      updatePlayerImagePreview();
+      markMapDirty();
+      draw();
+    }
+
+    function renderBlocksTab() {
+      const listEl = $('block-list');
+      const entries = getBlockEntries();
+      if (!state.selectedBlockKey && entries.length) state.selectedBlockKey = entries[0].key;
+      const selected = state.db.blocks[state.selectedBlockKey] || null;
+
+      renderSimpleList(
+        listEl,
+        entries,
+        (e) => e.key === state.selectedBlockKey,
+        (e) => `${e.name || e.key} (#${e.id})`,
+        (e) => {
+          state.selectedBlockKey = e.key;
+          renderBlocksTab();
+        }
+      );
+
+      $('block-key').value = state.selectedBlockKey || '';
+      $('block-id').value = selected ? String(selected.id ?? '') : '';
+      $('block-name').value = selected ? String(selected.name ?? '') : '';
+      $('block-hp').value = selected ? String(selected.maxHP ?? 100) : '100';
+      $('block-break').value = selected ? String(selected.breakDamage ?? 10) : '10';
+      $('block-opacity').value = selected ? String(selected.opacity ?? 1) : '1';
+      $('block-solid').value = selected ? String(!!selected.solid) : 'true';
+      $('block-floor').value = selected ? String(!!selected.isFloor) : 'false';
+      $('block-droppable').value = selected ? String(selected.droppable !== false) : 'true';
+      $('block-texture-key').value = selected ? String(getBlockThumbKey(selected) || '') : '';
+      const presetId = detectBlockScriptPreset(selected?.onUse);
+      if (!selected?.onUse) {
+        $('block-script-mode').value = 'none';
+        $('block-script-preset').value = 'door_toggle';
+        $('block-script').value = '';
+      } else if (presetId) {
+        $('block-script-mode').value = 'preset';
+        $('block-script-preset').value = presetId;
+        $('block-script').value = BLOCK_SCRIPT_PRESETS[presetId];
+      } else {
+        $('block-script-mode').value = 'custom';
+        $('block-script').value = functionText(selected.onUse);
+      }
+      updateBlockScriptUi();
+      updateBlockPreview();
+    }
+
+    function updateBlockScriptUi() {
+      const mode = $('block-script-mode').value;
+      $('block-script-preset').disabled = mode !== 'preset';
+      $('block-script').disabled = mode === 'none';
+    }
+
+    $('block-new').addEventListener('click', () => {
+      state.selectedBlockKey = '';
+      $('block-key').value = '';
+      $('block-id').value = '';
+      $('block-name').value = '';
+      $('block-hp').value = '100';
+      $('block-break').value = '10';
+      $('block-opacity').value = '1';
+      $('block-solid').value = 'true';
+      $('block-floor').value = 'false';
+      $('block-droppable').value = 'true';
+      $('block-texture-key').value = '';
+      $('block-image').value = '';
+      $('block-script-mode').value = 'none';
+      $('block-script-preset').value = 'door_toggle';
+      $('block-script').value = '';
+      updateBlockPreview();
+    });
+
+    $('block-save').addEventListener('click', async () => {
+      const key = sanitizeConstKey($('block-key').value || state.selectedBlockKey || 'NEW_BLOCK', 'NEW_BLOCK');
+      const id = Number($('block-id').value || 0);
+      if (!key || !Number.isFinite(id)) {
+        setDbStatus('Bloco inválido: preencha key e id.');
+        return;
+      }
+      const textureKey = sanitizeTextureKey($('block-texture-key').value || `${key.toLowerCase()}`);
+      await applyUploadedTexture($('block-image'), textureKey);
+      let scriptFn = null;
+      const scriptMode = $('block-script-mode').value;
+      if (scriptMode === 'preset') {
+        const presetId = $('block-script-preset').value;
+        try {
+          scriptFn = parseScriptFunction(BLOCK_SCRIPT_PRESETS[presetId]);
+        } catch {
+          setDbStatus(`Falha ao carregar preset de script: ${presetId}`);
+          return;
+        }
+      } else if (scriptMode === 'custom') {
+        try {
+          scriptFn = parseScriptFunction($('block-script').value);
+        } catch (err) {
+          setDbStatus(`Script inválido: ${err.message}`);
+          return;
+        }
+      }
+
+      state.db.blocks[key] = {
+        ...(state.db.blocks[key] || {}),
+        id,
+        name: $('block-name').value || key,
+        solid: asBool($('block-solid').value),
+        maxHP: Number($('block-hp').value || 100),
+        breakDamage: Number($('block-break').value || 10),
+        bulletSpeed: Number(state.db.blocks[key]?.bulletSpeed ?? 0.22),
+        bulletLifetime: Number(state.db.blocks[key]?.bulletLifetime ?? 28),
+        isFloor: asBool($('block-floor').value),
+        opacity: Number($('block-opacity').value || 1),
+        droppable: asBool($('block-droppable').value),
+        textures: { all: textureKey }
+      };
+      if (scriptFn) state.db.blocks[key].onUse = scriptFn;
+      else delete state.db.blocks[key].onUse;
+
+      state.selectedBlockKey = key;
+      setDbStatus(`Bloco salvo: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    $('block-script-mode').addEventListener('change', updateBlockScriptUi);
+    $('block-texture-key').addEventListener('input', updateBlockPreview);
+    $('block-image').addEventListener('change', updateBlockPreview);
+
+    $('block-delete').addEventListener('click', () => {
+      const key = sanitizeConstKey($('block-key').value || state.selectedBlockKey || '');
+      if (!key || !state.db.blocks[key]) return;
+      delete state.db.blocks[key];
+      state.selectedBlockKey = Object.keys(state.db.blocks)[0] || null;
+      setDbStatus(`Bloco removido: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    function renderItemsTab() {
+      const listEl = $('item-list');
+      const entries = getItemEntries();
+      if (!state.selectedItemKey && entries.length) state.selectedItemKey = entries[0].key;
+      const selected = state.db.items[state.selectedItemKey] || null;
+
+      renderSimpleList(
+        listEl,
+        entries,
+        (e) => e.key === state.selectedItemKey,
+        (e) => `${e.name || e.key} (${e.id})`,
+        (e) => {
+          state.selectedItemKey = e.key;
+          renderItemsTab();
+        }
+      );
+
+      $('item-key').value = state.selectedItemKey || '';
+      $('item-id').value = selected ? String(selected.id ?? '') : '';
+      $('item-name').value = selected ? String(selected.name ?? '') : '';
+      const isWeapon = Number(selected?.damage || 0) > 0 || Number(selected?.projectileDamage || 0) > 0;
+      $('item-weapon').value = String(isWeapon);
+      $('item-consumable').value = selected ? String(!!selected.isConsumable) : 'false';
+      $('item-heal').value = selected ? String(selected.healValue || 0) : '0';
+      $('item-damage').value = selected ? String(selected.damage || 0) : '0';
+      $('item-speed').value = selected ? String(selected.projectileSpeed || 0) : '0';
+      $('item-proj-dmg').value = selected ? String(selected.projectileDamage || 0) : '0';
+      $('item-texture-key').value = selected ? String(selected.textureKey || selected.uiTextureKey || '') : '';
+      updateItemPreview();
+    }
+
+    $('item-new').addEventListener('click', () => {
+      state.selectedItemKey = '';
+      $('item-key').value = '';
+      $('item-id').value = '';
+      $('item-name').value = '';
+      $('item-weapon').value = 'false';
+      $('item-consumable').value = 'false';
+      $('item-heal').value = '0';
+      $('item-damage').value = '0';
+      $('item-speed').value = '0';
+      $('item-proj-dmg').value = '0';
+      $('item-texture-key').value = '';
+      $('item-image').value = '';
+      updateItemPreview();
+    });
+    $('item-texture-key').addEventListener('input', updateItemPreview);
+    $('item-image').addEventListener('change', updateItemPreview);
+
+    $('item-save').addEventListener('click', async () => {
+      const key = sanitizeConstKey($('item-key').value || state.selectedItemKey || 'NEW_ITEM', 'NEW_ITEM');
+      const id = String($('item-id').value || '').trim();
+      if (!id) {
+        setDbStatus('Item inválido: preencha id string.');
+        return;
+      }
+      const textureKey = sanitizeTextureKey($('item-texture-key').value || `item-${id}`);
+      await applyUploadedTexture($('item-image'), textureKey);
+
+      const isWeapon = asBool($('item-weapon').value);
+      const isConsumable = asBool($('item-consumable').value);
+      const healValue = Number($('item-heal').value || 0);
+      const damage = Number($('item-damage').value || 0);
+      const projectileSpeed = Number($('item-speed').value || 0);
+      const projectileDamage = Number($('item-proj-dmg').value || 0);
+
+      const base = {
+        ...(state.db.items[key] || {}),
+        id,
+        name: $('item-name').value || id,
+        placeable: false,
+        textureKey,
+        uiTextureKey: textureKey,
+        dropTextureKey: textureKey,
+        handTextureKey: textureKey,
+        isConsumable,
+        healValue
+      };
+
+      if (isWeapon) {
+        base.damage = damage || projectileDamage || 10;
+        base.projectileDamage = projectileDamage || damage || 10;
+        base.projectileSpeed = projectileSpeed || 1;
+        base.projectileSize = Number(base.projectileSize || 0.2);
+        base.projectileGravityScale = Number(base.projectileGravityScale || 0.1);
+        base.projectileDrag = Number(base.projectileDrag || 0.99);
+        base.projectileTextureKey = base.projectileTextureKey || textureKey;
+      }
+
+      state.db.items[key] = base;
+      state.selectedItemKey = key;
+      setDbStatus(`Item/arma salvo: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    $('item-delete').addEventListener('click', () => {
+      const key = sanitizeConstKey($('item-key').value || state.selectedItemKey || '');
+      if (!key || !state.db.items[key]) return;
+      delete state.db.items[key];
+      state.selectedItemKey = Object.keys(state.db.items)[0] || null;
+      setDbStatus(`Item removido: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    function fillFactionSelect(selectEl, selectedId) {
+      const factions = Object.values(state.db.factions.list);
+      selectEl.innerHTML = '';
+      for (const f of factions) {
+        const opt = document.createElement('option');
+        opt.value = f.id;
+        opt.textContent = `${f.name} (${f.id})`;
+        selectEl.appendChild(opt);
+      }
+      selectEl.value = selectedId || (factions[0] ? factions[0].id : '');
+    }
+
+    function renderCreaturesTab() {
+      const listEl = $('creature-list');
+      const entries = getNpcEntries();
+      if (!state.selectedCreatureKey && entries.length) state.selectedCreatureKey = entries[0].key;
+      const selected = state.db.npcs[state.selectedCreatureKey] || null;
+
+      renderSimpleList(
+        listEl,
+        entries,
+        (e) => e.key === state.selectedCreatureKey,
+        (e) => `${e.name || e.key} (#${e.id})`,
+        (e) => {
+          state.selectedCreatureKey = e.key;
+          renderCreaturesTab();
+        }
+      );
+
+      fillFactionSelect($('creature-faction'), selected?.faction);
+
+      $('creature-key').value = state.selectedCreatureKey || '';
+      $('creature-id').value = selected ? String(selected.id ?? '') : '';
+      $('creature-name').value = selected ? String(selected.name ?? '') : '';
+      $('creature-width').value = selected ? String(selected.width ?? 0.8) : '0.8';
+      $('creature-height').value = selected ? String(selected.height ?? 1.6) : '1.6';
+      $('creature-hp').value = selected ? String(selected.maxHP ?? 100) : '100';
+      $('creature-hostile').value = selected ? String(!!selected.isHostile) : 'false';
+      $('creature-interactable').value = selected ? String(!!selected.interactable) : 'true';
+      $('creature-dialogue').value = selected ? String(selected.dialogue || '') : '';
+      $('creature-texture-key').value = selected ? String(selected.texture || '') : '';
+      updateCreaturePreview();
+    }
+
+    $('creature-new').addEventListener('click', () => {
+      state.selectedCreatureKey = '';
+      $('creature-key').value = '';
+      $('creature-id').value = '';
+      $('creature-name').value = '';
+      $('creature-width').value = '0.8';
+      $('creature-height').value = '1.6';
+      $('creature-hp').value = '100';
+      $('creature-hostile').value = 'false';
+      $('creature-interactable').value = 'true';
+      $('creature-dialogue').value = '';
+      $('creature-texture-key').value = '';
+      $('creature-image').value = '';
+      fillFactionSelect($('creature-faction'));
+      updateCreaturePreview();
+    });
+    $('creature-texture-key').addEventListener('input', updateCreaturePreview);
+    $('creature-image').addEventListener('change', updateCreaturePreview);
+
+    $('creature-save').addEventListener('click', async () => {
+      const key = sanitizeConstKey($('creature-key').value || state.selectedCreatureKey || 'NEW_CREATURE', 'NEW_CREATURE');
+      const id = Number($('creature-id').value || 0);
+      if (!Number.isFinite(id)) {
+        setDbStatus('Criatura inválida: preencha id numérico.');
+        return;
+      }
+      const textureKey = sanitizeTextureKey($('creature-texture-key').value || key.toLowerCase());
+      await applyUploadedTexture($('creature-image'), textureKey);
+
+      state.db.npcs[key] = {
+        ...(state.db.npcs[key] || {}),
+        id,
+        name: $('creature-name').value || key,
+        texture: textureKey,
+        width: Number($('creature-width').value || 0.8),
+        height: Number($('creature-height').value || 1.6),
+        interactable: asBool($('creature-interactable').value),
+        faction: $('creature-faction').value || null,
+        isHostile: asBool($('creature-hostile').value),
+        maxHP: Number($('creature-hp').value || 100),
+        dialogue: $('creature-dialogue').value || ''
+      };
+
+      state.selectedCreatureKey = key;
+      setDbStatus(`Criatura salva: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    $('creature-delete').addEventListener('click', () => {
+      const key = sanitizeConstKey($('creature-key').value || state.selectedCreatureKey || '');
+      if (!key || !state.db.npcs[key]) return;
+      delete state.db.npcs[key];
+      state.selectedCreatureKey = Object.keys(state.db.npcs)[0] || null;
+      setDbStatus(`Criatura removida: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    function ensureFactionRelationsConsistency() {
+      const ids = Object.values(state.db.factions.list).map((f) => f.id);
+      for (const id of ids) {
+        if (!state.db.factions.relations[id]) state.db.factions.relations[id] = {};
+      }
+      for (const a of ids) {
+        for (const b of ids) {
+          if (!state.db.factions.relations[a][b]) {
+            state.db.factions.relations[a][b] = a === b ? 'friendly' : 'hostile';
+          }
+        }
+      }
+      for (const key of Object.keys(state.db.factions.relations)) {
+        if (!ids.includes(key)) delete state.db.factions.relations[key];
+      }
+      state.db.factions.order = state.db.factions.order.filter((id) => ids.includes(id));
+      for (const id of ids) {
+        if (!state.db.factions.order.includes(id)) state.db.factions.order.push(id);
+      }
+    }
+
+    function renderFactionRelationsGrid() {
+      ensureFactionRelationsConsistency();
+      const container = $('relations-grid');
+      container.innerHTML = '';
+      const ids = [...state.db.factions.order];
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      const headCorner = document.createElement('th');
+      headCorner.textContent = 'facção';
+      headRow.appendChild(headCorner);
+      for (const colId of ids) {
+        const th = document.createElement('th');
+        th.textContent = colId;
+        headRow.appendChild(th);
+      }
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      for (const rowId of ids) {
+        const tr = document.createElement('tr');
+        const rowHead = document.createElement('th');
+        rowHead.textContent = rowId;
+        tr.appendChild(rowHead);
+        for (const colId of ids) {
+          const td = document.createElement('td');
+          const select = document.createElement('select');
+          ['friendly', 'neutral', 'hostile'].forEach((v) => {
+            const opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            select.appendChild(opt);
+          });
+          select.value = state.db.factions.relations[rowId][colId] || (rowId === colId ? 'friendly' : 'hostile');
+          select.addEventListener('change', () => {
+            state.db.factions.relations[rowId][colId] = select.value;
+            setDbStatus(`Relação atualizada: ${rowId} -> ${colId} = ${select.value}`);
+          });
+          td.appendChild(select);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      container.appendChild(table);
+    }
+
+    function renderFactionsTab() {
+      ensureFactionRelationsConsistency();
+      const listEl = $('faction-list');
+      const entries = Object.values(state.db.factions.list).sort((a, b) => a.id.localeCompare(b.id));
+      if (!state.selectedFactionKey && entries.length) state.selectedFactionKey = entries[0].id;
+      const selected = entries.find((e) => e.id === state.selectedFactionKey) || null;
+
+      renderSimpleList(
+        listEl,
+        entries,
+        (e) => e.id === state.selectedFactionKey,
+        (e) => `${e.name} (${e.id})`,
+        (e) => {
+          state.selectedFactionKey = e.id;
+          renderFactionsTab();
+        }
+      );
+
+      $('faction-id').value = selected ? selected.id : '';
+      $('faction-name').value = selected ? selected.name : '';
+      renderFactionRelationsGrid();
+      fillFactionSelect($('creature-faction'), $('creature-faction').value);
+    }
+
+    $('faction-new').addEventListener('click', () => {
+      $('faction-id').value = '';
+      $('faction-name').value = '';
+      state.selectedFactionKey = null;
+    });
+
+    $('faction-save').addEventListener('click', () => {
+      const id = sanitizeFactionId($('faction-id').value);
+      const name = String($('faction-name').value || '').trim();
+      if (!id || !name) {
+        setDbStatus('Facção inválida: preencha id e nome.');
+        return;
+      }
+      const constKey = sanitizeConstKey(id, 'NEW_FACTION');
+      state.db.factions.list[constKey] = { id, name };
+      state.selectedFactionKey = id;
+      ensureFactionRelationsConsistency();
+      setDbStatus(`Facção salva: ${id}`);
+      refreshAllForCatalogChanges();
+    });
+
+    $('faction-delete').addEventListener('click', () => {
+      const id = sanitizeFactionId($('faction-id').value || state.selectedFactionKey || '');
+      if (!id) return;
+      const entry = Object.entries(state.db.factions.list).find(([, f]) => f.id === id);
+      if (!entry) return;
+      delete state.db.factions.list[entry[0]];
+      delete state.db.factions.relations[id];
+      for (const row of Object.values(state.db.factions.relations)) {
+        delete row[id];
+      }
+      state.db.factions.order = state.db.factions.order.filter((fId) => fId !== id);
+      state.selectedFactionKey = Object.values(state.db.factions.list)[0]?.id || null;
+      setDbStatus(`Facção removida: ${id}`);
+      refreshAllForCatalogChanges();
+    });
+
+    function updateTexturePreview() {
+      const key = String($('texture-key').value || '').trim();
+      const url = state.db.embeddedImages[key] || $('texture-url').value || getTextureUrl(key) || '';
+      const holder = $('texture-preview');
+      holder.innerHTML = '';
+      if (!url) {
+        holder.textContent = 'N/A';
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      holder.appendChild(img);
+    }
+
+    function renameTextureReferences(oldKey, newKey) {
+      if (!oldKey || !newKey || oldKey === newKey) return;
+      for (const block of Object.values(state.db.blocks)) {
+        if (!block.textures) continue;
+        for (const texSlot of ['all', 'top', 'side', 'bottom']) {
+          if (block.textures[texSlot] === oldKey) block.textures[texSlot] = newKey;
+        }
+      }
+      for (const item of Object.values(state.db.items)) {
+        for (const field of ['textureKey', 'uiTextureKey', 'dropTextureKey', 'handTextureKey', 'projectileTextureKey']) {
+          if (item[field] === oldKey) item[field] = newKey;
+        }
+      }
+      for (const npc of Object.values(state.db.npcs)) {
+        if (npc.texture === oldKey) npc.texture = newKey;
+      }
+    }
+
+    function renderTexturesTab() {
+      const listEl = $('texture-list');
+      const entries = state.db.textures.slice().sort((a, b) => String(a.key || '').localeCompare(String(b.key || '')));
+      if (!state.selectedTextureKey && entries.length) state.selectedTextureKey = entries[0].key;
+      const selected = entries.find((e) => e.key === state.selectedTextureKey) || null;
+
+      renderSimpleList(
+        listEl,
+        entries,
+        (e) => e.key === state.selectedTextureKey,
+        (e) => `${e.key} -> ${e.url}`,
+        (e) => {
+          state.selectedTextureKey = e.key;
+          renderTexturesTab();
+        }
+      );
+
+      $('texture-key').value = selected ? String(selected.key || '') : '';
+      $('texture-url').value = selected ? String(selected.url || '') : '';
+      $('texture-image').value = '';
+      updateTexturePreview();
+    }
+
+    $('texture-key').addEventListener('input', updateTexturePreview);
+    $('texture-url').addEventListener('input', updateTexturePreview);
+    $('texture-image').addEventListener('change', async () => {
+      const key = sanitizeTextureKey($('texture-key').value || state.selectedTextureKey || 'new_texture');
+      if (!key) return;
+      await applyUploadedTexture($('texture-image'), key);
+      const entry = state.db.textures.find((t) => t.key === key);
+      if (entry) $('texture-url').value = entry.url || '';
+      updateTexturePreview();
+    });
+
+    $('texture-new').addEventListener('click', () => {
+      state.selectedTextureKey = null;
+      $('texture-key').value = '';
+      $('texture-url').value = '';
+      $('texture-image').value = '';
+      updateTexturePreview();
+    });
+
+    $('texture-save').addEventListener('click', async () => {
+      const oldKey = state.selectedTextureKey;
+      const key = sanitizeTextureKey($('texture-key').value || oldKey || 'new_texture');
+      if (!key) {
+        setDbStatus('Texture key inválida.');
+        return;
+      }
+      const urlField = String($('texture-url').value || '').trim();
+      let entry = state.db.textures.find((t) => t.key === oldKey) || state.db.textures.find((t) => t.key === key);
+      if (!entry) {
+        entry = { key, url: urlField || `./data/images/custom/${key}.png` };
+        state.db.textures.push(entry);
+      }
+      if (oldKey && oldKey !== key) {
+        renameTextureReferences(oldKey, key);
+        if (state.db.embeddedImages[oldKey]) {
+          state.db.embeddedImages[key] = state.db.embeddedImages[oldKey];
+          delete state.db.embeddedImages[oldKey];
+        }
+      }
+      entry.key = key;
+      if (urlField) entry.url = urlField;
+      await applyUploadedTexture($('texture-image'), key);
+      state.selectedTextureKey = key;
+      setDbStatus(`Textura salva: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    $('texture-delete').addEventListener('click', () => {
+      const key = sanitizeTextureKey($('texture-key').value || state.selectedTextureKey || '');
+      if (!key) return;
+      state.db.textures = state.db.textures.filter((t) => t.key !== key);
+      delete state.db.embeddedImages[key];
+      state.selectedTextureKey = state.db.textures[0]?.key || null;
+      setDbStatus(`Textura removida: ${key}`);
+      refreshAllForCatalogChanges();
+    });
+
+    function normalizeInventoryObject(obj) {
+      const out = {};
+      if (!obj || typeof obj !== 'object') return out;
+      for (const [k, v] of Object.entries(obj)) {
+        const qty = Math.max(0, Math.floor(Number(v) || 0));
+        if (!qty) continue;
+        out[String(k)] = qty;
+      }
+      return out;
+    }
+
+    function renderPresetsTab() {
+      const entries = Object.entries(state.db.inventoryPresets).sort((a, b) => a[0].localeCompare(b[0]));
+      if (!state.selectedPresetKey && entries.length) state.selectedPresetKey = entries[0][0];
+      const selected = state.selectedPresetKey ? state.db.inventoryPresets[state.selectedPresetKey] : null;
+
+      renderSimpleList(
+        presetListEl,
+        entries.map(([key, value]) => ({ key, value })),
+        (e) => e.key === state.selectedPresetKey,
+        (e) => e.key,
+        (e) => {
+          state.selectedPresetKey = e.key;
+          renderPresetsTab();
+        }
+      );
+
+      presetKeyEl.value = state.selectedPresetKey || '';
+      presetBlocksEl.value = selected ? JSON.stringify(selected.inventory || {}, null, 2) : '{}';
+      presetItemsEl.value = selected ? JSON.stringify(selected.itemInventory || {}, null, 2) : '{}';
+      renderInventoryPresetOptions();
+    }
+
+    $('preset-new').addEventListener('click', () => {
+      state.selectedPresetKey = null;
+      presetKeyEl.value = '';
+      presetBlocksEl.value = '{}';
+      presetItemsEl.value = '{}';
+    });
+
+    $('preset-save').addEventListener('click', () => {
+      const key = String(presetKeyEl.value || '').trim();
+      if (!key) {
+        setDbStatus('Nome do preset é obrigatório.');
+        return;
+      }
+      let blocks = {};
+      let items = {};
+      try {
+        blocks = normalizeInventoryObject(JSON.parse(String(presetBlocksEl.value || '{}')));
+        items = normalizeInventoryObject(JSON.parse(String(presetItemsEl.value || '{}')));
+      } catch {
+        setDbStatus('JSON inválido em inventários do preset.');
+        return;
+      }
+      state.db.inventoryPresets[key] = { inventory: blocks, itemInventory: items };
+      state.selectedPresetKey = key;
+      setDbStatus(`Preset salvo: ${key}`);
+      renderPresetsTab();
+    });
+
+    $('preset-delete').addEventListener('click', () => {
+      const key = String(presetKeyEl.value || state.selectedPresetKey || '').trim();
+      if (!key || !state.db.inventoryPresets[key]) return;
+      delete state.db.inventoryPresets[key];
+      state.selectedPresetKey = Object.keys(state.db.inventoryPresets)[0] || null;
+      setDbStatus(`Preset removido: ${key}`);
+      renderPresetsTab();
+    });
+
+    function renderUiTab() {
+      ensureMandatoryUiTextures();
+      const keys = Object.keys(state.db.ui.aliases || {}).sort((a, b) => a.localeCompare(b));
+      if (!state.selectedUiAliasKey && keys.length) state.selectedUiAliasKey = keys[0];
+      renderSimpleList(
+        uiAliasListEl,
+        keys.map((k) => ({ key: k })),
+        (e) => e.key === state.selectedUiAliasKey,
+        (e) => `${e.key} -> ${state.db.ui.aliases[e.key] || e.key}`,
+        (e) => {
+          state.selectedUiAliasKey = e.key;
+          renderUiTab();
+        }
+      );
+      const sel = state.selectedUiAliasKey || '';
+      uiAliasKeyEl.value = sel;
+      uiAliasValueEl.value = sel ? String(state.db.ui.aliases[sel] || '') : '';
+      uiAliasImageEl.value = '';
+      uiAliasPreviewEl.innerHTML = '';
+      if (sel) {
+        const img = document.createElement('img');
+        img.src = getTextureUrl(sel) || '';
+        img.alt = '';
+        uiAliasPreviewEl.appendChild(img);
+      }
+    }
+
+    function renderConfigTab() {
+      configJsonEl.value = JSON.stringify(state.db.config || {}, null, 2);
+    }
+
+    uiAliasValueEl.addEventListener('input', () => {
+      const alias = uiAliasKeyEl.value;
+      if (!alias) return;
+      state.db.ui.aliases[alias] = sanitizeTextureKey(uiAliasValueEl.value || alias);
+      applyUiAliasMappings();
+      rebuildTextureMap();
+      renderUiTab();
+    });
+
+    uiAliasImageEl.addEventListener('change', async () => {
+      const alias = uiAliasKeyEl.value;
+      if (!alias) return;
+      await applyUploadedTexture(uiAliasImageEl, alias);
+      state.db.ui.aliases[alias] = alias;
+      applyUiAliasMappings();
+      rebuildTextureMap();
+      renderUiTab();
+    });
+
+    $('ui-alias-save').addEventListener('click', () => {
+      applyUiAliasMappings();
+      rebuildTextureMap();
+      setDbStatus(`UI alias salvo: ${uiAliasKeyEl.value || '-'}`);
+      renderUiTab();
+      renderPalette();
+      draw();
+    });
+
+    $('config-save').addEventListener('click', () => {
+      try {
+        const parsed = JSON.parse(String(configJsonEl.value || '{}'));
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('objeto esperado');
+        state.db.config = deepCloneWithFns(parsed);
+        setDbStatus('Config salva.');
+      } catch (err) {
+        setDbStatus(`Config inválida: ${err.message}`);
+      }
+    });
+
+    $('config-reset').addEventListener('click', () => {
+      renderConfigTab();
+      setDbStatus('Config recarregada da memória.');
+    });
+
+    document.querySelectorAll('.content-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.content-tab-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.content-tab-pane').forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        const id = btn.getAttribute('data-tab');
+        if (id) $(id).classList.add('active');
+      });
+    });
+
+    document.querySelectorAll('.primary-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const section = btn.getAttribute('data-section');
+        state.activeSection = section || 'world';
+        document.querySelectorAll('.primary-tab-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.section-pane').forEach((pane) => {
+          const ok = pane.getAttribute('data-section') === section;
+          pane.classList.toggle('active', ok);
+        });
+        btn.classList.add('active');
+        updateSectionLayout();
+      });
+    });
+
+    function serializeJS(value, depth = 0) {
+      const pad = '  '.repeat(depth);
+      const padIn = '  '.repeat(depth + 1);
+
+      if (value === null) return 'null';
+      if (typeof value === 'function') return value.toString();
+      if (typeof value === 'string') return JSON.stringify(value);
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+      if (Array.isArray(value)) {
+        if (!value.length) return '[]';
+        return `\n${pad}[\n${value.map((v) => `${padIn}${serializeJS(v, depth + 1)}`).join(',\n')}\n${pad}]`;
+      }
+      if (typeof value === 'object') {
+        const entries = Object.entries(value);
+        if (!entries.length) return '{}';
+        const body = entries.map(([k, v]) => `${padIn}${/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k) ? k : JSON.stringify(k)}: ${serializeJS(v, depth + 1)}`);
+        return `{\n${body.join(',\n')}\n${pad}}`;
+      }
+      return 'null';
+    }
+
+    function buildBlocksJS() {
+      return `export default ${serializeJS(state.db.blocks)};\n`;
+    }
+
+    function buildItemsJS() {
+      return `export default ${serializeJS(state.db.items)};\n`;
+    }
+
+    function buildNpcsJS() {
+      return `export default ${serializeJS(state.db.npcs)};\n`;
+    }
+
+    function buildTexturesJS() {
+      return `export default ${serializeJS(state.db.textures)};\n`;
+    }
+
+    function buildFactionsJS() {
+      const factionsObj = state.db.factions.list;
+      const relationsObj = state.db.factions.relations;
+      const orderArr = state.db.factions.order;
+      return [
+        `export const FACTIONS = ${serializeJS(factionsObj)};`,
+        `\nexport const FACTION_RELATIONS = ${serializeJS(relationsObj)};`,
+        `\nexport function getFactionRelation(a, b) {`,
+        `  if (a === b) return 'friendly';`,
+        `  const row = FACTION_RELATIONS[a];`,
+        `  if (row && row[b]) return row[b];`,
+        `  return 'hostile';`,
+        `}`,
+        `\nexport const FACTION_ORDER = ${serializeJS(orderArr)};`,
+        ''
+      ].join('\n');
+    }
+
+    function buildConfigJS() {
+      return `export default ${serializeJS(state.db.config || {})};\n`;
+    }
+
+    function normalizeZipPath(path) {
+      return String(path || '').replace(/^\.\//, '').replace(/^\/+/, '');
+    }
+
+    function pickZipFile(zip, candidates) {
+      for (const c of candidates) {
+        const n = normalizeZipPath(c);
+        let f = zip.file(n);
+        if (!f) {
+          const suffix = `/${n}`;
+          f = Object.values(zip.files).find((entry) => !entry.dir && normalizeZipPath(entry.name).endsWith(suffix)) || null;
+        }
+        if (f) return f;
+      }
+      return null;
+    }
+
+    function findZipEntryByPath(zip, path) {
+      const normalized = normalizeZipPath(path);
+      const variants = [normalized];
+      if (normalized.startsWith('data/')) variants.push(normalized.slice(5));
+      else variants.push(`data/${normalized}`);
+      for (const candidate of variants) {
+        const exact = zip.file(candidate);
+        if (exact) return exact;
+        const suffix = `/${candidate}`;
+        const bySuffix = Object.values(zip.files).find((entry) => !entry.dir && normalizeZipPath(entry.name).endsWith(suffix));
+        if (bySuffix) return bySuffix;
+      }
+      return null;
+    }
+
+    function parseDefaultExportModule(code) {
+      try {
+        const exec = new Function(`${code.replace(/export\s+default/, 'return')}`);
+        return exec();
+      } catch {
+        // fallback by evaluating in function scope with transformed export
+      }
+      const transformed = code.replace(/export\s+default/, 'const __default_export__ =');
+      const wrapped = `${transformed}\nreturn typeof __default_export__ !== 'undefined' ? __default_export__ : null;`;
+      return new Function(wrapped)();
+    }
+
+    function parseFactionsModule(code) {
+      const transformed = code
+        .replace(/export\s+const\s+/g, 'const ')
+        .replace(/export\s+function\s+/g, 'function ')
+        .replace(/export\s+default\s+/g, 'const __default_export__ = ');
+      const wrapped = `${transformed}\nreturn { FACTIONS, FACTION_RELATIONS, FACTION_ORDER };`;
+      return new Function(wrapped)();
+    }
+
+    function dataUrlToUint8Array(dataUrl) {
+      const comma = dataUrl.indexOf(',');
+      if (comma < 0) return new Uint8Array();
+      const base64 = dataUrl.slice(comma + 1);
+      const binary = atob(base64);
+      const out = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+      return out;
+    }
+
+    function createSolidPngDataUrl(color, size = 16) {
+      const c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      const cctx = c.getContext('2d');
+      cctx.fillStyle = color;
+      cctx.fillRect(0, 0, size, size);
+      return c.toDataURL('image/png');
+    }
+
+    function ensureMandatoryUiTextures() {
+      const mandatory = {
+        ui_player_face: '#808080',
+        sensed_friendly: '#5cb85c',
+        sensed_friendly_unseen: '#8bc34a',
+        sensed_hostile: '#e53935',
+        sensed_hostile_unseen: '#ff7043',
+        mdam_almost_dead: '#8b0000',
+        mdam_severely_damaged: '#b22222',
+        mdam_heavily_damaged: '#d2691e',
+        mdam_moderately_damaged: '#daa520',
+        mdam_lightly_damaged: '#3cb371'
+      };
+      for (const [key, color] of Object.entries(mandatory)) {
+        let tex = state.db.textures.find((t) => t.key === key);
+        if (!tex) {
+          tex = { key, url: `./data/images/ui/${key}.png` };
+          state.db.textures.push(tex);
+        } else {
+          tex.url = `./data/images/ui/${key}.png`;
+        }
+        if (!state.db.embeddedImages[key]) {
+          state.db.embeddedImages[key] = createSolidPngDataUrl(color, key === 'ui_player_face' ? 64 : 16);
+        }
+      }
+      if (!state.db.ui.playerPortraitTextureKey) state.db.ui.playerPortraitTextureKey = 'ui_player_face';
+      if (!String(state.db.ui.playerName || '').trim()) state.db.ui.playerName = 'A.S.S';
+      if (!state.db.ui.aliases || typeof state.db.ui.aliases !== 'object') state.db.ui.aliases = {};
+      const uiKeys = ['ui_player_face', 'sensed_friendly', 'sensed_friendly_unseen', 'sensed_hostile', 'sensed_hostile_unseen', 'mdam_almost_dead', 'mdam_severely_damaged', 'mdam_heavily_damaged', 'mdam_moderately_damaged', 'mdam_lightly_damaged'];
+      for (const k of uiKeys) {
+        if (!state.db.ui.aliases[k]) state.db.ui.aliases[k] = k;
+      }
+      applyUiAliasMappings();
+    }
+
+    function applyUiAliasMappings() {
+      const aliases = state.db.ui.aliases || {};
+      for (const [aliasKey, sourceKey] of Object.entries(aliases)) {
+        const source = state.db.textures.find((t) => t.key === sourceKey);
+        if (!source) continue;
+        let alias = state.db.textures.find((t) => t.key === aliasKey);
+        if (!alias) {
+          alias = { key: aliasKey, url: source.url };
+          state.db.textures.push(alias);
+        } else {
+          alias.url = source.url;
+        }
+        if (state.db.embeddedImages[sourceKey]) {
+          state.db.embeddedImages[aliasKey] = state.db.embeddedImages[sourceKey];
+        }
+      }
+    }
+
+    function mimeFromPath(path) {
+      const lower = String(path || '').toLowerCase();
+      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+      if (lower.endsWith('.webp')) return 'image/webp';
+      if (lower.endsWith('.gif')) return 'image/gif';
+      return 'image/png';
+    }
+
+    async function importZip(file) {
+      if (!window.JSZip) {
+        setZipStatus('JSZip não carregou. Verifique conexão para usar ROM.');
+        return;
+      }
+      const zip = await window.JSZip.loadAsync(file);
+      state.importedZip = zip;
+
+      const blocksFile = pickZipFile(zip, ['data/config/blocks.js', './data/config/blocks.js', 'config/blocks.js']);
+      const itemsFile = pickZipFile(zip, ['data/config/items.js', './data/config/items.js', 'config/items.js']);
+      const npcsFile = pickZipFile(zip, ['data/config/npcs.js', './data/config/npcs.js', 'config/npcs.js']);
+      const texturesFile = pickZipFile(zip, ['data/config/textures.js', './data/config/textures.js', 'config/textures.js']);
+      const factionsFile = pickZipFile(zip, ['data/config/factions.js', './data/config/factions.js', 'config/factions.js']);
+      const configFile = pickZipFile(zip, ['data/config/config.js', './data/config/config.js', 'config/config.js']);
+      const presetsFile = pickZipFile(zip, ['data/config/inventory-presets.json', './data/config/inventory-presets.json', 'config/inventory-presets.json']);
+      const uiFile = pickZipFile(zip, ['data/config/ui.json', './data/config/ui.json', 'config/ui.json']);
+      const mapFile = pickZipFile(zip, ['data/maps/default.json', './data/maps/default.json', 'maps/default.json', 'map.json']);
+
+      if (blocksFile) state.db.blocks = deepCloneWithFns(parseDefaultExportModule(await blocksFile.async('string')) || state.db.blocks);
+      if (itemsFile) state.db.items = deepCloneWithFns(parseDefaultExportModule(await itemsFile.async('string')) || state.db.items);
+      if (npcsFile) state.db.npcs = deepCloneWithFns(parseDefaultExportModule(await npcsFile.async('string')) || state.db.npcs);
+      if (texturesFile) state.db.textures = deepCloneWithFns(parseDefaultExportModule(await texturesFile.async('string')) || state.db.textures);
+      if (configFile) state.db.config = deepCloneWithFns(parseDefaultExportModule(await configFile.async('string')) || state.db.config);
+
+      if (factionsFile) {
+        const parsed = parseFactionsModule(await factionsFile.async('string'));
+        state.db.factions.list = deepCloneWithFns(parsed.FACTIONS || state.db.factions.list);
+        state.db.factions.relations = deepCloneWithFns(parsed.FACTION_RELATIONS || state.db.factions.relations);
+        state.db.factions.order = [...(parsed.FACTION_ORDER || state.db.factions.order)];
+      }
+      if (presetsFile) {
+        try {
+          state.db.inventoryPresets = JSON.parse(await presetsFile.async('string')) || {};
+        } catch {
+          state.db.inventoryPresets = {};
+        }
+      }
+      if (uiFile) {
+        try {
+          const uiPayload = JSON.parse(await uiFile.async('string'));
+          state.db.ui = {
+            playerPortraitTextureKey: uiPayload.playerPortraitTextureKey || 'ui_player_face',
+            playerName: uiPayload.playerName || 'A.S.S',
+            aliases: uiPayload.aliases && typeof uiPayload.aliases === 'object' ? uiPayload.aliases : {}
+          };
+        } catch {}
+      }
+
+      state.maps = {};
+      const mapFiles = Object.values(zip.files).filter((f) => !f.dir && /(?:^|\/)(?:data\/)?maps\/.+\.json$/i.test(normalizeZipPath(f.name)));
+      if (mapFiles.length) {
+        for (const f of mapFiles) {
+          try {
+            const payload = JSON.parse(await f.async('string'));
+            if (!payload || !Array.isArray(payload.blocks)) continue;
+            const shortName = normalizeZipPath(f.name).replace(/^.*(?:data\/)?maps\//i, '');
+            state.maps[shortName] = cloneMapPayload(payload);
+          } catch {}
+        }
+      } else if (mapFile) {
+        const payload = JSON.parse(await mapFile.async('string'));
+        if (payload && Array.isArray(payload.blocks)) {
+          state.maps['default.json'] = cloneMapPayload(payload);
+        }
+      }
+      if (!Object.keys(state.maps).length) {
+        state.maps['default.json'] = cloneMapPayload(state.map);
+      }
+      state.currentMapName = state.maps['default.json'] ? 'default.json' : Object.keys(state.maps)[0];
+      applyMapPayload(state.maps[state.currentMapName], { skipCollectionSync: true });
+      renderMapManager();
+
+      state.db.embeddedImages = {};
+      rebuildTextureMap();
+
+      for (const t of state.db.textures) {
+        if (!t || !t.key || !t.url) continue;
+        const normalizedPath = normalizeZipPath(t.url);
+        const fileInZip = findZipEntryByPath(zip, normalizedPath);
+        if (!fileInZip) continue;
+        const bytes = await fileInZip.async('uint8array');
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const dataUrl = `data:${mimeFromPath(normalizedPath)};base64,${btoa(binary)}`;
+        state.db.embeddedImages[t.key] = dataUrl;
+      }
+
+      ensureMandatoryUiTextures();
+
+      setZipStatus(`ROM carregada: ${file.name}. Arquivos: ${Object.keys(zip.files).length}`);
+      setDbStatus('Catálogo carregado da ROM.');
+      refreshAllForCatalogChanges();
+    }
+
+    async function fetchRomFileFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const romRef = String(params.get('romref') || '').trim();
+      if (romRef) {
+        const openReq = indexedDB.open('rom-file-store', 1);
+        const db = await new Promise((resolve, reject) => {
+          openReq.onupgradeneeded = () => {
+            const dbUp = openReq.result;
+            if (!dbUp.objectStoreNames.contains('files')) dbUp.createObjectStore('files');
+          };
+          openReq.onsuccess = () => resolve(openReq.result);
+          openReq.onerror = () => reject(openReq.error || new Error('indexedDB open failed'));
+        });
+        const blob = await new Promise((resolve, reject) => {
+          const tx = db.transaction('files', 'readonly');
+          const req = tx.objectStore('files').get(romRef);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => reject(req.error || new Error('indexedDB read failed'));
+        });
+        db.close();
+        if (!blob) return null;
+        return new File([blob], 'rom-from-picker.zip', { type: blob.type || 'application/zip' });
+      }
+      const romRaw = params.get('rom');
+      const romParam = String(romRaw == null ? 'data.zip' : romRaw).trim();
+      if (!romParam || romParam === '0') return null;
+      const romUrl = new URL(romParam, window.location.href);
+      const resp = await fetch(romUrl.toString());
+      if (!resp.ok) {
+        throw new Error(`ROM fetch failed: ${resp.status}`);
+      }
+      const blob = await resp.blob();
+      const fileName = romUrl.pathname.split('/').pop() || 'rom.zip';
+      return new File([blob], fileName, { type: blob.type || 'application/zip' });
+    }
+
+    async function loadDefaultMapFromRomState() {
+      const payload = state.maps['default.json'];
+      if (!payload || !Array.isArray(payload.blocks)) {
+        throw new Error('default.json ausente no ROM atual');
+      }
+      saveCurrentMapIntoCollection();
+      applyMapPayload(payload);
+      state.maps[state.currentMapName] = cloneMapPayload(state.map);
+      renderMapManager();
+    }
+
+    async function maybeAutoLoadRomFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const romRef = String(params.get('romref') || '').trim();
+      const romRaw = params.get('rom');
+      const romParam = String(romRaw == null ? 'data.zip' : romRaw).trim();
+      if ((!romParam || romParam === '0') && !romRef) return false;
+      try {
+        setZipStatus(romRef ? 'Carregando ROM selecionada localmente...' : `Carregando ROM por URL: ${romParam}`);
+        const file = await fetchRomFileFromQuery();
+        if (!file) return false;
+        await importZip(file);
+        return true;
+      } catch (err) {
+        console.error(err);
+        setZipStatus(romRef ? 'Falha ao carregar ROM local.' : `Falha ao carregar ROM por URL: ${romParam}`);
+        return false;
+      }
+    }
+
+    async function exportZip() {
+      if (!window.JSZip) {
+        setZipStatus('JSZip não carregou. Verifique conexão para usar ROM.');
+        return;
+      }
+      ensureMandatoryUiTextures();
+      const out = new window.JSZip();
+
+      if (state.importedZip) {
+        const entries = Object.values(state.importedZip.files);
+        for (const entry of entries) {
+          if (entry.dir) continue;
+          const path = normalizeZipPath(entry.name);
+          if (
+            path === 'data/config/blocks.js' ||
+            path === 'data/config/items.js' ||
+            path === 'data/config/npcs.js' ||
+            path === 'data/config/config.js' ||
+            path === 'data/config/textures.js' ||
+            path === 'data/config/factions.js' ||
+            path === 'data/config/inventory-presets.json' ||
+            path === 'data/config/ui.json' ||
+            /^data\/maps\/.+\.json$/i.test(path)
+          ) {
+            continue;
+          }
+          const bytes = await entry.async('uint8array');
+          out.file(path, bytes);
+        }
+      }
+
+      out.file('data/config/blocks.js', buildBlocksJS());
+      out.file('data/config/items.js', buildItemsJS());
+      out.file('data/config/npcs.js', buildNpcsJS());
+      out.file('data/config/config.js', buildConfigJS());
+      out.file('data/config/textures.js', buildTexturesJS());
+      out.file('data/config/factions.js', buildFactionsJS());
+      out.file('data/config/inventory-presets.json', JSON.stringify(state.db.inventoryPresets || {}, null, 2));
+      out.file('data/config/ui.json', JSON.stringify(state.db.ui || {}, null, 2));
+      saveCurrentMapIntoCollection();
+      if (!state.maps['default.json']) {
+        const first = Object.keys(state.maps)[0];
+        state.maps['default.json'] = cloneMapPayload(state.maps[first] || buildMapPayload());
+      }
+      for (const [mapName, mapPayload] of Object.entries(state.maps)) {
+        out.file(`data/maps/${normalizeMapName(mapName)}`, JSON.stringify(mapPayload, null, 2));
+      }
+
+      for (const [textureKey, dataUrl] of Object.entries(state.db.embeddedImages)) {
+        const texture = state.db.textures.find((t) => t.key === textureKey);
+        if (!texture) continue;
+        let targetPath = normalizeZipPath(texture.url);
+        if (!targetPath) targetPath = `data/images/custom/${textureKey}.png`;
+        out.file(targetPath, dataUrlToUint8Array(dataUrl));
+      }
+      applyUiAliasMappings();
+
+      out.file('editor-manifest.json', JSON.stringify({
+        generatedAt: new Date().toISOString(),
+        counts: {
+          blocks: Object.keys(state.db.blocks).length,
+          items: Object.keys(state.db.items).length,
+          npcs: Object.keys(state.db.npcs).length,
+          factions: Object.keys(state.db.factions.list).length,
+          textures: state.db.textures.length,
+          mapBlocks: state.map.blocks.length
+        }
+      }, null, 2));
+
+      const blob = await out.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'game-content.rom.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      setZipStatus('ROM exportada: game-content.rom.zip');
+    }
+
+    const zipInput = document.createElement('input');
+    zipInput.type = 'file';
+    zipInput.accept = '.zip,application/zip';
+    zipInput.style.display = 'none';
+    document.body.appendChild(zipInput);
+
+    $('btn-import-zip').addEventListener('click', () => {
+      zipInput.value = '';
+      zipInput.click();
+    });
+
+    zipInput.addEventListener('change', async () => {
+      const file = zipInput.files && zipInput.files[0];
+      if (!file) return;
+      try {
+        await importZip(file);
+      } catch (err) {
+        console.error(err);
+        setZipStatus('Falha ao importar ROM. Verifique estrutura do pacote.');
+      }
+    });
+
+    $('btn-export-zip').addEventListener('click', async () => {
+      try {
+        await exportZip();
+      } catch (err) {
+        console.error(err);
+        setZipStatus('Falha ao exportar ROM.');
+      }
+    });
+
+    async function boot() {
+      rebuildTextureMap();
+      rebuildTypeIndexes();
+      state.toolMode = toolEl.value;
+      state.layerY = Math.trunc(Number(layerEl.value || 0));
+      state.zoom = Math.trunc(Number(zoomEl.value || 26));
+      ensurePlayer();
+      state.maps = { [state.currentMapName]: cloneMapPayload(state.map) };
+      renderMapManager();
+      playerImageKeyEl.value = state.db.ui.playerPortraitTextureKey || 'ui_player_face';
+      playerNameEl.value = state.db.ui.playerName || 'A.S.S';
+      updatePlayerImagePreview();
+      renderPalette();
+      renderInventoryTargets();
+      inventoryState.targetKey = invTargetEl.value || 'player';
+      inventoryState.category = invCategoryEl.value || 'item';
+      renderInventoryOptions();
+      renderInventoryList();
+      renderInventoryPresetOptions();
+      renderBlocksTab();
+      renderItemsTab();
+      renderCreaturesTab();
+      renderFactionsTab();
+      renderTexturesTab();
+      renderUiTab();
+      renderConfigTab();
+      renderPresetsTab();
+      updateSectionLayout();
+      resizeCanvas();
+      draw();
+      const romLoaded = await maybeAutoLoadRomFromQuery();
+      if (!romLoaded) {
+        setStatus('Nenhum ROM carregado. Defina ?rom=... para editar conteúdo.');
+      }
+    }
+
+    boot().catch((err) => {
+      console.error(err);
+      setZipStatus('Falha ao inicializar editor.');
+    });
+  </script>
+</body>
+</html>

@@ -1,8 +1,12 @@
-import CONFIG from '../data/config/config.js';
-import BLOCK_TYPES from '../data/config/blocks.js';
+import CONFIG from './rom-config/config.js';
+import BLOCK_TYPES from './rom-config/blocks.js';
 import { buildSurfaceNetGeometryData } from './surfaceNets.js';
 
 const CHUNK_SIZE = 8;
+
+function isNumericSequence(value) {
+    return Array.isArray(value) || ArrayBuffer.isView(value);
+}
 
 function chunkCoord(v) {
     return Math.floor(Math.round(v) / CHUNK_SIZE);
@@ -188,32 +192,23 @@ export default {
         const textures = this._internal.blockTextures;
         const opacity = typeof blockType.opacity === 'number' ? blockType.opacity : 1;
         const transparent = opacity < 1;
+        const makeMat = (texture) => new THREE.MeshLambertMaterial({
+            ...(texture ? { map: texture } : { color: 0x9bb0a3 }),
+            transparent,
+            opacity
+        });
         
-        if (blockType.textures.all) {
-            const mat = new THREE.MeshLambertMaterial({ 
-                map: textures[blockType.textures.all],
-                transparent: transparent,
-                opacity: opacity
-            });
+        if (blockType.textures && blockType.textures.all) {
+            const mat = makeMat(textures[blockType.textures.all] || null);
             return [mat, mat, mat, mat, mat, mat];
-        } else if (blockType.textures.top) {
-            const topMat = new THREE.MeshLambertMaterial({ 
-                map: textures[blockType.textures.top],
-                transparent: transparent,
-                opacity: opacity
-            });
-            const sideMat = new THREE.MeshLambertMaterial({ 
-                map: textures[blockType.textures.side],
-                transparent: transparent,
-                opacity: opacity
-            });
-            const bottomMat = new THREE.MeshLambertMaterial({ 
-                map: textures[blockType.textures.bottom],
-                transparent: transparent,
-                opacity: opacity
-            });
+        } else if (blockType.textures && blockType.textures.top) {
+            const topMat = makeMat(textures[blockType.textures.top] || null);
+            const sideMat = makeMat(textures[blockType.textures.side] || null);
+            const bottomMat = makeMat(textures[blockType.textures.bottom] || null);
             return [sideMat, sideMat, topMat, bottomMat, sideMat, sideMat];
         }
+        const fallback = makeMat(null);
+        return [fallback, fallback, fallback, fallback, fallback, fallback];
     },
     createCrossMesh(blockType) {
         const textures = this._internal.blockTextures;
@@ -608,10 +603,21 @@ export default {
         group.name = 'terrain-group';
 
         for (const result of results) {
+            if (!result || !isNumericSequence(result.positions) || !result.positions.length) continue;
+            if (result.positions.length % 3 !== 0) continue;
+            if (!Array.from(result.positions).every((v) => Number.isFinite(v))) continue;
             const geometry = new THREE.BufferGeometry();
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(result.positions, 3));
-            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(result.normals, 3));
-            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(result.uvs, 2));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(
+                isNumericSequence(result.normals) && result.normals.length === result.positions.length
+                    ? result.normals
+                    : new Array(result.positions.length).fill(0),
+                3
+            ));
+            const uvArray = isNumericSequence(result.uvs) && result.uvs.length === (result.positions.length / 3) * 2
+                ? result.uvs
+                : new Array((result.positions.length / 3) * 2).fill(0);
+            geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvArray, 2));
 
             const blockType = Object.values(BLOCK_TYPES).find((b) => b.id === result.typeId);
             const material = this.createTerrainMaterial(blockType || {});
@@ -651,10 +657,21 @@ export default {
             chunkGroup.name = 'chunk-' + ck;
 
             for (const meshData of chunkResult.meshes) {
+                if (!meshData || !isNumericSequence(meshData.positions) || !meshData.positions.length) continue;
+                if (meshData.positions.length % 3 !== 0) continue;
+                if (!Array.from(meshData.positions).every((v) => Number.isFinite(v))) continue;
                 const geometry = new THREE.BufferGeometry();
                 geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
-                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
-                geometry.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
+                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(
+                    isNumericSequence(meshData.normals) && meshData.normals.length === meshData.positions.length
+                        ? meshData.normals
+                        : new Array(meshData.positions.length).fill(0),
+                    3
+                ));
+                const uvArray = isNumericSequence(meshData.uvs) && meshData.uvs.length === (meshData.positions.length / 3) * 2
+                    ? meshData.uvs
+                    : new Array((meshData.positions.length / 3) * 2).fill(0);
+                geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvArray, 2));
                 geometry.computeBoundingBox();
                 geometry.computeBoundingSphere();
 

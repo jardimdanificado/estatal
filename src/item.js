@@ -1,6 +1,6 @@
-import CONFIG from '../data/config/config.js';
-import BLOCK_TYPES from '../data/config/blocks.js';
-import ITEMS from '../data/config/items.js';
+import CONFIG from './rom-config/config.js';
+import BLOCK_TYPES from './rom-config/blocks.js';
+import ITEMS from './rom-config/items.js';
 import { getGroundLevel } from './collision.js';
 
 function getBlockTextureKey(blockType) {

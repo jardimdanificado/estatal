@@ -1,32 +1,23 @@
-import CONFIG from '../data/config/config.js';
-import BLOCK_TYPES from '../data/config/blocks.js';
+import CONFIG from './rom-config/config.js';
+import BLOCK_TYPES from './rom-config/blocks.js';
 import { checkCollision, getGroundLevel } from './collision.js';
-import { getFactionRelation } from '../data/config/factions.js';
+import { getFactionRelation } from './rom-config/factions.js';
 import { alertEntitiesFromShot } from './bullet.js';
-import ITEMS from '../data/config/items.js';
+import ITEMS from './rom-config/items.js';
 import { useItem } from './item.js';
 
 const aiRaycaster = new THREE.Raycaster();
 const VISION_ICONS = {
-    friendly: { seen: 'sensed_friendly', unseen: 'sensed_friendly_unseen' },
-    hostile: { seen: 'sensed_hostile', unseen: 'sensed_hostile_unseen' }
+    friendly: { seen: '🙂', unseen: '😶' },
+    hostile: { seen: '😠', unseen: '👿' }
 };
-const DIRECTION_ICONS = [
-    'arrow_0',
-    'arrow_1',
-    'arrow_2',
-    'arrow_3',
-    'arrow_4',
-    'arrow_5',
-    'arrow_6',
-    'arrow_7'
-];
+const DIRECTION_ICONS = ['⬆', '↗', '➡', '↘', '⬇', '↙', '⬅', '↖'];
 const HP_ICONS = [
-    { threshold: 0.15, key: 'mdam_almost_dead' },
-    { threshold: 0.3, key: 'mdam_severely_damaged' },
-    { threshold: 0.5, key: 'mdam_heavily_damaged' },
-    { threshold: 0.7, key: 'mdam_moderately_damaged' },
-    { threshold: 1.01, key: 'mdam_lightly_damaged' }
+    { threshold: 0.15, emoji: '💀' },
+    { threshold: 0.3, emoji: '😵' },
+    { threshold: 0.5, emoji: '😣' },
+    { threshold: 0.7, emoji: '😐' },
+    { threshold: 1.01, emoji: '🙂' }
 ];
 
 const CONSUMABLE_HEALTH_RATIO = 0.6;
@@ -1263,16 +1254,18 @@ export function updateEntityMesh(world, entity, isPlayerControlled) {
     } else {
         if (!entity.mesh && entity.npcData) {
             const texture = world._internal.blockTextures[entity.npcData.texture];
-            let width = entity.npcData.width;
-            let height = entity.npcData.height;
+            let height = Number.isFinite(entity.npcData.height) ? entity.npcData.height : CONFIG.ENTITY_HEIGHT;
+            let width = Number.isFinite(entity.npcData.width) ? entity.npcData.width : 0.8;
             if (texture && texture.image && texture.image.width && texture.image.height) {
                 const aspect = texture.image.width / texture.image.height;
-                height = entity.npcData.height;
+                height = Number.isFinite(entity.npcData.height) ? entity.npcData.height : CONFIG.ENTITY_HEIGHT;
                 width = height * aspect;
             }
+            if (!Number.isFinite(width) || width <= 0) width = 0.8;
+            if (!Number.isFinite(height) || height <= 0) height = CONFIG.ENTITY_HEIGHT;
             const geometry = new THREE.PlaneGeometry(width, height);
             const material = new THREE.MeshBasicMaterial({
-                map: texture,
+                ...(texture ? { map: texture } : { color: 0xcccccc }),
                 transparent: true,
                 alphaTest: 0.5,
                 side: THREE.DoubleSide
@@ -1285,8 +1278,8 @@ export function updateEntityMesh(world, entity, isPlayerControlled) {
         if (entity.mesh) {
             entity.mesh.visible = true;
             const meshHeight = entity.isCrouching 
-                ? entity.npcData.height * 0.6 
-                : entity.npcData.height / 2;
+                ? (Number.isFinite(entity.npcData.height) ? entity.npcData.height : CONFIG.ENTITY_HEIGHT) * 0.6
+                : (Number.isFinite(entity.npcData.height) ? entity.npcData.height : CONFIG.ENTITY_HEIGHT) / 2;
             entity.mesh.position.set(entity.x, entity.y + meshHeight, entity.z);
             
             // Olha para o alvo se tiver, senão olha para a câmera
@@ -1356,6 +1349,45 @@ function createNameTagMesh(text) {
     return { mesh, texture, width };
 }
 
+function ensureUiIconCache(world) {
+    if (!world._internal.uiIconTextures) {
+        world._internal.uiIconTextures = new Map();
+    }
+    return world._internal.uiIconTextures;
+}
+
+function getUiEmojiTexture(world, emoji, options = {}) {
+    const cache = ensureUiIconCache(world);
+    const size = Number(options.size || 96);
+    const bg = options.bg || 'rgba(0,0,0,0)';
+    const fg = options.fg || '#ffffff';
+    const key = `${emoji}|${size}|${bg}|${fg}`;
+    if (cache.has(key)) return cache.get(key);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, size, size);
+    if (bg !== 'rgba(0,0,0,0)') {
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, size, size);
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${Math.floor(size * 0.74)}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+    ctx.fillStyle = fg;
+    ctx.fillText(emoji, size / 2, size / 2 + 1);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    cache.set(key, texture);
+    return texture;
+}
+
 function ensureIndicatorMeshes(world, entity) {
     if (entity.indicatorGroup) return;
     const group = new THREE.Group();
@@ -1365,28 +1397,30 @@ function ensureIndicatorMeshes(world, entity) {
     const bgSize = 0.45;
     const spriteGeometry = new THREE.PlaneGeometry(spriteSize, spriteSize);
     const bgGeometry = new THREE.PlaneGeometry(bgSize, bgSize);
+    const disabledBaseTexture = world._internal.blockTextures['disabled_base'] || null;
     const bgMaterial = new THREE.MeshBasicMaterial({
-        map: world._internal.blockTextures['disabled_base'],
+        ...(disabledBaseTexture ? { map: disabledBaseTexture } : { color: 0x1a1a1a }),
         transparent: true
     });
     const bgMesh = new THREE.Mesh(bgGeometry, bgMaterial);
     const dirBgMaterial = new THREE.MeshBasicMaterial({
-        map: world._internal.blockTextures['halo'],
+        map: null,
+        color: 0x101010,
         transparent: true
     });
     const dirBgMesh = new THREE.Mesh(bgGeometry, dirBgMaterial);
     const spriteMaterial = new THREE.MeshBasicMaterial({
-        map: world._internal.blockTextures[VISION_ICONS.friendly.unseen],
+        map: getUiEmojiTexture(world, VISION_ICONS.friendly.unseen),
         transparent: true
     });
     const spriteMesh = new THREE.Mesh(spriteGeometry, spriteMaterial);
     const hpMaterial = new THREE.MeshBasicMaterial({
-        map: world._internal.blockTextures[HP_ICONS[HP_ICONS.length - 1].key],
+        map: getUiEmojiTexture(world, HP_ICONS[HP_ICONS.length - 1].emoji),
         transparent: true
     });
     const hpMesh = new THREE.Mesh(spriteGeometry, hpMaterial);
     const dirMaterial = new THREE.MeshBasicMaterial({
-        map: world._internal.blockTextures[DIRECTION_ICONS[0]],
+        map: getUiEmojiTexture(world, DIRECTION_ICONS[0]),
         transparent: true
     });
     const dirMesh = new THREE.Mesh(spriteGeometry, dirMaterial);
@@ -1456,8 +1490,8 @@ function updateEntityIndicators(world, entity) {
     const relation = player ? getFactionRelation(entity.faction, player.faction) : 'hostile';
     const relationKey = relation === 'friendly' ? 'friendly' : 'hostile';
     const seenKey = entity.canSeePlayer ? 'seen' : 'unseen';
-    const iconKey = VISION_ICONS[relationKey][seenKey];
-    const texture = world._internal.blockTextures[iconKey];
+    const iconEmoji = VISION_ICONS[relationKey][seenKey];
+    const texture = getUiEmojiTexture(world, iconEmoji);
     if (texture && entity.statusSpriteMesh.material.map !== texture) {
         entity.statusSpriteMesh.material.map = texture;
         entity.statusSpriteMesh.material.needsUpdate = true;
@@ -1465,21 +1499,21 @@ function updateEntityIndicators(world, entity) {
     const hpMax = entity.maxHP || 1;
     const hp = typeof entity.hp === 'number' ? entity.hp : hpMax;
     const ratio = Math.max(0, Math.min(1, hp / Math.max(1, hpMax)));
-    let hpKey = HP_ICONS[HP_ICONS.length - 1].key;
+    let hpEmoji = HP_ICONS[HP_ICONS.length - 1].emoji;
     for (const entry of HP_ICONS) {
         if (ratio <= entry.threshold) {
-            hpKey = entry.key;
+            hpEmoji = entry.emoji;
             break;
         }
     }
-    const hpTexture = world._internal.blockTextures[hpKey];
+    const hpTexture = getUiEmojiTexture(world, hpEmoji);
     if (hpTexture && entity.hpSpriteMesh.material.map !== hpTexture) {
         entity.hpSpriteMesh.material.map = hpTexture;
         entity.hpSpriteMesh.material.needsUpdate = true;
     }
     const dirIndex = getDirectionIconIndex(entity, player);
-    const dirKey = DIRECTION_ICONS[dirIndex];
-    const dirTexture = world._internal.blockTextures[dirKey];
+    const dirEmoji = DIRECTION_ICONS[dirIndex];
+    const dirTexture = getUiEmojiTexture(world, dirEmoji);
     if (dirTexture && entity.directionSpriteMesh.material.map !== dirTexture) {
         entity.directionSpriteMesh.material.map = dirTexture;
         entity.directionSpriteMesh.material.needsUpdate = true;

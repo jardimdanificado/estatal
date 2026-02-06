@@ -1,89 +1,194 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<title>maquina estatal - no game specified</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>maquina estatal - menu</title>
+<link rel="icon" href="data:,">
 <style>
-    body {
-        margin: 0;
-        background: #87CEEB;
-        overflow: hidden;
-        font-family: 'Courier New', monospace;
-    }
-    canvas {
-        display: block;
-    }
-    #crosshair {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 20px;
-        height: 20px;
-        pointer-events: none;
-    }
-    #crosshair::before,
-    #crosshair::after {
-        content: '';
-        position: absolute;
-        background: white;
-    }
-    #crosshair::before {
-        width: 2px;
-        height: 20px;
-        left: 9px;
-    }
-    #crosshair::after {
-        width: 20px;
-        height: 2px;
-        top: 9px;
-    }
-    #interaction {
-        position: fixed;
-        bottom: 100px;
-        left: 50%;
-        transform: translateX(-50%);
-        color: white;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-        font-size: 16px;
-        font-weight: bold;
-        display: none;
-    }
-    #block-outline {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 60px;
-        height: 60px;
-        border: 3px solid rgba(255, 255, 255, 0.5);
-        pointer-events: none;
-        display: none;
-    }
-    #current-item {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        color: white;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-        font-size: 14px;
-        line-height: 1.5;
-        z-index: 10;
-    }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: #f2f2f2;
+    color: #111;
+    font-family: "Courier New", monospace;
+  }
+  .card {
+    width: min(92vw, 520px);
+    background: #fff;
+    border: 1px solid #cfcfcf;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  h1 {
+    margin: 0 0 10px;
+    font-size: 22px;
+  }
+  p {
+    margin: 0 0 14px;
+    font-size: 14px;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  a.btn {
+    display: inline-block;
+    text-decoration: none;
+    color: #111;
+    border: 1px solid #999;
+    background: #fafafa;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  a.btn:hover {
+    background: #efefef;
+  }
+  button {
+    border: 1px solid #999;
+    background: #fafafa;
+    padding: 9px 12px;
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #efefef;
+  }
+  #rom-note {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #444;
+    word-break: break-all;
+  }
 </style>
 </head>
 <body>
-<div id="crosshair"></div>
-<div id="interaction"></div>
-<div id="block-outline"></div>
-<div id="inventory"></div>
-<div id="current-item">Item: -</div>
+  <main class="card">
+    <h1>maquina estatal</h1>
+    <div class="row">
+      <button id="pick-rom" type="button">Load ROM (.zip)</button>
+      <span id="rom-file-label" style="font-size:12px;color:#444;">Using default: data.zip</span>
+    </div>
+    <div class="actions">
+      <a id="play-link" class="btn" href="./play.html">Play</a>
+      <a id="create-link" class="btn" href="./editor.html">Create</a>
+    </div>
+    <div id="rom-note"></div>
+  </main>
 
-<script>
-    window.__MODE__ = 'integrated';
-</script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script type="module" src="./src/main.js"></script>
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const romParam = params.get('rom');
+      const romRefParam = params.get('romref');
+      const rom = String(romParam == null ? 'data.zip' : romParam).trim();
+      const map = String(params.get('map') || '').trim();
+
+      if (romParam == null && !romRefParam) {
+        const normalized = new URL(window.location.href);
+        normalized.searchParams.set('rom', rom || 'data.zip');
+        if (map) normalized.searchParams.set('map', map);
+        history.replaceState(null, '', normalized.toString());
+      }
+
+      const play = document.getElementById('play-link');
+      const create = document.getElementById('create-link');
+      const note = document.getElementById('rom-note');
+      const pickRomBtn = document.getElementById('pick-rom');
+      const romFileLabel = document.getElementById('rom-file-label');
+      const romFileInput = document.createElement('input');
+      romFileInput.type = 'file';
+      romFileInput.accept = '.zip,application/zip';
+      romFileInput.style.display = 'none';
+      document.body.appendChild(romFileInput);
+      const ROM_DB_NAME = 'rom-file-store';
+      const ROM_STORE_NAME = 'files';
+
+      function openRomDb() {
+        return new Promise((resolve, reject) => {
+          const req = indexedDB.open(ROM_DB_NAME, 1);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(ROM_STORE_NAME)) {
+              db.createObjectStore(ROM_STORE_NAME);
+            }
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error || new Error('indexedDB error'));
+        });
+      }
+
+      async function saveRomBlobToDb(blob) {
+        const db = await openRomDb();
+        const token = (crypto && crypto.randomUUID) ? crypto.randomUUID() : `rom-${Date.now()}`;
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(ROM_STORE_NAME, 'readwrite');
+          tx.objectStore(ROM_STORE_NAME).put(blob, token);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error || new Error('indexedDB write error'));
+        });
+        db.close();
+        return token;
+      }
+
+      function updateLinks(targetRom, targetRomRef) {
+        const nextParams = new URLSearchParams();
+        if (targetRomRef) nextParams.set('romref', targetRomRef);
+        else if (targetRom) nextParams.set('rom', targetRom);
+        if (map) nextParams.set('map', map);
+        const suffix = nextParams.toString() ? `?${nextParams.toString()}` : '';
+        play.href = `./play.html${suffix}`;
+        create.href = `./editor.html${suffix}`;
+        if (targetRomRef) {
+          note.textContent = 'ROM: loaded from local file';
+        } else if (targetRom) {
+          note.textContent = `ROM: ${targetRom}`;
+        } else {
+          note.textContent = 'Sem ROM por URL.';
+        }
+      }
+
+      updateLinks(rom, romRefParam);
+      if (romRefParam) {
+        romFileLabel.textContent = 'Using previously selected local ROM';
+      }
+
+      pickRomBtn.addEventListener('click', () => {
+        romFileInput.value = '';
+        romFileInput.click();
+      });
+
+      romFileInput.addEventListener('change', async () => {
+        const file = romFileInput.files && romFileInput.files[0];
+        if (!file) return;
+        let token = null;
+        try {
+          token = await saveRomBlobToDb(file);
+        } catch (err) {
+          note.textContent = 'Falha ao salvar ROM local no navegador.';
+          console.error(err);
+          return;
+        }
+        updateLinks('', token);
+        romFileLabel.textContent = `Loaded: ${file.name}`;
+        const next = new URL(window.location.href);
+        next.searchParams.delete('rom');
+        next.searchParams.set('romref', token);
+        if (map) next.searchParams.set('map', map);
+        history.replaceState(null, '', next.toString());
+      });
+    })();
+  </script>
 </body>
 </html>

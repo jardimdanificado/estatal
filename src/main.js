@@ -1,13 +1,13 @@
 // ============================================================
 // CONSTANTES E CONFIGURAÇÃO
 // ============================================================
-import CONFIG from "../data/config/config.js"
-import NPC_TYPES from "../data/config/npcs.js"
-import BLOCK_TYPES from "../data/config/blocks.js"
-import ITEMS from "../data/config/items.js"
-import texturesToLoad from "../data/config/textures.js"
+import CONFIG from "./rom-config/config.js"
+import NPC_TYPES from "./rom-config/npcs.js"
+import BLOCK_TYPES from "./rom-config/blocks.js"
+import ITEMS from "./rom-config/items.js"
+import texturesToLoad from "./rom-config/textures.js"
 import { vocabulario } from "../lib/vocabulario.js"
-import { FACTIONS, FACTION_RELATIONS, FACTION_ORDER } from "../data/config/factions.js"
+import { FACTIONS, FACTION_RELATIONS, FACTION_ORDER } from "./rom-config/factions.js"
 import world from "./world.js"
 import { updateEntity, checkInteractionTarget, refreshEntityIndicators } from "./entity.js"
 import { handleInteraction } from './entity.js';
@@ -26,12 +26,14 @@ const ROM_RUNTIME = {
     mapPayload: null,
     mapByName: {},
     textureUrlByKey: {},
+    assetUrlByPath: {},
     objectUrls: []
 };
 
 let TEXTURE_PREVIEW_MAP = {};
 let INVENTORY_ITEM_OPTIONS = [];
 let INVENTORY_BLOCK_OPTIONS = [];
+const GENERATED_UI_TEXTURE_CACHE = new Map();
 
 function replaceObjectContents(target, source) {
     for (const key of Object.keys(target)) delete target[key];
@@ -62,13 +64,36 @@ function normalizeRomPath(path) {
 
 function pickZipFile(zip, candidates) {
     for (const c of candidates) {
-        const file = zip.file(normalizeRomPath(c));
+        const normalized = normalizeRomPath(c);
+        let file = zip.file(normalized);
+        if (!file) {
+            const suffix = `/${normalized}`;
+            file = Object.values(zip.files).find((f) => !f.dir && normalizeRomPath(f.name).endsWith(suffix)) || null;
+        }
         if (file) return file;
     }
     return null;
 }
 
+function findZipEntryByPath(zip, path) {
+    const normalized = normalizeRomPath(path);
+    const variants = [normalized];
+    if (normalized.startsWith('data/')) variants.push(normalized.slice(5));
+    else variants.push(`data/${normalized}`);
+    for (const candidate of variants) {
+        const exact = zip.file(candidate);
+        if (exact) return exact;
+        const suffix = `/${candidate}`;
+        const bySuffix = Object.values(zip.files).find((f) => !f.dir && normalizeRomPath(f.name).endsWith(suffix));
+        if (bySuffix) return bySuffix;
+    }
+    return null;
+}
+
 function resolveTextureLoadUrl(key, fallbackUrl) {
+    if (ROM_RUNTIME.enabled) {
+        return ROM_RUNTIME.textureUrlByKey[key] || null;
+    }
     return ROM_RUNTIME.textureUrlByKey[key] || fallbackUrl;
 }
 
@@ -103,7 +128,55 @@ function refreshCatalogCaches() {
 }
 
 function resolvePreviewTextureUrl(key) {
-    return ROM_RUNTIME.textureUrlByKey[key] || TEXTURE_PREVIEW_MAP[key] || null;
+    if (!key) return null;
+    const romUrl = ROM_RUNTIME.textureUrlByKey[key];
+    if (romUrl) return romUrl;
+    if (isGeneratedUiTextureKey(key)) return getGeneratedUiTextureDataUrl(key);
+    return TEXTURE_PREVIEW_MAP[key] || null;
+}
+
+function isGeneratedUiTextureKey(key) {
+    return key === 'ui_player_face' ||
+        key === 'ui_empty_hand' ||
+        key.startsWith('sensed_') ||
+        key.startsWith('mdam_');
+}
+
+function getGeneratedUiTextureDataUrl(key) {
+    if (GENERATED_UI_TEXTURE_CACHE.has(key)) {
+        return GENERATED_UI_TEXTURE_CACHE.get(key);
+    }
+    const size = key === 'ui_player_face' ? 64 : 16;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const emojiByKey = {
+        ui_player_face: '😀',
+        sensed_friendly: '🙂',
+        sensed_friendly_unseen: '😶',
+        sensed_hostile: '😠',
+        sensed_hostile_unseen: '👿',
+        mdam_almost_dead: '💀',
+        mdam_severely_damaged: '😵',
+        mdam_heavily_damaged: '😣',
+        mdam_moderately_damaged: '😐',
+        mdam_lightly_damaged: '🙂',
+        ui_empty_hand: '✋'
+    };
+    const emoji = emojiByKey[key] || '❔';
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, size, size);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${Math.floor(size * 0.72)}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+    ctx.fillText(emoji, size / 2, size / 2 + 1);
+
+    const dataUrl = canvas.toDataURL('image/png');
+    GENERATED_UI_TEXTURE_CACHE.set(key, dataUrl);
+    return dataUrl;
 }
 
 function getItemTextureKey(itemDef, purpose = 'ui') {
@@ -129,6 +202,23 @@ function getBlockThumbnailTextureKey(blockType) {
         null;
 }
 
+function getPreferredBlockType(...keys) {
+    for (const key of keys) {
+        if (key && BLOCK_TYPES[key]) return BLOCK_TYPES[key];
+    }
+    const first = Object.values(BLOCK_TYPES)[0] || null;
+    return first;
+}
+
+function getPlayerFactionId() {
+    const byUpper = FACTIONS.PLAYER && FACTIONS.PLAYER.id ? FACTIONS.PLAYER.id : null;
+    if (byUpper) return byUpper;
+    const byLower = FACTIONS.player && FACTIONS.player.id ? FACTIONS.player.id : null;
+    if (byLower) return byLower;
+    const first = Object.values(FACTIONS).find((f) => f && typeof f.id === 'string');
+    return first ? first.id : 'neutral';
+}
+
 function revokeRomTextureUrls() {
     for (const url of ROM_RUNTIME.objectUrls) {
         URL.revokeObjectURL(url);
@@ -140,12 +230,12 @@ async function loadRomFromZipFile(file) {
     if (!window.JSZip) throw new Error('JSZip indisponível');
     const zip = await window.JSZip.loadAsync(file);
 
-    const blocksFile = pickZipFile(zip, ['data/config/blocks.js']);
-    const itemsFile = pickZipFile(zip, ['data/config/items.js']);
-    const npcsFile = pickZipFile(zip, ['data/config/npcs.js']);
-    const texturesFile = pickZipFile(zip, ['data/config/textures.js']);
-    const factionsFile = pickZipFile(zip, ['data/config/factions.js']);
-    const mapFile = pickZipFile(zip, ['data/maps/default.json', 'map.json']);
+    const blocksFile = pickZipFile(zip, ['data/config/blocks.js', 'config/blocks.js']);
+    const itemsFile = pickZipFile(zip, ['data/config/items.js', 'config/items.js']);
+    const npcsFile = pickZipFile(zip, ['data/config/npcs.js', 'config/npcs.js']);
+    const texturesFile = pickZipFile(zip, ['data/config/textures.js', 'config/textures.js']);
+    const factionsFile = pickZipFile(zip, ['data/config/factions.js', 'config/factions.js']);
+    const mapFile = pickZipFile(zip, ['data/maps/default.json', 'maps/default.json', 'map.json']);
 
     if (blocksFile) replaceObjectContents(BLOCK_TYPES, parseDefaultExportModule(await blocksFile.async('string')));
     if (itemsFile) replaceObjectContents(ITEMS, parseDefaultExportModule(await itemsFile.async('string')));
@@ -161,25 +251,45 @@ async function loadRomFromZipFile(file) {
 
     revokeRomTextureUrls();
     ROM_RUNTIME.textureUrlByKey = {};
+    ROM_RUNTIME.assetUrlByPath = {};
     for (const tex of texturesToLoad) {
         if (!tex || !tex.key || !tex.url) continue;
         const path = normalizeRomPath(tex.url);
-        const imageFile = zip.file(path);
+        const imageFile = findZipEntryByPath(zip, path);
         if (!imageFile) continue;
         const blob = await imageFile.async('blob');
         const objectUrl = URL.createObjectURL(blob);
         ROM_RUNTIME.textureUrlByKey[tex.key] = objectUrl;
+        ROM_RUNTIME.assetUrlByPath[path] = objectUrl;
+        if (path.startsWith('data/')) {
+            ROM_RUNTIME.assetUrlByPath[path.slice(5)] = objectUrl;
+        } else {
+            ROM_RUNTIME.assetUrlByPath[`data/${path}`] = objectUrl;
+        }
         ROM_RUNTIME.objectUrls.push(objectUrl);
+    }
+
+    const emptyHandPath = 'images/empty-hand.png';
+    if (!ROM_RUNTIME.assetUrlByPath[emptyHandPath]) {
+        const emptyHandFile = findZipEntryByPath(zip, emptyHandPath);
+        if (emptyHandFile) {
+            const emptyHandBlob = await emptyHandFile.async('blob');
+            const emptyHandUrl = URL.createObjectURL(emptyHandBlob);
+            ROM_RUNTIME.assetUrlByPath[emptyHandPath] = emptyHandUrl;
+            ROM_RUNTIME.assetUrlByPath[`data/${emptyHandPath}`] = emptyHandUrl;
+            ROM_RUNTIME.textureUrlByKey['empty-hand'] = ROM_RUNTIME.textureUrlByKey['empty-hand'] || emptyHandUrl;
+            ROM_RUNTIME.objectUrls.push(emptyHandUrl);
+        }
     }
 
     ROM_RUNTIME.mapPayload = null;
     ROM_RUNTIME.mapByName = {};
-    const zipMapFiles = Object.values(zip.files).filter((f) => !f.dir && /^data\/maps\/.+\.json$/i.test(normalizeRomPath(f.name)));
+    const zipMapFiles = Object.values(zip.files).filter((f) => !f.dir && /(?:^|\/)(?:data\/)?maps\/.+\.json$/i.test(normalizeRomPath(f.name)));
     for (const mf of zipMapFiles) {
         try {
             const payload = JSON.parse(await mf.async('string'));
             if (!payload || !Array.isArray(payload.blocks)) continue;
-            const shortName = normalizeRomPath(mf.name).replace(/^data\/maps\//i, '');
+            const shortName = normalizeRomPath(mf.name).replace(/^.*(?:data\/)?maps\//i, '');
             ROM_RUNTIME.mapByName[shortName] = payload;
         } catch {}
     }
@@ -195,9 +305,60 @@ async function loadRomFromZipFile(file) {
     }
     ROM_RUNTIME.mapPayload = ROM_RUNTIME.mapByName['default.json'] || Object.values(ROM_RUNTIME.mapByName)[0] || null;
 
+    const audioMaster = pickZipFile(zip, ['data/audio/Master.bank', 'audio/Master.bank']);
+    const audioStrings = pickZipFile(zip, ['data/audio/Master.strings.bank', 'audio/Master.strings.bank']);
+    if (audioMaster) {
+        const blob = await audioMaster.async('blob');
+        const url = URL.createObjectURL(blob);
+        ROM_RUNTIME.assetUrlByPath['audio/Master.bank'] = url;
+        ROM_RUNTIME.objectUrls.push(url);
+    }
+    if (audioStrings) {
+        const blob = await audioStrings.async('blob');
+        const url = URL.createObjectURL(blob);
+        ROM_RUNTIME.assetUrlByPath['audio/Master.strings.bank'] = url;
+        ROM_RUNTIME.objectUrls.push(url);
+    }
+
     ROM_RUNTIME.enabled = true;
     ROM_RUNTIME.name = file.name;
     refreshCatalogCaches();
+}
+
+async function fetchRomFileFromParam(romParam) {
+    const raw = String(romParam || '').trim();
+    if (!raw || raw === '0') return null;
+    const romUrl = new URL(raw, window.location.href);
+    const response = await fetch(romUrl.toString());
+    if (!response.ok) {
+        throw new Error(`ROM fetch failed: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const fileName = romUrl.pathname.split('/').pop() || 'rom.zip';
+    return new File([blob], fileName, { type: blob.type || 'application/zip' });
+}
+
+async function fetchRomFileFromRef(romRef) {
+    const ref = String(romRef || '').trim();
+    if (!ref) return null;
+    const openReq = indexedDB.open('rom-file-store', 1);
+    const db = await new Promise((resolve, reject) => {
+        openReq.onupgradeneeded = () => {
+            const dbUp = openReq.result;
+            if (!dbUp.objectStoreNames.contains('files')) dbUp.createObjectStore('files');
+        };
+        openReq.onsuccess = () => resolve(openReq.result);
+        openReq.onerror = () => reject(openReq.error || new Error('indexedDB open failed'));
+    });
+    const blob = await new Promise((resolve, reject) => {
+        const tx = db.transaction('files', 'readonly');
+        const req = tx.objectStore('files').get(ref);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error || new Error('indexedDB read failed'));
+    });
+    db.close();
+    if (!blob) return null;
+    return new File([blob], 'rom-from-picker.zip', { type: blob.type || 'application/zip' });
 }
 
 function buildRomPrompt() {
@@ -261,47 +422,27 @@ function buildRomPrompt() {
 
 async function maybeLoadRomAtBoot() {
     const params = new URLSearchParams(window.location.search);
-    const forceBuiltIn = params.get('rom') === '0';
+    const romRef = params.get('romref');
+    const romParamRaw = params.get('rom');
+    const romParam = String(romParamRaw == null ? 'data.zip' : romParamRaw).trim();
+    const forceBuiltIn = romParam === '0';
     if (forceBuiltIn || !window.JSZip) {
         refreshCatalogCaches();
         return;
     }
-
-    await new Promise((resolve) => {
-        const { wrap, loadBtn, skipBtn } = buildRomPrompt();
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.zip,application/zip';
-        input.style.display = 'none';
-        document.body.appendChild(input);
-        document.body.appendChild(wrap);
-
-        const closePrompt = () => {
-            wrap.remove();
-            input.remove();
-            resolve();
-        };
-
-        skipBtn.onclick = () => closePrompt();
-        loadBtn.onclick = () => {
-            input.value = '';
-            input.click();
-        };
-        input.onchange = async () => {
-            const file = input.files && input.files[0];
-            if (!file) return;
-            showLoadingOverlay('Carregando ROM...');
-            try {
-                await loadRomFromZipFile(file);
-            } catch (err) {
-                console.warn('Falha ao carregar ROM:', err);
-            } finally {
-                hideLoadingOverlay();
-                closePrompt();
-            }
-        };
-    });
-
+    showLoadingOverlay('Carregando ROM...');
+    try {
+        const romFile = romRef
+            ? await fetchRomFileFromRef(romRef)
+            : await fetchRomFileFromParam(romParam);
+        if (romFile) {
+            await loadRomFromZipFile(romFile);
+        }
+    } catch (err) {
+        console.warn(`Falha ao carregar ROM (${romRef ? `ref=${romRef}` : romParam}):`, err);
+    } finally {
+        hideLoadingOverlay();
+    }
     refreshCatalogCaches();
 }
 
@@ -431,7 +572,7 @@ async function init() {
 
     await maybeLoadRomAtBoot();
     
-    await initAudio();
+    initAudioOnFirstGesture();
     
     showLoadingOverlay('Carregando texturas...');
     loadTextures(world);
@@ -473,18 +614,29 @@ function setupRenderDebugHotkey(world) {
 async function initAudio() {
     try {
         await audioSystem.init();
-        
-        // Carrega o banco Master
-        await audioSystem.loadBank('./data/audio/Master.bank', true);
-        
-        // Carrega o banco de strings (necessário para resolver nomes de eventos)
-        await audioSystem.loadBank('./data/audio/Master.strings.bank', false);
+        const masterBank = ROM_RUNTIME.assetUrlByPath['audio/Master.bank'];
+        const stringsBank = ROM_RUNTIME.assetUrlByPath['audio/Master.strings.bank'];
+        if (masterBank) await audioSystem.loadBank(masterBank, true);
+        if (stringsBank) await audioSystem.loadBank(stringsBank, false);
         
         console.log('✅ Audio FMOD ready');
     } catch (error) {
         console.warn('⚠️ FMOD não disponível - jogo rodando sem áudio');
         console.warn('Para habilitar áudio: baixe FMOD em https://www.fmod.com/download');
     }
+}
+
+function initAudioOnFirstGesture() {
+    let started = false;
+    const start = async () => {
+        if (started) return;
+        started = true;
+        window.removeEventListener('pointerdown', start);
+        window.removeEventListener('keydown', start);
+        await initAudio();
+    };
+    window.addEventListener('pointerdown', start, { once: true });
+    window.addEventListener('keydown', start, { once: true });
 }
 
 // ============================================================
@@ -513,8 +665,40 @@ function loadTextures(world) {
         }
     }
     
+    function createFallbackTextureForKey(key) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext('2d');
+        const colors = {
+            'stone': '#808080',
+            'grass': '#228B22',
+            'wood': '#8B4513',
+            'dirt': '#654321',
+            'gold': '#FFD700',
+            'door': '#654321',
+            'sand': '#C2B280'
+        };
+        if (ctx) {
+            ctx.fillStyle = colors[key] || '#888888';
+            ctx.fillRect(0, 0, 16, 16);
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        return texture;
+    }
+
     texturesToLoad.forEach(({ key, url }) => {
-        loader.load(resolveTextureLoadUrl(key, url), (tex) => {
+        const loadUrl = resolveTextureLoadUrl(key, url);
+        if (!loadUrl) {
+            world._internal.blockTextures[key] = createFallbackTextureForKey(key);
+            checkLoaded();
+            return;
+        }
+        loader.load(loadUrl, (tex) => {
             tex.magFilter = THREE.NearestFilter;
             tex.minFilter = THREE.NearestFilter;
             tex.wrapS = THREE.RepeatWrapping;
@@ -522,30 +706,7 @@ function loadTextures(world) {
             world._internal.blockTextures[key] = tex;
             checkLoaded();
         }, undefined, () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = 16;
-            canvas.height = 16;
-            const ctx = canvas.getContext('2d');
-            
-            const colors = {
-                'stone': '#808080',
-                'grass': '#228B22',
-                'wood': '#8B4513',
-                'dirt': '#654321',
-                'gold': '#FFD700',
-                'door': '#654321',
-                'sand': '#C2B280'
-            };
-            
-            ctx.fillStyle = colors[key] || '#888888';
-            ctx.fillRect(0, 0, 16, 16);
-            
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.magFilter = THREE.NearestFilter;
-            texture.minFilter = THREE.NearestFilter;
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-            world._internal.blockTextures[key] = texture;
+            world._internal.blockTextures[key] = createFallbackTextureForKey(key);
             checkLoaded();
         });
     });
@@ -572,18 +733,19 @@ async function initWorld(world) {
 
 function createPlayer(world) {
     const isEditor = world.mode === 'editor';
+    const spawnBlockType = getPreferredBlockType('PLAYER_SPAWN', 'GRASS', 'STONE');
     const playerNpcData = {
         texture: 'npc',
         width: 0.8,
         height: 1.6
     };
     const editorInventory = {};
-    if (isEditor) {
-        editorInventory[BLOCK_TYPES.PLAYER_SPAWN.id] = 999;
+    if (isEditor && spawnBlockType) {
+        editorInventory[spawnBlockType.id] = 999;
     }
 
     world.addEntity({
-        name: 'Player',
+        name: 'A.S.S',
         type: 'player',
         x: 7.5,
         y: 2,
@@ -598,16 +760,16 @@ function createPlayer(world) {
             cuscuz: 6,
             pedra: 12
         },
-        selectedBlockType: isEditor ? BLOCK_TYPES.PLAYER_SPAWN : null,
+        selectedBlockType: isEditor ? spawnBlockType : null,
         selectedItem: isEditor
-            ? { kind: 'block', id: BLOCK_TYPES.PLAYER_SPAWN.id }
+            ? { kind: 'block', id: spawnBlockType ? spawnBlockType.id : 0 }
             : { kind: 'empty' },
         entitySpawners: [],
         npcData: playerNpcData,
         hp: isEditor ? 999999 : 100,
         maxHP: isEditor ? 999999 : 100,
-        faction: FACTIONS.PLAYER.id,
-        uiPortrait: './data/images/ui/player-face.png'
+        faction: getPlayerFactionId(),
+        uiPortraitKey: 'ui_player_face'
     });
 }
 
@@ -778,7 +940,7 @@ function ensureHud() {
 
     const playerPhoto = document.createElement('img');
     playerPhoto.id = 'hud-player-photo';
-    playerPhoto.src = './data/images/ui/player-face.png';
+    playerPhoto.src = resolvePreviewTextureUrl('ui_player_face') || getGeneratedUiTextureDataUrl('ui_player_face');
     playerPhoto.alt = 'Foto do jogador';
     playerPhoto.style.width = '68px';
     playerPhoto.style.height = '68px';
@@ -786,6 +948,10 @@ function ensureHud() {
     playerPhoto.style.border = '1px solid rgba(255,255,255,0.45)';
     playerPhoto.style.objectFit = 'cover';
     playerPhoto.style.boxShadow = '0 2px 6px rgba(0,0,0,0.5)';
+    playerPhoto.onerror = () => {
+        const fallback = getGeneratedUiTextureDataUrl('ui_player_face');
+        if (fallback && playerPhoto.src !== fallback) playerPhoto.src = fallback;
+    };
 
     const playerName = document.createElement('div');
     playerName.id = 'hud-player-name';
@@ -907,8 +1073,10 @@ function setWorldMode(world, mode) {
                 player._savedEntitySpawners = Array.isArray(player.entitySpawners) ? [...player.entitySpawners] : [];
             }
             if (!player._editorInventory || player._editorInventoryVersion !== 2) {
+                const editorSpawnBlock = getPreferredBlockType('PLAYER_SPAWN', 'GRASS', 'STONE');
+                const editorSpawnId = editorSpawnBlock && typeof editorSpawnBlock.id === 'number' ? editorSpawnBlock.id : 1;
                 player._editorInventory = {
-                    [BLOCK_TYPES.PLAYER_SPAWN.id]: 999
+                    [editorSpawnId]: 999
                 };
                 player._editorItemInventory = {};
                 player._editorEntitySpawners = [];
@@ -2101,13 +2269,17 @@ function updateEditorMovePreview(world) {
 function buildEditorDefaultMap() {
     const blocks = [];
     const size = 16;
+    const floorType = getPreferredBlockType('GRASS', 'STONE', 'PLAYER_SPAWN');
+    const spawnType = getPreferredBlockType('PLAYER_SPAWN', 'GRASS', 'STONE');
+    const floorTypeId = floorType && typeof floorType.id === 'number' ? floorType.id : 1;
+    const spawnTypeId = spawnType && typeof spawnType.id === 'number' ? spawnType.id : floorTypeId;
     for (let z = 0; z < size; z++) {
         for (let x = 0; x < size; x++) {
             blocks.push({
                 x,
                 y: -0.5,
                 z,
-                typeId: BLOCK_TYPES.GRASS.id,
+                typeId: floorTypeId,
                 isFloor: true
             });
         }
@@ -2116,7 +2288,7 @@ function buildEditorDefaultMap() {
         x: Math.floor(size / 2),
         y: 0.5,
         z: Math.floor(size / 2),
-        typeId: BLOCK_TYPES.PLAYER_SPAWN.id,
+        typeId: spawnTypeId,
         isFloor: false
     });
     return {
@@ -2147,15 +2319,7 @@ async function loadInitialMap(world) {
             return;
         }
     }
-
-    if (requestedMapName && requestedMapName !== 'default.json') {
-        const okRequested = await loadMapFromUrl(world, `./data/maps/${requestedMapName}`, { fallbackToEditorDefault: false });
-        if (okRequested) return;
-    }
-    const okDefault = await loadMapFromUrl(world, './data/maps/default.json', { fallbackToEditorDefault: false });
-    if (!okDefault) {
-        applyMap(world, buildEditorDefaultMap());
-    }
+    applyMap(world, buildEditorDefaultMap());
 }
 
 async function loadMapFromUrl(world, url, options = {}) {
@@ -2223,7 +2387,8 @@ function exportMap(world) {
             z: player.z,
             yaw: player.yaw || 0,
             pitch: player.pitch || 0,
-            portrait: player.uiPortrait || './data/images/ui/player-face.png',
+            name: player.name || 'A.S.S',
+            portraitTextureKey: player.uiPortraitKey || 'ui_player_face',
             inventory: player.inventory || {},
             itemInventory: player.itemInventory || {}
         };
@@ -2272,14 +2437,19 @@ function applyMap(world, payload) {
     let maxX = -Infinity;
     let minZ = Infinity;
     let maxZ = -Infinity;
+    const isFiniteNumber = (n) => Number.isFinite(Number(n));
     for (const entry of payload.blocks) {
+        if (!entry || !isFiniteNumber(entry.x) || !isFiniteNumber(entry.y) || !isFiniteNumber(entry.z)) continue;
         const blockType = Object.values(BLOCK_TYPES).find(bt => bt.id === entry.typeId);
         if (!blockType) continue;
-        world.addBlock(entry.x, entry.y, entry.z, blockType, entry.isFloor);
-        if (entry.x < minX) minX = entry.x;
-        if (entry.x > maxX) maxX = entry.x;
-        if (entry.z < minZ) minZ = entry.z;
-        if (entry.z > maxZ) maxZ = entry.z;
+        const bx = Number(entry.x);
+        const by = Number(entry.y);
+        const bz = Number(entry.z);
+        world.addBlock(bx, by, bz, blockType, entry.isFloor);
+        if (bx < minX) minX = bx;
+        if (bx > maxX) maxX = bx;
+        if (bz < minZ) minZ = bz;
+        if (bz > maxZ) maxZ = bz;
     }
     world.endTerrainBatch();
     if (minX !== Infinity) {
@@ -2290,12 +2460,14 @@ function applyMap(world, payload) {
     
     if (Array.isArray(payload.items)) {
         for (const entry of payload.items) {
+            if (!entry || !isFiniteNumber(entry.x) || !isFiniteNumber(entry.y) || !isFiniteNumber(entry.z)) continue;
+            const pos = { x: Number(entry.x), y: Number(entry.y), z: Number(entry.z) };
             if (entry.kind === 'block') {
                 const blockType = Object.values(BLOCK_TYPES).find(bt => bt.id === entry.blockTypeId);
                 if (!blockType) continue;
-                spawnBlockDrop(world, blockType, entry.amount || 1, { x: entry.x, y: entry.y, z: entry.z });
+                spawnBlockDrop(world, blockType, entry.amount || 1, pos);
             } else if (entry.kind === 'item') {
-                spawnItemDrop(world, entry.itemId, entry.amount || 1, { x: entry.x, y: entry.y, z: entry.z });
+                spawnItemDrop(world, entry.itemId, entry.amount || 1, pos);
             }
         }
     }
@@ -2303,6 +2475,7 @@ function applyMap(world, payload) {
     if (Array.isArray(payload.entities)) {
         for (const entry of payload.entities) {
             if (entry.type !== 'npc') continue;
+            if (!isFiniteNumber(entry.x) || !isFiniteNumber(entry.y) || !isFiniteNumber(entry.z)) continue;
             const npcType = getNpcTypeById(entry.npcTypeId);
             let entity = null;
             if (npcType) {
@@ -2311,7 +2484,7 @@ function applyMap(world, payload) {
                 entity = createNpcEntity(
                     world,
                     npcType,
-                    { x: entry.x, y: entry.y, z: entry.z },
+                    { x: Number(entry.x), y: Number(entry.y), z: Number(entry.z) },
                     entry.name || null,
                     entry.faction || null,
                     {
@@ -2331,7 +2504,11 @@ function applyMap(world, payload) {
         }
     }
     
-    let spawnBlock = world.blocks.find((block) => block.type && block.type.id === BLOCK_TYPES.PLAYER_SPAWN.id);
+    const spawnType = getPreferredBlockType('PLAYER_SPAWN', 'GRASS', 'STONE');
+    const spawnTypeId = spawnType && typeof spawnType.id === 'number' ? spawnType.id : null;
+    let spawnBlock = spawnTypeId == null
+        ? null
+        : world.blocks.find((block) => block.type && block.type.id === spawnTypeId);
     if (spawnBlock) {
         world._internal.mapCenter = { x: spawnBlock.x, z: spawnBlock.z };
     } else if (payload.player) {
@@ -2360,8 +2537,15 @@ function applyMap(world, payload) {
         if (payload.player.itemInventory && typeof payload.player.itemInventory === 'object') {
             player.itemInventory = { ...payload.player.itemInventory };
         }
+        if (typeof payload.player.portraitTextureKey === 'string' && payload.player.portraitTextureKey.trim()) {
+            player.uiPortraitKey = payload.player.portraitTextureKey;
+        }
+        if (typeof payload.player.name === 'string' && payload.player.name.trim()) {
+            player.name = payload.player.name.trim();
+        }
         if (typeof payload.player.portrait === 'string' && payload.player.portrait.trim()) {
-            player.uiPortrait = payload.player.portrait;
+            // backward compatibility with old maps (path-based portrait)
+            if (!player.uiPortraitKey) player.uiPortraitKey = 'ui_player_face';
         }
     }
 }
@@ -2580,6 +2764,7 @@ function updateHud(world) {
     const hudText = document.getElementById('hud-text');
     const hudPreview = document.getElementById('hud-item-preview');
     const hudPhoto = document.getElementById('hud-player-photo');
+    const hudName = document.getElementById('hud-player-name');
     if (!hud || !hudText || !hudPreview) return;
     if (world.mode !== 'game') {
         hud.style.display = 'none';
@@ -2592,12 +2777,15 @@ function updateHud(world) {
     if (!player) {
         hudText.textContent = 'HP: -\nItem: -\nCoins: -';
         hudPreview.style.backgroundImage = 'none';
-        if (hudPhoto) hudPhoto.src = './data/images/ui/player-face.png';
+        if (hudPhoto) hudPhoto.src = resolvePreviewTextureUrl('ui_player_face') || getGeneratedUiTextureDataUrl('ui_player_face');
+        if (hudName) hudName.textContent = 'A.S.S';
         updateHandOverlay(world, null);
         return;
     }
+    if (hudName) hudName.textContent = String(player.name || 'A.S.S');
     if (hudPhoto) {
-        hudPhoto.src = player.uiPortrait || './data/images/ui/player-face.png';
+        const portraitKey = player.uiPortraitKey || 'ui_player_face';
+        hudPhoto.src = resolvePreviewTextureUrl(portraitKey) || getGeneratedUiTextureDataUrl('ui_player_face');
     }
     
     const hpMax = player.maxHP || 0;
@@ -2681,7 +2869,12 @@ function updateHandOverlay(world, player) {
         }
     }
     const handUrl = resolvePreviewTextureUrl(handKey);
-    const finalUrl = handUrl || (useEmptyHand ? './data/images/empty-hand.png' : null);
+    const emptyHandUrl = resolvePreviewTextureUrl('empty-hand') ||
+        ROM_RUNTIME.assetUrlByPath['images/empty-hand.png'] ||
+        ROM_RUNTIME.assetUrlByPath['data/images/empty-hand.png'] ||
+        resolvePreviewTextureUrl('empty_hand') ||
+        resolvePreviewTextureUrl('ui_empty_hand');
+    const finalUrl = handUrl || (useEmptyHand ? (emptyHandUrl || getGeneratedUiTextureDataUrl('ui_empty_hand')) : null);
     if (finalUrl) {
         handImg.src = finalUrl;
         hand.style.display = 'block';
