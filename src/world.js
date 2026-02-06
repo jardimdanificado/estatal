@@ -60,7 +60,8 @@ export default {
         chunkGroups: new Map(),
         blockSpatialHash: new Map(),
         terrainRootGroup: null,
-        lastRebuiltChunks: null
+        lastRebuiltChunks: null,
+        onTerrainReady: null
     },
 
     recalculateMapBounds() {
@@ -303,6 +304,11 @@ export default {
             }
 
             this._internal.terrainBuilding = false;
+            if (this._internal.onTerrainReady) {
+                const cb = this._internal.onTerrainReady;
+                this._internal.onTerrainReady = null;
+                cb();
+            }
             if (this._internal.terrainDirty || this._internal.dirtyChunks.size > 0) {
                 this.scheduleTerrainRebuild();
             }
@@ -588,6 +594,11 @@ export default {
         this.applyChunkResults(results, chunksToRebuild);
         this._internal.lastRebuiltChunks = null;
         this._internal.terrainBuilding = false;
+        if (this._internal.onTerrainReady) {
+            const cb = this._internal.onTerrainReady;
+            this._internal.onTerrainReady = null;
+            cb();
+        }
     },
     applyTerrainResult(results) {
         this.disposeTerrainGroup();

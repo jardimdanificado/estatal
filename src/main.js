@@ -266,9 +266,11 @@ function loadTextures(world) {
     function checkLoaded() {
         loaded++;
         if (loaded === total) {
-            hideLoadingOverlay();
             world._internal.texturesLoaded = true;
-            initWorld(world);
+            showLoadingOverlay('Gerando terreno…');
+            initWorld(world).then(() => {
+                hideLoadingOverlay();
+            });
         }
     }
     
@@ -322,6 +324,11 @@ async function initWorld(world) {
         await loadInitialMap(world);
     }
     updateCurrentItemLabel(world);
+    if (world._internal.useTerrainMesh && (world._internal.terrainBuilding || world._internal.dirtyChunks.size > 0 || world._internal.terrainBuildTimer)) {
+        await new Promise((resolve) => {
+            world._internal.onTerrainReady = resolve;
+        });
+    }
 }
 
 function createPlayer(world) {
