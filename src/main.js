@@ -115,7 +115,97 @@ function resolveTextureLoadUrl(key, fallbackUrl) {
     return null;
 }
 
+function blockTypeLooksLikeDoor(blockType) {
+    if (!blockType || typeof blockType !== 'object') return false;
+    if (blockType.isDoor === true || blockType.door === true) return true;
+    const name = String(blockType.name || '').toLowerCase();
+    const key = String(blockType.key || '').toLowerCase();
+    const textures = blockType.textures && typeof blockType.textures === 'object'
+        ? Object.values(blockType.textures).map((v) => String(v || '').toLowerCase()).join(' ')
+        : '';
+    const hints = `${name} ${key} ${textures}`;
+    return hints.includes('door') || hints.includes('porta');
+}
+
+function usesLegacyDoorGrouping(onUseFn) {
+    if (typeof onUseFn !== 'function') return false;
+    const src = String(onUseFn).replace(/\s+/g, ' ');
+    return src.includes('onUse === DOOR_USE') || src.includes('onUse === block.type.onUse');
+}
+
+function applyDoorVisualState(targetBlock, solid) {
+    if (!targetBlock || !targetBlock.mesh) return;
+    const mats = Array.isArray(targetBlock.mesh.material)
+        ? targetBlock.mesh.material
+        : (targetBlock.mesh.material ? [targetBlock.mesh.material] : []);
+    for (const mat of mats) {
+        if (!mat) continue;
+        if ('opacity' in mat) mat.opacity = solid ? (targetBlock.type.opacity ?? 1) : 0.35;
+        if ('transparent' in mat) mat.transparent = (mat.opacity ?? 1) < 1;
+    }
+}
+
+const SHARED_DOOR_TOGGLE_ON_USE = function (world, block, creature) {
+    const worldBlocks = world && Array.isArray(world.blocks) ? world.blocks : [];
+    if (!worldBlocks.length || !block || !block.userData) return;
+    const isOpening = !!block.userData.solid;
+    const targetSolid = !isOpening;
+    const EPS = 0.01;
+    const isAt = (b, x, y, z) =>
+        Math.abs(b.x - x) < EPS &&
+        Math.abs(b.y - y) < EPS &&
+        Math.abs(b.z - z) < EPS;
+    const isDoorBlock = (b) => {
+        if (!b || !b.type) return false;
+        const hasUse = !!(b.hasUseFunction || typeof b.type.onUse === 'function');
+        return hasUse && blockTypeLooksLikeDoor(b.type);
+    };
+
+    const visited = new Set();
+    const queue = [{ x: block.userData.x, y: block.userData.y, z: block.userData.z }];
+    while (queue.length > 0) {
+        const current = queue.shift();
+        const cellKey = `${current.x},${current.y},${current.z}`;
+        if (visited.has(cellKey)) continue;
+        visited.add(cellKey);
+
+        const targetBlock = worldBlocks.find((b) => isAt(b, current.x, current.y, current.z) && isDoorBlock(b));
+        if (!targetBlock) continue;
+        targetBlock.solid = targetSolid;
+        if (isAt({ x: block.userData.x, y: block.userData.y, z: block.userData.z }, current.x, current.y, current.z)) {
+            block.userData.solid = targetSolid;
+        }
+        applyDoorVisualState(targetBlock, targetSolid);
+
+        queue.push(
+            { x: current.x + 1, y: current.y, z: current.z },
+            { x: current.x - 1, y: current.y, z: current.z },
+            { x: current.x, y: current.y, z: current.z + 1 },
+            { x: current.x, y: current.y, z: current.z - 1 },
+            { x: current.x, y: current.y + 1, z: current.z },
+            { x: current.x, y: current.y - 1, z: current.z }
+        );
+    }
+    if (world && typeof world.markTerrainDirty === 'function') {
+        world.markTerrainDirty();
+    }
+};
+
+function normalizeLegacyDoorScriptsInBlockTypes() {
+    const candidates = Object.values(BLOCK_TYPES || {}).filter((bt) =>
+        bt &&
+        typeof bt.onUse === 'function' &&
+        blockTypeLooksLikeDoor(bt) &&
+        usesLegacyDoorGrouping(bt.onUse)
+    );
+    if (!candidates.length) return;
+    for (const blockType of candidates) {
+        blockType.onUse = SHARED_DOOR_TOGGLE_ON_USE;
+    }
+}
+
 function refreshCatalogCaches() {
+    normalizeLegacyDoorScriptsInBlockTypes();
     const textureEntries = Array.isArray(texturesToLoad) ? texturesToLoad : [];
     TEXTURE_PREVIEW_MAP = textureEntries.reduce((map, entry) => {
         map[entry.key] = entry.url;

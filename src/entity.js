@@ -110,6 +110,22 @@ function createItemProjectileMesh(world, itemDef) {
     return new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0xffffff }));
 }
 
+function invokeBlockUseWithLegacyScope(world, target, blockAdapter, actor) {
+    const onUse = target && target.type ? target.type.onUse : null;
+    if (typeof onUse !== 'function') return;
+    const root = globalThis;
+    const hadDoorUse = Object.prototype.hasOwnProperty.call(root, 'DOOR_USE');
+    const previousDoorUse = root.DOOR_USE;
+    try {
+        // Compat: antigos scripts exportados referenciam DOOR_USE como global.
+        root.DOOR_USE = onUse;
+        onUse(world, blockAdapter, actor);
+    } finally {
+        if (hadDoorUse) root.DOOR_USE = previousDoorUse;
+        else delete root.DOOR_USE;
+    }
+}
+
 
 
 
@@ -146,7 +162,7 @@ export function handleInteraction(world, target) {
         };
         
         // Passa world, block e entity que ativou
-        target.type.onUse(world, blockAdapter, player);
+        invokeBlockUseWithLegacyScope(world, target, blockAdapter, player);
         target.solid = blockAdapter.userData.solid;
     } 
     else if (target.onInteract) {
@@ -569,7 +585,7 @@ function useBlock(world, target, entity) {
         }
     };
     
-    target.type.onUse(world, blockAdapter, entity);
+    invokeBlockUseWithLegacyScope(world, target, blockAdapter, entity);
     target.solid = blockAdapter.userData.solid;
 }
 
