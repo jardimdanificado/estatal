@@ -50,10 +50,11 @@ export default {
         mapBounds: null,
         fx: [],
         terrainGroup: null,
-        terrainWorker: null,
+        terrainWorkers: [],
         terrainWorkerFailed: false,
         terrainBuildId: 0,
         terrainBuilding: false,
+        terrainPendingResults: 0,
         terrainDirty: false,
         terrainBuildTimer: null,
         terrainBuildDelay: 50,
@@ -274,49 +275,129 @@ export default {
             }
         }
     },
-    ensureTerrainWorker() {
-        if (this._internal.terrainWorkerFailed) return null;
-        if (this._internal.terrainWorker) return this._internal.terrainWorker;
-        if (typeof Worker === 'undefined') return null;
-        let worker = null;
-        try {
-            worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
-        } catch (error) {
-            this._internal.terrainWorkerFailed = true;
-            return null;
+    ensureTerrainWorkers() {
+        if (this._internal.terrainWorkerFailed) return [];
+        if (this._internal.terrainWorkers.length > 0) return this._internal.terrainWorkers;
+        if (typeof Worker === 'undefined') return [];
+
+        const poolSize = Math.max(1, Math.min(4,
+            Math.floor((typeof navigator !== 'undefined' && navigator.hardwareConcurrency || 2) / 2)));
+        const workers = [];
+        const self = this;
+
+        for (let i = 0; i < poolSize; i++) {
+            let worker;
+            try {
+                worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
+            } catch (error) {
+                if (workers.length === 0) {
+                    this._internal.terrainWorkerFailed = true;
+                    return [];
+                }
+                break;
+            }
+
+            worker.onmessage = (event) => {
+                const payload = event.data;
+                if (!payload || payload.id !== self._internal.terrainBuildId) return;
+
+                if (payload.type === 'result') {
+                    self.applyTerrainResult(payload.results || []);
+                } else if (payload.type === 'chunkResult') {
+                    self._applyPartialChunkResults(payload.results || []);
+                }
+
+                self._internal.terrainPendingResults--;
+                if (self._internal.terrainPendingResults <= 0) {
+                    self._internal.terrainPendingResults = 0;
+                    self._internal.terrainBuilding = false;
+                    const rebuilt = self._internal.lastRebuiltChunks;
+                    if (rebuilt) {
+                        for (const ck of rebuilt) {
+                            if (self._internal.dirtyChunks.has(ck)) continue;
+                            const set = self._internal.chunkMap.get(ck);
+                            if (!set || set.size === 0) {
+                                self.disposeChunkGroup(ck);
+                            }
+                        }
+                        self._internal.lastRebuiltChunks = null;
+                    }
+                    if (self._internal.onTerrainReady) {
+                        const cb = self._internal.onTerrainReady;
+                        self._internal.onTerrainReady = null;
+                        cb();
+                    }
+                    if (self._internal.terrainDirty || self._internal.dirtyChunks.size > 0) {
+                        self.scheduleTerrainRebuild();
+                    }
+                }
+            };
+
+            worker.onerror = () => {
+                self._internal.terrainPendingResults--;
+                if (self._internal.terrainPendingResults <= 0) {
+                    self._internal.terrainBuilding = false;
+                }
+                for (const w of self._internal.terrainWorkers) {
+                    try { w.terminate(); } catch (e) {}
+                }
+                self._internal.terrainWorkerFailed = true;
+                self._internal.terrainWorkers = [];
+                self._internal.terrainDirty = true;
+                self.scheduleTerrainRebuild();
+            };
+
+            workers.push(worker);
         }
-        worker.onmessage = (event) => {
-            const payload = event.data;
-            if (!payload) return;
-            if (payload.id !== this._internal.terrainBuildId) return;
 
-            if (payload.type === 'result') {
-                this.applyTerrainResult(payload.results || []);
-            } else if (payload.type === 'chunkResult') {
-                const rebuiltChunks = this._internal.lastRebuiltChunks;
-                this.applyChunkResults(payload.results || [], rebuiltChunks);
-                this._internal.lastRebuiltChunks = null;
+        this._internal.terrainWorkers = workers;
+        return workers;
+    },
+    _applyPartialChunkResults(results) {
+        if (!this._internal.scene) return;
+        if (!this._internal.terrainRootGroup) {
+            const root = new THREE.Group();
+            root.name = 'terrain-root';
+            this._internal.scene.add(root);
+            this._internal.terrainRootGroup = root;
+            this._internal.terrainGroup = root;
+        }
+        for (const chunkResult of results) {
+            const ck = chunkResult.chunkKey;
+            // Dispose old chunk only when its replacement is ready (prevents blink)
+            this.disposeChunkGroup(ck);
+            const chunkGroup = new THREE.Group();
+            chunkGroup.name = 'chunk-' + ck;
+            for (const meshData of chunkResult.meshes) {
+                if (!meshData || !isNumericSequence(meshData.positions) || !meshData.positions.length) continue;
+                if (meshData.positions.length % 3 !== 0) continue;
+                if (meshData.positions[0] !== meshData.positions[0]) continue;
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
+                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(
+                    isNumericSequence(meshData.normals) && meshData.normals.length === meshData.positions.length
+                        ? meshData.normals
+                        : new Array(meshData.positions.length).fill(0),
+                    3
+                ));
+                const uvArray = isNumericSequence(meshData.uvs) && meshData.uvs.length === (meshData.positions.length / 3) * 2
+                    ? meshData.uvs
+                    : new Array((meshData.positions.length / 3) * 2).fill(0);
+                geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvArray, 2));
+                geometry.computeBoundingBox();
+                geometry.computeBoundingSphere();
+                const blockType = Object.values(BLOCK_TYPES).find((b) => b.id === meshData.typeId);
+                const material = this.createTerrainMaterial(blockType || {});
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.receiveShadow = true;
+                mesh.castShadow = false;
+                mesh.frustumCulled = true;
+                mesh.userData.blockTypeId = meshData.typeId;
+                chunkGroup.add(mesh);
             }
-
-            this._internal.terrainBuilding = false;
-            if (this._internal.onTerrainReady) {
-                const cb = this._internal.onTerrainReady;
-                this._internal.onTerrainReady = null;
-                cb();
-            }
-            if (this._internal.terrainDirty || this._internal.dirtyChunks.size > 0) {
-                this.scheduleTerrainRebuild();
-            }
-        };
-        worker.onerror = () => {
-            this._internal.terrainBuilding = false;
-            this._internal.terrainWorkerFailed = true;
-            this._internal.terrainWorker = null;
-            this._internal.terrainDirty = true;
-            this.scheduleTerrainRebuild();
-        };
-        this._internal.terrainWorker = worker;
-        return worker;
+            this._internal.terrainRootGroup.add(chunkGroup);
+            this._internal.chunkGroups.set(ck, chunkGroup);
+        }
     },
     addBlockToChunk(block) {
         const ck = chunkKey(block.x, block.y, block.z);
@@ -530,17 +611,19 @@ export default {
                 continue;
             }
 
+            // Pack blocks as flat arrays per type (4 floats per block: x,y,z,dmg)
             const grouped = new Map();
             for (const block of contextBlocks) {
                 const typeId = block.type ? block.type.id : 'unknown';
                 if (!grouped.has(typeId)) grouped.set(typeId, []);
                 const dmg = (block.maxHP > 0) ? 1 - block.hp / block.maxHP : 0;
-                grouped.get(typeId).push({ x: block.x, y: block.y, z: block.z, dmg });
+                grouped.get(typeId).push(block.x, block.y, block.z, dmg);
             }
 
             const groups = [];
-            for (const [typeId, list] of grouped.entries()) {
-                groups.push({ typeId, blocks: list });
+            for (const [typeId, flatList] of grouped.entries()) {
+                const packed = new Float32Array(flatList);
+                groups.push({ typeId, blocks: packed });
             }
 
             const clipMin = [
@@ -564,12 +647,34 @@ export default {
 
         this._internal.lastRebuiltChunks = chunksToRebuild;
 
-        const worker = this.ensureTerrainWorker();
-        if (worker) {
-            worker.postMessage({ type: 'buildChunks', id: buildId, chunks: chunkPayloads, options });
+        const workers = this.ensureTerrainWorkers();
+        if (workers.length > 0) {
+            // Distribute chunks across worker pool
+            const workerCount = Math.min(workers.length, chunkPayloads.length);
+            this._internal.terrainPendingResults = workerCount;
+
+            for (let wi = 0; wi < workerCount; wi++) {
+                const batch = [];
+                const transfers = [];
+                // Round-robin distribution for balanced load
+                for (let ci = wi; ci < chunkPayloads.length; ci += workerCount) {
+                    const chunk = chunkPayloads[ci];
+                    batch.push(chunk);
+                    for (const group of chunk.groups) {
+                        if (group.blocks.buffer) {
+                            transfers.push(group.blocks.buffer);
+                        }
+                    }
+                }
+                workers[wi].postMessage(
+                    { type: 'buildChunks', id: buildId, chunks: batch, options },
+                    transfers
+                );
+            }
             return;
         }
 
+        // Main-thread fallback (no workers available)
         const results = [];
         for (const chunk of chunkPayloads) {
             const chunkOpts = Object.assign({}, options, {
@@ -605,7 +710,7 @@ export default {
         for (const result of results) {
             if (!result || !isNumericSequence(result.positions) || !result.positions.length) continue;
             if (result.positions.length % 3 !== 0) continue;
-            if (!Array.from(result.positions).every((v) => Number.isFinite(v))) continue;
+            if (result.positions[0] !== result.positions[0]) continue;
             const geometry = new THREE.BufferGeometry();
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(result.positions, 3));
             geometry.setAttribute('normal', new THREE.Float32BufferAttribute(
@@ -659,7 +764,7 @@ export default {
             for (const meshData of chunkResult.meshes) {
                 if (!meshData || !isNumericSequence(meshData.positions) || !meshData.positions.length) continue;
                 if (meshData.positions.length % 3 !== 0) continue;
-                if (!Array.from(meshData.positions).every((v) => Number.isFinite(v))) continue;
+                if (meshData.positions[0] !== meshData.positions[0]) continue;
                 const geometry = new THREE.BufferGeometry();
                 geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.positions, 3));
                 geometry.setAttribute('normal', new THREE.Float32BufferAttribute(
