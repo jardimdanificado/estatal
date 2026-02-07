@@ -40,6 +40,7 @@ let ROM_AUDIO_CONFIG = {
     banks: [],
     events: {}
 };
+let ROM_INVENTORY_PRESETS = {};
 
 function replaceObjectContents(target, source) {
     for (const key of Object.keys(target)) delete target[key];
@@ -351,6 +352,7 @@ async function loadRomFromZipFile(file) {
     const factionsFile = pickZipFile(zip, ['data/config/factions.js', 'config/factions.js']);
     const uiLayoutFile = pickZipFile(zip, ['data/config/ui-layout.js', 'config/ui-layout.js']);
     const audioConfigFile = pickZipFile(zip, ['data/config/audio.json', 'config/audio.json']);
+    const presetsFile = pickZipFile(zip, ['data/config/inventory-presets.json', 'config/inventory-presets.json']);
     const mapFile = pickZipFile(zip, ['data/maps/default.json', 'maps/default.json', 'map.json']);
 
     if (blocksFile) replaceObjectContents(BLOCK_TYPES, parseDefaultExportModule(await blocksFile.async('string')));
@@ -390,6 +392,15 @@ async function loadRomFromZipFile(file) {
             };
         } catch {
             ROM_AUDIO_CONFIG = { banks: [], events: {} };
+        }
+    }
+    ROM_INVENTORY_PRESETS = {};
+    if (presetsFile) {
+        try {
+            const parsedPresets = JSON.parse(await presetsFile.async('string'));
+            ROM_INVENTORY_PRESETS = parsedPresets && typeof parsedPresets === 'object' ? parsedPresets : {};
+        } catch {
+            ROM_INVENTORY_PRESETS = {};
         }
     }
 
@@ -1786,7 +1797,43 @@ function createPlayer(world) {
 
 function createNpcEntity(world, npcType, position, nameOverride = null, factionOverride = null, options = {}) {
     const entityName = nameOverride ? ensureUniqueName(world, nameOverride) : generateUniqueName(world);
-    const inventory = {};
+    const normalizeInventoryObject = (obj) => {
+        const out = {};
+        if (!obj || typeof obj !== 'object') return out;
+        for (const [k, v] of Object.entries(obj)) {
+            const qty = Math.max(0, Math.floor(Number(v) || 0));
+            if (!qty) continue;
+            out[String(k)] = qty;
+        }
+        return out;
+    };
+    const getFactionDefaultPresetKey = (factionId) => {
+        const id = String(factionId || '').trim();
+        if (!id) return '';
+        const factionEntry = Object.values(FACTIONS || {}).find((f) => f && String(f.id || '') === id) || null;
+        if (!factionEntry) return '';
+        return String(factionEntry.defaultInventoryPresetKey || '').trim();
+    };
+    const getNpcDefaultPresetKey = () => {
+        const byNpc = String(npcType && npcType.defaultInventoryPresetKey || '').trim();
+        if (byNpc) return byNpc;
+        return getFactionDefaultPresetKey(factionOverride || npcType.faction || 'neutral');
+    };
+    const getPresetPayload = (presetKey) => {
+        const key = String(presetKey || '').trim();
+        if (!key) return null;
+        const preset = ROM_INVENTORY_PRESETS && ROM_INVENTORY_PRESETS[key];
+        if (!preset || typeof preset !== 'object') return null;
+        return {
+            inventory: normalizeInventoryObject(preset.inventory),
+            itemInventory: normalizeInventoryObject(preset.itemInventory)
+        };
+    };
+
+    const hasInventoryOverride = options.inventory && typeof options.inventory === 'object';
+    const hasItemInventoryOverride = options.itemInventory && typeof options.itemInventory === 'object';
+    const defaultPreset = getPresetPayload(getNpcDefaultPresetKey());
+    const inventory = (!hasInventoryOverride && defaultPreset) ? { ...(defaultPreset.inventory || {}) } : {};
     if (npcType.inventory && typeof npcType.inventory === 'object') {
         Object.assign(inventory, npcType.inventory);
     } else if (npcType.blockDrops && typeof npcType.blockDrops === 'object') {
@@ -1798,12 +1845,17 @@ function createNpcEntity(world, npcType, position, nameOverride = null, factionO
             inventory[blockType.id] = qty;
         }
     }
-    if (options.inventory && typeof options.inventory === 'object') {
+    if (hasInventoryOverride) {
         Object.assign(inventory, options.inventory);
     }
-    const itemInventory = options.itemInventory && typeof options.itemInventory === 'object'
-        ? { ...options.itemInventory }
-        : (npcType.itemDrops || npcType.itemInventory || {});
+    const itemInventory = (!hasItemInventoryOverride && defaultPreset) ? { ...(defaultPreset.itemInventory || {}) } : {};
+    const npcItemBase = npcType.itemDrops || npcType.itemInventory || {};
+    if (npcItemBase && typeof npcItemBase === 'object') {
+        Object.assign(itemInventory, normalizeInventoryObject(npcItemBase));
+    }
+    if (hasItemInventoryOverride) {
+        Object.assign(itemInventory, normalizeInventoryObject(options.itemInventory));
+    }
     const disableFallback = options && options.disableInventoryFallback;
     if (!Object.keys(inventory).length && !disableFallback) {
         const faction = factionOverride || npcType.faction || 'neutral';
